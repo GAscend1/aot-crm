@@ -19,7 +19,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,15 +42,34 @@ jobs:
           cp -r .next/server .next/standalone/.next/
           cp .next/BUILD_ID .next/standalone/.next/
 
+          if [ -f .next/package.json ]; then
+            cp .next/package.json .next/standalone/.next/
+          fi
+
           if [ -d public ]; then
             cp -r public .next/standalone/
           fi
+
+      - name: Verify Next.js build
+        run: |
+          echo "========== ROOT .NEXT =========="
+          ls -la .next
+          echo ""
+          echo "========== STANDALONE =========="
+          ls -la .next/standalone
+          echo ""
+          echo "========== STANDALONE .NEXT =========="
+          ls -la .next/standalone/.next
+          echo ""
+          echo "========== BUILD_ID =========="
+          cat .next/standalone/.next/BUILD_ID
 
       - name: Upload standalone artifact
         uses: actions/upload-artifact@v4
         with:
           name: app
           path: .next/standalone
+          include-hidden-files: true
 
   deploy:
     runs-on: ubuntu-latest
@@ -60,6 +80,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: app
+
+      - name: Verify downloaded artifact
+        run: |
+          echo "========== DOWNLOADED FILES =========="
+          ls -la
+          echo ""
+          echo "========== DOWNLOADED .NEXT =========="
+          ls -la .next || true
+          echo ""
+          find . -maxdepth 3
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
