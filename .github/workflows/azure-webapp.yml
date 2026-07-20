@@ -36,8 +36,14 @@ jobs:
       - name: Prepare standalone package
         run: |
           mkdir -p .next/standalone/.next
+
           cp -r .next/static .next/standalone/.next/
-          cp -r public .next/standalone/
+          cp -r .next/server .next/standalone/.next/
+          cp .next/BUILD_ID .next/standalone/.next/
+
+          if [ -d public ]; then
+            cp -r public .next/standalone/
+          fi
 
       - name: Upload standalone artifact
         uses: actions/upload-artifact@v4
