@@ -33,11 +33,17 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Upload artifact
+      - name: Prepare standalone package
+        run: |
+          mkdir -p .next/standalone/.next
+          cp -r .next/static .next/standalone/.next/
+          cp -r public .next/standalone/
+
+      - name: Upload standalone artifact
         uses: actions/upload-artifact@v4
         with:
           name: app
-          path: .
+          path: .next/standalone
 
   deploy:
     runs-on: ubuntu-latest
