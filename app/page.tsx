@@ -16,7 +16,7 @@ export default function Home() {
         {/* Logo */}
         <div className="flex justify-center">
           <Image
-            src="/Ali_logo.png"
+            src="/logo.png"
             alt="AOT Logo"
             width={90}
             height={90}
