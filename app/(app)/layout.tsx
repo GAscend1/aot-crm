@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppNavbar } from "@/components/layout/AppNavbar";
+import { SidebarProvider } from "@/components/layout/SidebarProvider";
 
 export default async function DashboardLayout({
   children,
@@ -17,11 +18,13 @@ export default async function DashboardLayout({
   }
 
   return (
-    <AppShell
-      sidebar={<AppSidebar />}
-      navbar={<AppNavbar />}
-    >
-      {children}
-    </AppShell>
+    <SidebarProvider>
+      <AppShell
+        sidebar={<AppSidebar />}
+        navbar={<AppNavbar />}
+      >
+        {children}
+      </AppShell>
+    </SidebarProvider>
   );
 }

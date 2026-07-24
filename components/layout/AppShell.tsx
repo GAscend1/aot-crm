@@ -1,8 +1,9 @@
 "use client";
 
 import { ReactNode } from "react";
-import { useSidebar } from "@/hooks/useSidebar";
 import clsx from "clsx";
+
+import { useSidebar } from "@/components/layout/SidebarProvider";
 
 interface AppShellProps {
   sidebar: ReactNode;
@@ -23,16 +24,16 @@ export function AppShell({
         className={clsx(
           "grid min-h-screen transition-all duration-300",
           collapsed
-            ? "lg:grid-cols-[72px_1fr]"
-            : "lg:grid-cols-[260px_1fr]"
+            ? "lg:grid-cols-[72px_minmax(0,1fr)]"
+            : "lg:grid-cols-[260px_minmax(0,1fr)]"
         )}
       >
         {sidebar}
 
-        <div className="flex flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-col">
           {navbar}
 
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 min-w-0 overflow-auto p-6">
             {children}
           </main>
         </div>

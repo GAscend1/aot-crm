@@ -1,0 +1,36 @@
+import { Customer } from "./types";
+
+export const customers: Customer[] = [
+  {
+    id: "1",
+    customerCode: "CUS-0001",
+    firstName: "John",
+    lastName: "Smith",
+    company: "Microsoft",
+    position: "IT Manager",
+    email: "john.smith@microsoft.com",
+    phone: "+1 555-1000",
+    country: "USA",
+    city: "Seattle",
+    owner: "Glenn",
+    status: "Active",
+    createdAt: "2026-07-01",
+    updatedAt: "2026-07-22",
+  },
+  {
+    id: "2",
+    customerCode: "CUS-0002",
+    firstName: "Sarah",
+    lastName: "Williams",
+    company: "Google",
+    position: "HR Director",
+    email: "sarah@google.com",
+    phone: "+1 555-2000",
+    country: "USA",
+    city: "California",
+    owner: "Glenn",
+    status: "Prospect",
+    createdAt: "2026-07-05",
+    updatedAt: "2026-07-21",
+  },
+];
