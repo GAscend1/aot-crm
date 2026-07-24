@@ -1,9 +1,22 @@
+"use client";
+
 import Image from "next/image";
+import { signIn, useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const { status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/dashboard");
+    }
+  }, [status, router]);
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-blue-900 px-6">
-
       {/* Background Glow */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -left-32 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl" />
@@ -12,11 +25,10 @@ export default function Home() {
 
       {/* Login Card */}
       <div className="relative w-full max-w-lg rounded-3xl border border-white/10 bg-white/10 p-10 shadow-2xl backdrop-blur-xl">
-
         {/* Logo */}
         <div className="flex justify-center">
           <Image
-            src="/Ali_logo.png"
+            src="/Logo.png"
             alt="AOT Logo"
             width={90}
             height={90}
@@ -45,15 +57,11 @@ export default function Home() {
           one centralized cloud platform.
         </p>
 
-        {/* Sign In Button */}
         <button
+          onClick={() => signIn("microsoft-entra-id")}
           className="mt-10 flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-blue-600 text-lg font-semibold text-white transition hover:bg-blue-700"
         >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 23 23"
-          >
+          <svg width="22" height="22" viewBox="0 0 23 23">
             <rect width="10" height="10" fill="#F25022" />
             <rect x="12" width="10" height="10" fill="#7FBA00" />
             <rect y="12" width="10" height="10" fill="#00A4EF" />
@@ -72,7 +80,6 @@ export default function Home() {
       <div className="absolute bottom-6 text-center text-xs text-slate-400">
         © 2026 Ascend One Tech. All rights reserved.
       </div>
-
     </main>
   );
 }

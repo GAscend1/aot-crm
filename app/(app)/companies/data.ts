@@ -1,0 +1,36 @@
+import { Company } from "./types";
+
+export const companies: Company[] = [
+  {
+    id: "1",
+    companyCode: "COM-0001",
+    companyName: "Microsoft",
+    industry: "Technology",
+    website: "https://microsoft.com",
+    email: "contact@microsoft.com",
+    phone: "+1 555-1000",
+    country: "USA",
+    city: "Seattle",
+    employees: 221000,
+    owner: "Glenn",
+    status: "Partner",
+    createdAt: "2026-07-01",
+    updatedAt: "2026-07-21",
+  },
+  {
+    id: "2",
+    companyCode: "COM-0002",
+    companyName: "Google",
+    industry: "Technology",
+    website: "https://google.com",
+    email: "info@google.com",
+    phone: "+1 555-2000",
+    country: "USA",
+    city: "Mountain View",
+    employees: 182000,
+    owner: "Glenn",
+    status: "Active",
+    createdAt: "2026-07-03",
+    updatedAt: "2026-07-22",
+  },
+];
