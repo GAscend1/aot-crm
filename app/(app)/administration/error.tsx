@@ -10,7 +10,7 @@ export default function Error({
   reset,
 }: ErrorProps) {
   return (
-    <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
+    <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-center gap-4 p-6">
       <h2 className="text-xl font-semibold">
         Something went wrong
       </h2>

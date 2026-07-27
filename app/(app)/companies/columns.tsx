@@ -1,88 +1,102 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DataTableColumnHeader } from "@/components/table/DataTableColumnHeader";
 
 import { Company } from "./types";
 
-export const columns: ColumnDef<Company>[] = [
-  {
-    accessorKey: "companyCode",
-    header: "Code",
-  },
-  {
-    accessorKey: "companyName",
-    header: "Company",
-  },
-  {
-    accessorKey: "industry",
-    header: "Industry",
-  },
-  {
-    accessorKey: "email",
-    header: "Email",
-  },
-  {
-    accessorKey: "phone",
-    header: "Phone",
-  },
-  {
-    accessorKey: "country",
-    header: "Country",
-  },
-  {
-    accessorKey: "owner",
-    header: "Owner",
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.original.status;
+interface ColumnActions {
+  onView: (company: Company) => void;
+  onEdit: (company: Company) => void;
+  onDelete: (company: Company) => void;
+}
 
-      return (
-        <span
-          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-            status === "Active"
-              ? "bg-green-100 text-green-700"
-              : status === "Partner"
-              ? "bg-blue-100 text-blue-700"
-              : status === "Prospect"
-              ? "bg-yellow-100 text-yellow-700"
-              : "bg-gray-100 text-gray-700"
-          }`}
-        >
-          {status}
-        </span>
-      );
+export function createColumns(actions: ColumnActions): ColumnDef<Company>[] {
+  return [
+    {
+      accessorKey: "name",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Name" />
+      ),
     },
-  },
-  {
-    id: "actions",
-    enableSorting: false,
-    enableHiding: false,
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem>View</DropdownMenuItem>
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
-];
+    {
+      accessorKey: "industry",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Industry" />
+      ),
+    },
+    {
+      accessorKey: "size",
+      header: "Size",
+    },
+    {
+      accessorKey: "city",
+      header: "City",
+    },
+    {
+      accessorKey: "phone",
+      header: "Phone",
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.original.status;
+        return (
+          <span
+            className={cn(
+              "inline-flex rounded-full px-2 py-1 text-xs font-medium",
+              status === "Active"
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-700"
+            )}
+          >
+            {status}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: "revenue",
+      header: "Revenue",
+    },
+    {
+      id: "actions",
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const company = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted">
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => actions.onView(company)}>
+                <Eye className="mr-2 h-4 w-4" />
+                View
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => actions.onEdit(company)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => actions.onDelete(company)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+}

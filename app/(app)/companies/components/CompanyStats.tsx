@@ -1,4 +1,5 @@
-import { Building2, Globe, Handshake, Users } from "lucide-react";
+import { Banknote, Building2, Globe, Users } from "lucide-react";
+
 import { StatCard } from "@/components/common/StatCard";
 
 export function CompanyStats() {
@@ -6,26 +7,26 @@ export function CompanyStats() {
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <StatCard
         title="Total Companies"
-        value="248"
+        value="12"
         icon={Building2}
       />
 
       <StatCard
-        title="Partners"
-        value="38"
-        icon={Handshake}
+        title="Active"
+        value="9"
+        icon={Users}
       />
 
       <StatCard
         title="Industries"
-        value="16"
+        value="6"
         icon={Globe}
       />
 
       <StatCard
-        title="Employees"
-        value="1.2M"
-        icon={Users}
+        title="Total Revenue"
+        value="$27.1B"
+        icon={Banknote}
       />
     </div>
   );

@@ -1,5 +1,17 @@
-import { TicketsPage } from "@/modules/tickets/components/TicketsPage";
+import { PageLayout } from "@/components/common/PageLayout";
 
-export default function Page() {
-    return <TicketsPage />;
+import { TicketStats } from "./components/TicketStats";
+import { TicketTable } from "./components/TicketTable";
+
+export default function TicketsPage() {
+  return (
+    <PageLayout
+      title="Tickets"
+      description="Track, manage, and resolve support tickets and issues."
+    >
+      <TicketStats />
+
+      <TicketTable />
+    </PageLayout>
+  );
 }

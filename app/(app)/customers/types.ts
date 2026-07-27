@@ -7,27 +7,25 @@ export type CustomerStatus =
 export interface Customer {
   id: string;
 
-  customerCode: string;
-
-  firstName: string;
-
-  lastName: string;
+  name: string;
 
   company: string;
-
-  position: string;
 
   email: string;
 
   phone: string;
 
+  position: string;
+
   country: string;
 
   city: string;
 
-  owner: string;
-
   status: CustomerStatus;
+
+  tags: string[];
+
+  notes?: string;
 
   createdAt: string;
 
