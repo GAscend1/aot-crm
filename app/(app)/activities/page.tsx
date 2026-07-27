@@ -1,5 +1,17 @@
-import { ActivitiesPage } from "@/modules/activities/components/ActivitiesPage";
+import { PageLayout } from "@/components/common/PageLayout";
 
-export default function Page() {
-    return <ActivitiesPage />;
+import { ActivityStats } from "./components/ActivityStats";
+import { ActivityTable } from "./components/ActivityTable";
+
+export default function ActivitiesPage() {
+  return (
+    <PageLayout
+      title="Activities"
+      description="Track meetings, calls, emails, tasks, and reminders."
+    >
+      <ActivityStats />
+
+      <ActivityTable />
+    </PageLayout>
+  );
 }

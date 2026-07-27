@@ -1,5 +1,20 @@
-import { ContactsPage } from "@/modules/contacts/components/ContactsPage";
+import { PageLayout } from "@/components/common/PageLayout";
 
-export default function Page() {
-    return <ContactsPage />;
+import { ContactStats } from "./components/ContactStats";
+import { ContactToolbar } from "./components/ContactToolbar";
+import { ContactTable } from "./components/ContactTable";
+
+export default function ContactsPage() {
+  return (
+    <PageLayout
+      title="Contacts"
+      description="Manage your network of business contacts, leads, and team members."
+    >
+      <ContactStats />
+
+      <ContactToolbar />
+
+      <ContactTable />
+    </PageLayout>
+  );
 }

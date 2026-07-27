@@ -1,5 +1,5 @@
 interface SectionCardProps {
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
 }
 

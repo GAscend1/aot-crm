@@ -1,22 +1,17 @@
-import { PageHeader } from "@/components/common/PageHeader";
+import { PageLayout } from "@/components/common/PageLayout";
 
-import { CustomerStats } from "@/modules/customers/components/CustomerStats";
-import { CustomerToolbar } from "@/modules/customers/components/CustomerToolbar";
-import { CustomerTable } from "@/modules/customers/components/CustomerTable";
+import { CustomerStats } from "./components/CustomerStats";
+import { CustomerTable } from "./components/CustomerTable";
 
 export default function CustomersPage() {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Customers"
-        description="Manage customer accounts and relationships."
-      />
-
+    <PageLayout
+      title="Customers"
+      description="Manage customer accounts, contacts, and relationships."
+    >
       <CustomerStats />
 
-      <CustomerToolbar />
-
       <CustomerTable />
-    </div>
+    </PageLayout>
   );
 }
