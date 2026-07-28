@@ -23,6 +23,7 @@ interface Activity {
 
 export class ActivityService extends BaseService<Activity> {
   protected repository: MockRepository<Activity>;
+  protected entityName = "activity";
 
   constructor(initialData: Activity[] = []) {
     super();

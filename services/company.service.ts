@@ -21,6 +21,7 @@ interface Company {
 
 export class CompanyService extends BaseService<Company> {
   protected repository: MockRepository<Company>;
+  protected entityName = "company";
 
   constructor(initialData: Company[] = []) {
     super();

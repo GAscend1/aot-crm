@@ -19,6 +19,7 @@ interface Customer {
 
 export class CustomerService extends BaseService<Customer> {
   protected repository: MockRepository<Customer>;
+  protected entityName = "customer";
 
   constructor(initialData: Customer[] = []) {
     super();

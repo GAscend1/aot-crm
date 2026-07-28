@@ -1,15 +1,24 @@
+"use client";
+
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmptyState } from "@/components/common/EmptyState";
-
-import { recentCompanies } from "../mockData";
+import { useLive } from "@/hooks/use-live";
+import { Events } from "@/services/events";
+import { companyService } from "@/services";
 
 export function RecentCompanies() {
-  if (recentCompanies.length === 0) {
+  const { data: companies } = useLive(
+    () => companyService.findAll({ page: 1, pageSize: 5 }).then(r => r.data),
+    [Events.COMPANY_CREATED, Events.COMPANY_UPDATED, Events.COMPANY_DELETED],
+    []
+  );
+
+  if (companies.length === 0) {
     return (
       <SectionCard title="Recent Companies">
         <EmptyState
-          title="No companies yet"
-          description="New companies will appear here once added."
+          title="No companies"
+          description="Companies will appear here once added."
         />
       </SectionCard>
     );
@@ -18,34 +27,26 @@ export function RecentCompanies() {
   return (
     <SectionCard title="Recent Companies">
       <div className="-mx-6 -mb-6">
-        {recentCompanies.map((company, index) => (
+        {companies.map((company: any, index: number) => (
           <div
             key={company.id}
-            className={`flex items-center justify-between px-6 py-3.5 ${
-              index < recentCompanies.length - 1
-                ? "border-b border-slate-100"
-                : ""
+            className={`flex items-center justify-between px-6 py-3 ${
+              index < companies.length - 1 ? "border-b border-slate-100" : ""
             }`}
           >
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-900">
-                {company.name}
-              </p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {company.industry} · {company.city}, {company.country}
-              </p>
+            <div>
+              <p className="text-sm font-medium text-slate-900">{company.name}</p>
+              <p className="text-xs text-slate-400">{company.industry} · {company.city}</p>
             </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  company.status === "Active"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {company.status}
-              </span>
-            </div>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                company.status === "Active"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {company.status}
+            </span>
           </div>
         ))}
       </div>

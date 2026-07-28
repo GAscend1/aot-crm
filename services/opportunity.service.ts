@@ -18,6 +18,7 @@ interface Opportunity {
 
 export class OpportunityService extends BaseService<Opportunity> {
   protected repository: MockRepository<Opportunity>;
+  protected entityName = "opportunity";
 
   constructor(initialData: Opportunity[] = []) {
     super();

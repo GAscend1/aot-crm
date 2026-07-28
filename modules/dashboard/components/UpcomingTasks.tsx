@@ -1,9 +1,11 @@
-import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
+"use client";
 
+import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmptyState } from "@/components/common/EmptyState";
-
-import { upcomingTasks } from "../mockData";
+import { useLive } from "@/hooks/use-live";
+import { Events } from "@/services/events";
+import { activityService } from "@/services";
 
 const priorityColors = {
   High: "text-red-500",
@@ -12,10 +14,17 @@ const priorityColors = {
 } as const;
 
 export function UpcomingTasks() {
-  const activeTasks = upcomingTasks.filter((t) => !t.completed);
-  const completedTasks = upcomingTasks.filter((t) => t.completed);
+  const { data: activities } = useLive(
+    () => activityService.findAll({ page: 1, pageSize: 20 }).then(r => r.data),
+    [Events.ACTIVITY_CREATED, Events.ACTIVITY_UPDATED, Events.ACTIVITY_DELETED, Events.ACTIVITY_COMPLETED],
+    []
+  );
 
-  if (upcomingTasks.length === 0) {
+  const tasks = activities.filter((a: any) => a.type === "Task");
+  const activeTasks = tasks.filter((t: any) => t.status !== "Completed");
+  const completedTasks = tasks.filter((t: any) => t.status === "Completed");
+
+  if (tasks.length === 0) {
     return (
       <SectionCard title="Upcoming Tasks">
         <EmptyState
@@ -29,7 +38,7 @@ export function UpcomingTasks() {
   return (
     <SectionCard title="Upcoming Tasks">
       <div className="-mx-6 -mb-6">
-        {activeTasks.map((task, index) => (
+        {activeTasks.map((task: any, index: number) => (
           <div
             key={task.id}
             className={`flex items-start gap-3 px-6 py-3 ${
@@ -40,18 +49,14 @@ export function UpcomingTasks() {
           >
             <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-slate-900">{task.title}</p>
+              <p className="text-sm text-slate-900">{task.subject}</p>
               <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
-                <span>{task.assignee}</span>
+                <span>{task.owner}</span>
                 <span>·</span>
-                <span>Due {task.dueDate}</span>
+                <span>Due {task.date}</span>
               </div>
             </div>
-            <AlertCircle
-              className={`mt-0.5 h-4 w-4 shrink-0 ${
-                priorityColors[task.priority]
-              }`}
-            />
+            <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${priorityColors.High}`} />
           </div>
         ))}
         {completedTasks.length > 0 && (
@@ -59,7 +64,7 @@ export function UpcomingTasks() {
             <div className="border-b border-slate-100 px-6 py-2">
               <p className="text-xs font-medium text-slate-400">Completed</p>
             </div>
-            {completedTasks.map((task) => (
+            {completedTasks.map((task: any) => (
               <div
                 key={task.id}
                 className="flex items-start gap-3 px-6 py-3 opacity-60"
@@ -67,12 +72,12 @@ export function UpcomingTasks() {
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-slate-500 line-through">
-                    {task.title}
+                    {task.subject}
                   </p>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
-                    <span>{task.assignee}</span>
+                    <span>{task.owner}</span>
                     <span>·</span>
-                    <span>{task.dueDate}</span>
+                    <span>{task.date}</span>
                   </div>
                 </div>
               </div>

@@ -22,6 +22,7 @@ interface Lead {
 
 export class LeadService extends BaseService<Lead> {
   protected repository: MockRepository<Lead>;
+  protected entityName = "lead";
 
   constructor(initialData: Lead[] = []) {
     super();
