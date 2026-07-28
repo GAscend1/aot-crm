@@ -18,27 +18,27 @@ export default function DashboardPage() {
     >
       <DashboardKPIs />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <RevenueChart />
         </div>
         <Notifications />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <RecentActivity />
         </div>
         <QuickActions />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-3">
         <RecentCustomers />
         <RecentCompanies />
         <RecentOpportunities />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <UpcomingTasks />
         </div>

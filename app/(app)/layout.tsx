@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppNavbar } from "@/components/layout/AppNavbar";
 import { SidebarProvider } from "@/components/layout/SidebarProvider";
+import { AppProviders } from "./AppProviders";
 
 export default async function DashboardLayout({
   children,
@@ -19,12 +20,14 @@ export default async function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <AppShell
-        sidebar={<AppSidebar />}
-        navbar={<AppNavbar />}
-      >
-        {children}
-      </AppShell>
+      <AppProviders>
+        <AppShell
+          sidebar={<AppSidebar />}
+          navbar={<AppNavbar />}
+        >
+          {children}
+        </AppShell>
+      </AppProviders>
     </SidebarProvider>
   );
 }

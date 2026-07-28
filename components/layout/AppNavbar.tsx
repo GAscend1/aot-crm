@@ -1,12 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import {
-  Bell,
-  ChevronRight,
   HelpCircle,
+  Info,
   LogOut,
   Menu,
   Moon,
@@ -15,6 +12,9 @@ import {
   Settings,
   Sun,
   User,
+  Bell,
+  Command,
+  Keyboard,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,29 +28,46 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { useSidebar } from "@/components/layout/SidebarProvider";
-import { navigation } from "@/config/navigation";
-
-function usePageTitle() {
-  const pathname = usePathname();
-
-  return useMemo(() => {
-    const flat = navigation.flatMap((g) => g.items);
-    const match = flat.find(
-      (item) => pathname === item.href || pathname.startsWith(item.href + "/")
-    );
-    return match?.title ?? "Dashboard";
-  }, [pathname]);
-}
+import { Breadcrumbs } from "@/components/enterprise/Breadcrumbs";
+import { NotificationCenter } from "@/components/enterprise/NotificationCenter";
+import { useTheme } from "@/components/enterprise/ThemeProvider";
+import { useAppNotifications } from "@/app/(app)/AppProviders";
 
 export function AppNavbar() {
-  const { toggle } = useSidebar();
-  const title = usePageTitle();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const { toggle, toggleMobile } = useSidebar();
+  const { toggle: toggleTheme, resolved: theme } = useTheme();
+  const { data: session } = useSession();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+    removeNotification,
+  } = useAppNotifications();
+  const user = session?.user;
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "U";
+
+  const openCommandPalette = () => {
+    const event = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      metaKey: false,
+      bubbles: true,
+    });
+    window.dispatchEvent(event);
+  };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white px-4 lg:px-6">
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white px-4 lg:px-6 dark:bg-slate-950 dark:border-slate-800">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
@@ -64,30 +81,26 @@ export function AppNavbar() {
         <Button
           variant="ghost"
           size="icon"
+          onClick={toggleMobile}
           className="lg:hidden"
         >
           <Menu className="h-5 w-5" />
         </Button>
 
-        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Link href="/dashboard" className="hover:text-foreground">
-            AOT CRM
-          </Link>
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span className="font-semibold text-foreground">
-            {title}
-          </span>
-        </nav>
+        <Breadcrumbs />
       </div>
 
       <div className="hidden max-w-md flex-1 px-8 md:block">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            className="pl-8"
-          />
-        </div>
+        <button
+          onClick={openCommandPalette}
+          className="flex w-full items-center gap-2 rounded-lg border bg-slate-50 px-3 py-1.5 text-sm text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-600"
+        >
+          <Search className="h-4 w-4" />
+          <span className="flex-1 text-left">Search anything...</span>
+          <kbd className="hidden rounded border px-1.5 py-0.5 text-[10px] font-medium sm:inline-block dark:border-slate-600">
+            Ctrl+K
+          </kbd>
+        </button>
       </div>
 
       <div className="flex items-center gap-1">
@@ -95,6 +108,7 @@ export function AppNavbar() {
           variant="ghost"
           size="icon"
           className="md:hidden"
+          onClick={openCommandPalette}
         >
           <Search className="h-5 w-5" />
         </Button>
@@ -102,45 +116,42 @@ export function AppNavbar() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          onClick={toggleTheme}
         >
-          {theme === "light" ? (
-            <Moon className="h-5 w-5" />
-          ) : (
+          {theme === "dark" ? (
             <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
           )}
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
-        </Button>
+        <NotificationCenter
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onClear={clearNotifications}
+          onRemove={removeNotification}
+        />
 
         <DropdownMenu>
           <DropdownMenuTrigger className="ml-2 flex items-center gap-2 rounded-lg p-1 hover:bg-muted">
             <Avatar size="sm">
-              <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face" />
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarImage src={user?.image ?? undefined} />
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
             align="end"
             sideOffset={8}
-            className="w-56"
+            className="w-64"
           >
             <DropdownMenuLabel>
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">John Doe</p>
+                <p className="text-sm font-medium">{user?.name ?? "User"}</p>
                 <p className="text-xs font-normal text-muted-foreground">
-                  john@aotcrm.com
-                </p>
-                <p className="text-xs font-normal text-muted-foreground">
-                  Super Admin
+                  {user?.email ?? ""}
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -150,12 +161,33 @@ export function AppNavbar() {
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <User className="mr-2 h-4 w-4" />
-                Profile
+                My Profile
               </DropdownMenuItem>
-
               <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
-                Account Settings
+                Preferences
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Bell className="mr-2 h-4 w-4" />
+                Notifications
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Moon className="mr-2 h-4 w-4" />
+                Appearance
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={openCommandPalette}>
+                <Command className="mr-2 h-4 w-4" />
+                Command Palette
+                <kbd className="ml-auto text-[10px] text-slate-400">⌘K</kbd>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Keyboard className="mr-2 h-4 w-4" />
+                Keyboard Shortcuts
               </DropdownMenuItem>
             </DropdownMenuGroup>
 
@@ -166,11 +198,18 @@ export function AppNavbar() {
                 <HelpCircle className="mr-2 h-4 w-4" />
                 Help & Support
               </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Info className="mr-2 h-4 w-4" />
+                About
+              </DropdownMenuItem>
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem variant="destructive">
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => signOut()}
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
             </DropdownMenuItem>

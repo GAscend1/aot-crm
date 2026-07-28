@@ -1,9 +1,8 @@
 "use client";
 
 import { ReactNode } from "react";
-import clsx from "clsx";
-
-import { useSidebar } from "@/components/layout/SidebarProvider";
+import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface AppShellProps {
   sidebar: ReactNode;
@@ -16,27 +15,28 @@ export function AppShell({
   navbar,
   children,
 }: AppShellProps) {
-  const { collapsed } = useSidebar();
+  const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div
-        className={clsx(
-          "grid min-h-screen transition-all duration-300",
-          collapsed
-            ? "lg:grid-cols-[72px_minmax(0,1fr)]"
-            : "lg:grid-cols-[260px_minmax(0,1fr)]"
-        )}
-      >
-        {sidebar}
+    <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-950">
+      {sidebar}
 
-        <div className="flex min-w-0 flex-col">
-          {navbar}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {navbar}
 
-          <main className="flex-1 min-w-0 overflow-auto p-6">
-            {children}
-          </main>
-        </div>
+        <main className="flex-1 overflow-y-auto">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.12 }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </main>
       </div>
     </div>
   );

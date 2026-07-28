@@ -11,6 +11,7 @@ import { CompanyFilters } from "./CompanyFilters";
 
 interface CompanyToolbarProps {
   onAdd: () => void;
+  onRefresh?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   filters: {
@@ -26,6 +27,7 @@ interface CompanyToolbarProps {
 
 export function CompanyToolbar({
   onAdd,
+  onRefresh,
   search,
   onSearchChange,
   filters,
@@ -55,6 +57,7 @@ export function CompanyToolbar({
           Add Company
         </Button>
       }
+      onRefresh={onRefresh}
     />
   );
 }

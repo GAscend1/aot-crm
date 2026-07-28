@@ -14,6 +14,7 @@ export const documents: Document[] = [
     description: "Comprehensive annual report covering fiscal year 2025 performance metrics and strategic outlook.",
     status: "Active",
     createdAt: "2026-01-15",
+    updatedAt: "2026-01-15",
   },
   {
     id: "2",
@@ -28,6 +29,7 @@ export const documents: Document[] = [
     description: "Sales proposal for Q4 enterprise accounts including pricing tiers and implementation timeline.",
     status: "Active",
     createdAt: "2026-02-20",
+    updatedAt: "2026-02-20",
   },
   {
     id: "3",
@@ -42,6 +44,7 @@ export const documents: Document[] = [
     description: "Standard employment contract template updated for 2026 compliance requirements.",
     status: "Active",
     createdAt: "2026-03-05",
+    updatedAt: "2026-03-05",
   },
   {
     id: "4",
@@ -56,6 +59,7 @@ export const documents: Document[] = [
     description: "Product marketing brochure with updated branding guidelines and product specifications.",
     status: "Active",
     createdAt: "2026-03-12",
+    updatedAt: "2026-03-12",
   },
   {
     id: "5",
@@ -70,6 +74,7 @@ export const documents: Document[] = [
     description: "Invoice for Acme Corp Q1 services - $45,000 due Net 30.",
     status: "Active",
     createdAt: "2026-04-01",
+    updatedAt: "2026-04-01",
   },
   {
     id: "6",
@@ -84,6 +89,7 @@ export const documents: Document[] = [
     description: "Strategic partnership agreement between AOT and Globex Inc for joint go-to-market initiatives.",
     status: "Active",
     createdAt: "2026-04-18",
+    updatedAt: "2026-04-18",
   },
   {
     id: "7",
@@ -98,6 +104,7 @@ export const documents: Document[] = [
     description: "Detailed R&D expenditure breakdown for Q1 2026 with budget variance analysis.",
     status: "Active",
     createdAt: "2026-05-02",
+    updatedAt: "2026-05-02",
   },
   {
     id: "8",
@@ -112,6 +119,7 @@ export const documents: Document[] = [
     description: "Investor presentation covering Q2 2026 results, growth metrics, and forward guidance.",
     status: "Active",
     createdAt: "2026-05-22",
+    updatedAt: "2026-05-22",
   },
   {
     id: "9",
@@ -126,6 +134,7 @@ export const documents: Document[] = [
     description: "Preliminary product roadmap for 2027 with feature priorities and release timelines.",
     status: "Active",
     createdAt: "2026-06-10",
+    updatedAt: "2026-06-10",
   },
   {
     id: "10",
@@ -140,6 +149,7 @@ export const documents: Document[] = [
     description: "Office lease agreement for headquarters expansion - 5 year term with renewal options.",
     status: "Archived",
     createdAt: "2025-11-15",
+    updatedAt: "2025-11-15",
   },
   {
     id: "11",
@@ -154,6 +164,7 @@ export const documents: Document[] = [
     description: "Legacy brand asset collection from previous branding agency - kept for reference.",
     status: "Archived",
     createdAt: "2025-09-28",
+    updatedAt: "2025-09-28",
   },
   {
     id: "12",
@@ -168,5 +179,6 @@ export const documents: Document[] = [
     description: "Corporate tax filing documents for fiscal year 2025 with all supporting schedules.",
     status: "Active",
     createdAt: "2026-04-15",
+    updatedAt: "2026-04-15",
   },
 ];

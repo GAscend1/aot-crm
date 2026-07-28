@@ -1,127 +1,231 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { DataTable } from "@/components/table/DataTable";
+import { useToastContext } from "@/app/(app)/AppProviders";
 
-import { companies as initialData } from "../data";
-import { Company, CompanyStatus } from "../types";
 import { createColumns } from "../columns";
+import { companyService } from "@/services/index";
+import type { Company } from "@/services/company.service";
 import { CompanyDrawer } from "./CompanyDrawer";
 import { CompanyDeleteDialog } from "./CompanyDeleteDialog";
 import { CompanyToolbar } from "./CompanyToolbar";
 
 export function CompanyTable() {
-  const [data, setData] = useState(initialData);
+  const router = useRouter();
+  const { success, error: showError } = useToastContext();
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("");
+  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [editingCompany, setEditingCompany] = useState<Company | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<{
-    status: CompanyStatus | "all";
-    industry: string;
-  }>({ status: "all", industry: "all" });
+  const [deletingCompany, setDeletingCompany] = useState<Company | undefined>();
+
+  useEffect(() => {
+    companyService.findAll().then((result) => {
+      setCompanies(result.data);
+      setLoading(false);
+    });
+  }, []);
 
   const industries = useMemo(
-    () => [...new Set(data.map((c) => c.industry))],
-    [data]
+    () => [...new Set(companies.map((c) => c.industry))],
+    [companies],
   );
 
-  const filteredData = useMemo(() => {
-    return data.filter((company) => {
-      const matchesSearch =
-        !search ||
-        company.name.toLowerCase().includes(search.toLowerCase()) ||
-        company.city.toLowerCase().includes(search.toLowerCase()) ||
-        company.industry.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus =
-        filters.status === "all" || company.status === filters.status;
-      const matchesIndustry =
-        filters.industry === "all" || company.industry === filters.industry;
-      return matchesSearch && matchesStatus && matchesIndustry;
-    });
-  }, [data, search, filters]);
+  const filtered = useMemo(() => {
+    let result = companies;
 
-  function handleAdd() {
-    setSelectedCompany(null);
-    setDrawerOpen(true);
-  }
-
-  function handleView(company: Company) {
-    setSelectedCompany(company);
-    setDrawerOpen(true);
-  }
-
-  function handleEdit(company: Company) {
-    setSelectedCompany(company);
-    setDrawerOpen(true);
-  }
-
-  function handleDelete(company: Company) {
-    setCompanyToDelete(company);
-    setDeleteDialogOpen(true);
-  }
-
-  function handleSave(company: Company) {
-    if (selectedCompany) {
-      setData((prev) =>
-        prev.map((c) => (c.id === selectedCompany.id ? company : c))
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.city.toLowerCase().includes(q) ||
+          c.industry.toLowerCase().includes(q),
       );
-    } else {
-      setData((prev) => [...prev, company]);
     }
-    setDrawerOpen(false);
-    setSelectedCompany(null);
-  }
 
-  function handleConfirmDelete() {
-    if (companyToDelete) {
-      setData((prev) => prev.filter((c) => c.id !== companyToDelete.id));
+    if (statusFilter) {
+      result = result.filter((c) => c.status === statusFilter);
     }
-    setDeleteDialogOpen(false);
-    setCompanyToDelete(null);
-  }
 
-  function handleCancelDelete() {
-    setDeleteDialogOpen(false);
-    setCompanyToDelete(null);
-  }
+    if (industryFilter) {
+      result = result.filter((c) => c.industry === industryFilter);
+    }
+
+    return result;
+  }, [companies, searchQuery, statusFilter, industryFilter]);
+
+  const handleEdit = useCallback((company: Company) => {
+    setEditingCompany(company);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleView = useCallback(
+    (company: Company) => {
+      router.push(`/companies/${company.id}`);
+    },
+    [router],
+  );
+
+  const handleDelete = useCallback((company: Company) => {
+    setDeletingCompany(company);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleRowClick = useCallback(
+    (company: Company) => {
+      router.push(`/companies/${company.id}`);
+    },
+    [router],
+  );
 
   const columns = useMemo(
     () => createColumns({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete }),
-    []
+    [handleView, handleEdit, handleDelete],
   );
 
-  return (
-    <>
-      <CompanyToolbar
-        onAdd={handleAdd}
-        search={search}
-        onSearchChange={setSearch}
-        filters={filters}
-        onFilterChange={setFilters}
-        industries={industries}
-      />
+  const handleSave = useCallback(
+    async (data: Company) => {
+      try {
+        if (editingCompany) {
+          const updated = await companyService.update(editingCompany.id, data as Partial<Company>);
+          setCompanies((prev) =>
+            prev.map((c) => (c.id === editingCompany.id ? updated : c)),
+          );
+          success("Company updated", `${updated.name} has been updated.`);
+        } else {
+          const created = await companyService.create(data as Omit<Company, "id" | "createdAt" | "updatedAt">);
+          setCompanies((prev) => [created, ...prev]);
+          success("Company created", `${created.name} has been added.`);
+        }
+        setDrawerOpen(false);
+        setEditingCompany(undefined);
+      } catch {
+        showError("Error", "Failed to save company.");
+      }
+    },
+    [editingCompany, success, showError],
+  );
 
+  const handleConfirmDelete = useCallback(async () => {
+    if (deletingCompany) {
+      try {
+        await companyService.delete(deletingCompany.id);
+        setCompanies((prev) =>
+          prev.filter((c) => c.id !== deletingCompany.id),
+        );
+        success("Company deleted", `${deletingCompany.name} has been removed.`);
+        setDeletingCompany(undefined);
+      } catch {
+        showError("Error", "Failed to delete company.");
+      }
+    }
+  }, [deletingCompany, success, showError]);
+
+  const handleAdd = useCallback(() => {
+    setEditingCompany(undefined);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setLoading(true);
+    const result = await companyService.findAll();
+    setCompanies(result.data);
+    setLoading(false);
+  }, []);
+
+  const handleBulkAction = useCallback(
+    async (action: string, rows: Company[]) => {
+      if (action === "delete") {
+        for (const row of rows) {
+          await companyService.delete(row.id);
+        }
+        setCompanies((prev) =>
+          prev.filter((c) => !rows.find((r) => r.id === c.id)),
+        );
+        success("Deleted", `${rows.length} company(ies) deleted.`);
+      } else if (action === "export") {
+        const csv = [
+          "Name,Industry,City,Status,Revenue,Created",
+          ...rows.map(
+            (r) =>
+              `${r.name},${r.industry},${r.city},${r.status},${r.revenue},${r.createdAt}`,
+          ),
+        ].join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "companies.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    },
+    [success],
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
       <DataTable
         columns={columns}
-        data={filteredData}
+        data={filtered}
+        enableRowSelection={true}
+        onRowClick={handleRowClick}
+        onBulkAction={handleBulkAction}
+        toolbar={
+          <CompanyToolbar
+            search={searchQuery}
+            onSearchChange={setSearchQuery}
+            filters={{
+              status: (statusFilter || "all") as Company["status"] | "all",
+              industry: industryFilter || "all",
+            }}
+            onFilterChange={({ status, industry }) => {
+              setStatusFilter(status === "all" ? "" : status);
+              setIndustryFilter(industry === "all" ? "" : industry);
+            }}
+            industries={industries}
+            onAdd={handleAdd}
+            onRefresh={handleRefresh}
+          />
+        }
       />
 
       <CompanyDrawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        company={selectedCompany}
+        onOpenChange={(open) => {
+          setDrawerOpen(open);
+          if (!open) setEditingCompany(undefined);
+        }}
+        company={editingCompany ?? null}
         onSave={handleSave}
       />
 
       <CompanyDeleteDialog
         open={deleteDialogOpen}
-        company={companyToDelete}
+        company={deletingCompany ?? null}
         onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setDeletingCompany(undefined);
+        }}
       />
-    </>
+    </div>
   );
 }

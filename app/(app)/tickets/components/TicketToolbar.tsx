@@ -11,6 +11,7 @@ import { TicketFilters } from "./TicketFilters";
 
 interface TicketToolbarProps {
   onAdd: () => void;
+  onRefresh?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   filters: {
@@ -25,6 +26,7 @@ interface TicketToolbarProps {
 
 export function TicketToolbar({
   onAdd,
+  onRefresh,
   search,
   onSearchChange,
   filters,
@@ -52,6 +54,7 @@ export function TicketToolbar({
           Add Ticket
         </Button>
       }
+      onRefresh={onRefresh}
     />
   );
 }

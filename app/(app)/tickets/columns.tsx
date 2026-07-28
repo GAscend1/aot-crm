@@ -34,7 +34,7 @@ const statusColors: Record<string, string> = {
   Closed: "bg-gray-100 text-gray-700",
 };
 
-export function createColumns(actions: ColumnActions): ColumnDef<Ticket>[] {
+export function createColumns(actions: ColumnActions): ColumnDef<Ticket, unknown>[] {
   return [
     {
       accessorKey: "subject",

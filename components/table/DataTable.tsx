@@ -13,7 +13,10 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  type Table as TanstackTable,
+  Row,
 } from "@tanstack/react-table";
+import { ListRestart } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import {
@@ -27,21 +30,41 @@ import {
 
 import { DataTablePagination } from "./DataTablePagination";
 import { DataTableViewOptions } from "./DataTableViewOptions";
+import { DataTableBulkActions } from "./DataTableBulkActions";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { BulkAction } from "@/types/common";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   enableRowSelection?: boolean;
   onRowSelectionChange?: (rows: TData[]) => void;
+  onRowClick?: (row: TData) => void;
   filterKey?: string;
-  filterPlaceholder?: string;
+  bulkActions?: BulkAction[];
+  onBulkAction?: (action: string, rows: TData[]) => void;
+  toolbar?: React.ReactNode;
+  loading?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  onRefresh?: () => void;
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends { id: string }, TValue>({
   columns,
   data,
-  enableRowSelection = false,
+  enableRowSelection = true,
   onRowSelectionChange,
+  onRowClick,
+  bulkActions,
+  onBulkAction,
+  toolbar,
+  loading,
+  emptyTitle = "No records found",
+  emptyDescription = "There are no records to display yet.",
+  onRefresh,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] =
@@ -57,7 +80,7 @@ export function DataTable<TData, TValue>({
     return [
       {
         id: "select",
-        header: ({ table }) => (
+        header: ({ table }: { table: TanstackTable<TData> }) => (
           <Checkbox
             checked={table.getIsAllPageRowsSelected()}
             data-indeterminate={table.getIsSomePageRowsSelected() || undefined}
@@ -67,7 +90,7 @@ export function DataTable<TData, TValue>({
             aria-label="Select all"
           />
         ),
-        cell: ({ row }) => (
+        cell: ({ row }: { row: Row<TData> }) => (
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -93,6 +116,8 @@ export function DataTable<TData, TValue>({
       rowSelection,
     },
 
+    getRowId: (row) => row.id,
+
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
@@ -117,16 +142,31 @@ export function DataTable<TData, TValue>({
     getPaginationRowModel: getPaginationRowModel(),
   });
 
+  const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original);
+
   return (
     <div className="space-y-4">
+      {toolbar}
+
       <div className="flex items-center justify-between gap-4">
-        <div className="flex-1" />
-        <DataTableViewOptions table={table} />
+        <DataTableBulkActions
+          selectedRows={selectedRows}
+          bulkActions={bulkActions}
+          onBulkAction={(action) => onBulkAction?.(action, selectedRows)}
+        />
+        <div className="flex items-center gap-2">
+          {onRefresh && (
+            <Button variant="ghost" size="icon" onClick={onRefresh} title="Refresh">
+              <ListRestart className="h-4 w-4" />
+            </Button>
+          )}
+          <DataTableViewOptions table={table} />
+        </div>
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm">
+      <div className="relative overflow-auto rounded-xl border bg-white shadow-sm dark:bg-slate-900 dark:border-slate-700">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-white dark:bg-slate-900">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -144,11 +184,23 @@ export function DataTable<TData, TValue>({
           </TableHeader>
 
           <TableBody>
-            {table.getRowModel().rows.length ? (
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {allColumns.map((_, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-5 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  onClick={() => onRowClick?.(row.original)}
+                  className={onRowClick ? "cursor-pointer" : ""}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -166,7 +218,7 @@ export function DataTable<TData, TValue>({
                   colSpan={allColumns.length}
                   className="h-32 text-center"
                 >
-                  No records found.
+                  <EmptyState title={emptyTitle} description={emptyDescription} />
                 </TableCell>
               </TableRow>
             )}

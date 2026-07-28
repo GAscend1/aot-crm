@@ -11,6 +11,7 @@ import { DocumentFilters } from "./DocumentFilters";
 
 interface DocumentToolbarProps {
   onAdd: () => void;
+  onRefresh?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   filters: {
@@ -26,6 +27,7 @@ interface DocumentToolbarProps {
 
 export function DocumentToolbar({
   onAdd,
+  onRefresh,
   search,
   onSearchChange,
   filters,
@@ -55,6 +57,7 @@ export function DocumentToolbar({
           Upload Document
         </Button>
       }
+      onRefresh={onRefresh}
     />
   );
 }

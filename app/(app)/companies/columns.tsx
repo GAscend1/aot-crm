@@ -20,7 +20,7 @@ interface ColumnActions {
   onDelete: (company: Company) => void;
 }
 
-export function createColumns(actions: ColumnActions): ColumnDef<Company>[] {
+export function createColumns(actions: ColumnActions): ColumnDef<Company, unknown>[] {
   return [
     {
       accessorKey: "name",
