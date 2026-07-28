@@ -11,6 +11,7 @@ import { OpportunityFilters } from "./OpportunityFilters";
 
 interface OpportunityToolbarProps {
   onAdd: () => void;
+  onRefresh?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   filters: {
@@ -25,6 +26,7 @@ interface OpportunityToolbarProps {
 
 export function OpportunityToolbar({
   onAdd,
+  onRefresh,
   search,
   onSearchChange,
   filters,
@@ -49,6 +51,7 @@ export function OpportunityToolbar({
           Add Opportunity
         </Button>
       }
+      onRefresh={onRefresh}
     />
   );
 }

@@ -36,7 +36,7 @@ const statusStyles: Record<string, string> = {
   Archived: "bg-orange-100 text-orange-700",
 };
 
-export function createColumns(actions: ColumnActions): ColumnDef<Report>[] {
+export function createColumns(actions: ColumnActions): ColumnDef<Report, unknown>[] {
   return [
     {
       accessorKey: "name",

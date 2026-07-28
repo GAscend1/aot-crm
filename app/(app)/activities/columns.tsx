@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTableColumnHeader } from "@/components/table/DataTableColumnHeader";
 
-import { Activity, ActivityStatus, ActivityType } from "./types";
+import type { Activity } from "@/services/activity.service";
+import type { ActivityStatus, ActivityType } from "./types";
 
 const typeIcon: Record<ActivityType, typeof Calendar> = {
   Meeting: Calendar,
@@ -45,7 +46,7 @@ interface ColumnActions {
   onDelete: (activity: Activity) => void;
 }
 
-export function createColumns(actions: ColumnActions): ColumnDef<Activity>[] {
+export function createColumns(actions: ColumnActions): ColumnDef<Activity, unknown>[] {
   return [
     {
       accessorKey: "type",

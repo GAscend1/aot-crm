@@ -11,6 +11,7 @@ import { LeadFilters } from "./LeadFilters";
 
 interface LeadToolbarProps {
   onAdd: () => void;
+  onRefresh?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   filters: {
@@ -26,6 +27,7 @@ interface LeadToolbarProps {
 
 export function LeadToolbar({
   onAdd,
+  onRefresh,
   search,
   onSearchChange,
   filters,
@@ -55,6 +57,7 @@ export function LeadToolbar({
           Add Lead
         </Button>
       }
+      onRefresh={onRefresh}
     />
   );
 }

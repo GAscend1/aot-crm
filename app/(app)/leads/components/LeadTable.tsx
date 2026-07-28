@@ -1,128 +1,232 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { DataTable } from "@/components/table/DataTable";
+import { useToastContext } from "@/app/(app)/AppProviders";
 
-import { leads as initialData } from "../data";
-import { Lead, LeadSource, LeadStatus } from "../types";
 import { createColumns } from "../columns";
+import { leadService } from "@/services/index";
+import type { Lead } from "@/services/lead.service";
 import { LeadDrawer } from "./LeadDrawer";
 import { LeadDeleteDialog } from "./LeadDeleteDialog";
 import { LeadToolbar } from "./LeadToolbar";
 
 export function LeadTable() {
-  const [data, setData] = useState(initialData);
+  const router = useRouter();
+  const { success, error: showError } = useToastContext();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [editingLead, setEditingLead] = useState<Lead | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<{
-    status: LeadStatus | "all";
-    source: LeadSource | "all";
-  }>({ status: "all", source: "all" });
+  const [deletingLead, setDeletingLead] = useState<Lead | undefined>();
+
+  useEffect(() => {
+    leadService.findAll().then((result) => {
+      setLeads(result.data);
+      setLoading(false);
+    });
+  }, []);
 
   const sourceOptions = useMemo(
-    () => [...new Set(data.map((l) => l.source))] as LeadSource[],
-    [data]
+    () => [...new Set(leads.map((l) => l.source))],
+    [leads],
   );
 
-  const filteredData = useMemo(() => {
-    return data.filter((lead) => {
-      const matchesSearch =
-        !search ||
-        lead.title.toLowerCase().includes(search.toLowerCase()) ||
-        lead.company.toLowerCase().includes(search.toLowerCase()) ||
-        lead.contactName.toLowerCase().includes(search.toLowerCase()) ||
-        lead.owner.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus =
-        filters.status === "all" || lead.status === filters.status;
-      const matchesSource =
-        filters.source === "all" || lead.source === filters.source;
-      return matchesSearch && matchesStatus && matchesSource;
-    });
-  }, [data, search, filters]);
+  const filtered = useMemo(() => {
+    let result = leads;
 
-  function handleAdd() {
-    setSelectedLead(null);
-    setDrawerOpen(true);
-  }
-
-  function handleView(lead: Lead) {
-    setSelectedLead(lead);
-    setDrawerOpen(true);
-  }
-
-  function handleEdit(lead: Lead) {
-    setSelectedLead(lead);
-    setDrawerOpen(true);
-  }
-
-  function handleDelete(lead: Lead) {
-    setLeadToDelete(lead);
-    setDeleteDialogOpen(true);
-  }
-
-  function handleSave(lead: Lead) {
-    if (selectedLead) {
-      setData((prev) =>
-        prev.map((c) => (c.id === selectedLead.id ? lead : c))
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (l) =>
+          l.title.toLowerCase().includes(q) ||
+          l.company.toLowerCase().includes(q) ||
+          l.contactName.toLowerCase().includes(q) ||
+          l.owner.toLowerCase().includes(q),
       );
-    } else {
-      setData((prev) => [...prev, lead]);
     }
-    setDrawerOpen(false);
-    setSelectedLead(null);
-  }
 
-  function handleConfirmDelete() {
-    if (leadToDelete) {
-      setData((prev) => prev.filter((c) => c.id !== leadToDelete.id));
+    if (statusFilter) {
+      result = result.filter((l) => l.status === statusFilter);
     }
-    setDeleteDialogOpen(false);
-    setLeadToDelete(null);
-  }
 
-  function handleCancelDelete() {
-    setDeleteDialogOpen(false);
-    setLeadToDelete(null);
-  }
+    if (sourceFilter) {
+      result = result.filter((l) => l.source === sourceFilter);
+    }
+
+    return result;
+  }, [leads, searchQuery, statusFilter, sourceFilter]);
+
+  const handleEdit = useCallback((lead: Lead) => {
+    setEditingLead(lead);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleView = useCallback(
+    (lead: Lead) => {
+      router.push(`/leads/${lead.id}`);
+    },
+    [router],
+  );
+
+  const handleDelete = useCallback((lead: Lead) => {
+    setDeletingLead(lead);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleRowClick = useCallback(
+    (lead: Lead) => {
+      router.push(`/leads/${lead.id}`);
+    },
+    [router],
+  );
 
   const columns = useMemo(
     () => createColumns({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete }),
-    []
+    [handleView, handleEdit, handleDelete],
   );
 
-  return (
-    <>
-      <LeadToolbar
-        onAdd={handleAdd}
-        search={search}
-        onSearchChange={setSearch}
-        filters={filters}
-        onFilterChange={setFilters}
-        sourceOptions={sourceOptions}
-      />
+  const handleSave = useCallback(
+    async (data: Lead) => {
+      try {
+        if (editingLead) {
+          const updated = await leadService.update(editingLead.id, data as Partial<Lead>);
+          setLeads((prev) =>
+            prev.map((l) => (l.id === editingLead.id ? updated : l)),
+          );
+          success("Lead updated", `${updated.title} has been updated.`);
+        } else {
+          const created = await leadService.create(data as Omit<Lead, "id" | "createdAt" | "updatedAt">);
+          setLeads((prev) => [created, ...prev]);
+          success("Lead created", `${created.title} has been added.`);
+        }
+        setDrawerOpen(false);
+        setEditingLead(undefined);
+      } catch {
+        showError("Error", "Failed to save lead.");
+      }
+    },
+    [editingLead, success, showError],
+  );
 
+  const handleConfirmDelete = useCallback(async () => {
+    if (deletingLead) {
+      try {
+        await leadService.delete(deletingLead.id);
+        setLeads((prev) =>
+          prev.filter((l) => l.id !== deletingLead.id),
+        );
+        success("Lead deleted", `${deletingLead.title} has been removed.`);
+        setDeletingLead(undefined);
+      } catch {
+        showError("Error", "Failed to delete lead.");
+      }
+    }
+  }, [deletingLead, success, showError]);
+
+  const handleAdd = useCallback(() => {
+    setEditingLead(undefined);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setLoading(true);
+    const result = await leadService.findAll();
+    setLeads(result.data);
+    setLoading(false);
+  }, []);
+
+  const handleBulkAction = useCallback(
+    async (action: string, rows: Lead[]) => {
+      if (action === "delete") {
+        for (const row of rows) {
+          await leadService.delete(row.id);
+        }
+        setLeads((prev) =>
+          prev.filter((l) => !rows.find((r) => r.id === l.id)),
+        );
+        success("Deleted", `${rows.length} lead(s) deleted.`);
+      } else if (action === "export") {
+        const csv = [
+          "Title,Company,Contact,Email,Status,Created",
+          ...rows.map(
+            (r) =>
+              `${r.title},${r.company},${r.contactName},${r.email},${r.status},${r.createdAt}`,
+          ),
+        ].join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "leads.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    },
+    [success],
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
       <DataTable
         columns={columns}
-        data={filteredData}
+        data={filtered}
+        enableRowSelection={true}
+        onRowClick={handleRowClick}
+        onBulkAction={handleBulkAction}
+        toolbar={
+          <LeadToolbar
+            search={searchQuery}
+            onSearchChange={setSearchQuery}
+            filters={{
+              status: (statusFilter || "all") as Lead["status"] | "all",
+              source: (sourceFilter || "all") as Lead["source"] | "all",
+            }}
+            onFilterChange={({ status, source }) => {
+              setStatusFilter(status === "all" ? "" : status);
+              setSourceFilter(source === "all" ? "" : source);
+            }}
+            sourceOptions={sourceOptions}
+            onAdd={handleAdd}
+            onRefresh={handleRefresh}
+          />
+        }
       />
 
       <LeadDrawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        lead={selectedLead}
+        onOpenChange={(open) => {
+          setDrawerOpen(open);
+          if (!open) setEditingLead(undefined);
+        }}
+        lead={editingLead ?? null}
         onSave={handleSave}
       />
 
       <LeadDeleteDialog
         open={deleteDialogOpen}
-        lead={leadToDelete}
+        lead={deletingLead ?? null}
         onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setDeletingLead(undefined);
+        }}
       />
-    </>
+    </div>
   );
 }

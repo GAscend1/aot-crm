@@ -29,7 +29,7 @@ const categoryColors: Record<DocumentCategory, string> = {
   Other: "bg-gray-100 text-gray-700",
 };
 
-export function createColumns(actions: ColumnActions): ColumnDef<Document>[] {
+export function createColumns(actions: ColumnActions): ColumnDef<Document, unknown>[] {
   return [
     {
       accessorKey: "name",

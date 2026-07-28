@@ -39,7 +39,7 @@ interface ColumnActions {
   onDelete: (lead: Lead) => void;
 }
 
-export function createColumns(actions: ColumnActions): ColumnDef<Lead>[] {
+export function createColumns(actions: ColumnActions): ColumnDef<Lead, unknown>[] {
   return [
     {
       accessorKey: "title",

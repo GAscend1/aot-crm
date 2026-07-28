@@ -1,0 +1,92 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { KanbanBoard } from "@/components/enterprise/KanbanBoard";
+import { opportunityService } from "@/services/index";
+import type { Opportunity } from "@/services/opportunity.service";
+import { useToastContext } from "@/app/(app)/AppProviders";
+
+const stages = [
+  "Qualification",
+  "Discovery",
+  "Proposal",
+  "Negotiation",
+  "Closed Won",
+  "Closed Lost",
+] as const;
+
+const stageColors: Record<string, string> = {
+  Qualification: "#94a3b8",
+  Discovery: "#3b82f6",
+  Proposal: "#f59e0b",
+  Negotiation: "#8b5cf6",
+  "Closed Won": "#22c55e",
+  "Closed Lost": "#ef4444",
+};
+
+export function OpportunityKanban() {
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { success } = useToastContext();
+
+  useEffect(() => {
+    opportunityService.findAll().then((result) => {
+      setOpportunities(result.data);
+      setLoading(false);
+    });
+  }, []);
+
+  const columns = stages.map((stage) => ({
+    id: stage,
+    title: stage,
+    color: stageColors[stage],
+    cards: opportunities
+      .filter((opp) => opp.stage === stage)
+      .map((opp) => ({
+        id: opp.id,
+        title: opp.title,
+        subtitle: opp.customer,
+        value: opp.value,
+        probability: opp.probability,
+        assignee: opp.owner,
+        tags: [],
+      })),
+  }));
+
+  const handleCardMove = useCallback(
+    async (cardId: string, _fromColumn: string, toColumn: string) => {
+      setOpportunities((prev) =>
+        prev.map((opp) =>
+          opp.id === cardId
+            ? { ...opp, stage: toColumn as Opportunity["stage"] }
+            : opp
+        )
+      );
+      await opportunityService.update(cardId, {
+        stage: toColumn as Opportunity["stage"],
+      });
+      success("Opportunity updated", `Moved to ${toColumn}`);
+    },
+    [success]
+  );
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[calc(100vh-12rem)]">
+      <KanbanBoard
+        columns={columns}
+        onCardMove={handleCardMove}
+        onCardClick={(id) => {
+          window.location.href = `/opportunities/${id}`;
+        }}
+      />
+    </div>
+  );
+}

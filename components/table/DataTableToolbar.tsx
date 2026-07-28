@@ -1,18 +1,11 @@
 "use client";
 
-import { Table } from "@tanstack/react-table";
 import { Download, Filter, Plus, RotateCw, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-interface DataTableToolbarProps<TData> {
-  table: Table<TData>;
-}
-
-export function DataTableToolbar<TData>({
-  table,
-}: DataTableToolbarProps<TData>) {
+export function DataTableToolbar() {
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-1 items-center gap-3">

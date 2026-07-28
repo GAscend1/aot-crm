@@ -16,7 +16,7 @@ import { Customer } from "./types";
 export function createColumns(
   onEdit?: (customer: Customer) => void,
   onDelete?: (customer: Customer) => void,
-): ColumnDef<Customer>[] {
+): ColumnDef<Customer, unknown>[] {
   return [
     {
       accessorKey: "name",

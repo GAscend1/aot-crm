@@ -22,7 +22,7 @@ interface ColumnActions {
 
 export function createColumns(
   actions: ColumnActions
-): ColumnDef<Opportunity>[] {
+): ColumnDef<Opportunity, unknown>[] {
   return [
     {
       accessorKey: "title",

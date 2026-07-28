@@ -73,6 +73,7 @@ export function DocumentForm({
       description,
       status,
       createdAt: initialData?.createdAt ?? new Date().toISOString().split("T")[0],
+      updatedAt: initialData?.updatedAt ?? new Date().toISOString().split("T")[0],
     });
   }
 

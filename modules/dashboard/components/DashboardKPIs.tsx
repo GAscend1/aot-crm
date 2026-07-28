@@ -1,40 +1,41 @@
+import { StatCard } from "@/components/common/StatCard";
 import { kpis } from "../mockData";
+
+function getVariant(
+  title: string
+): "default" | "primary" | "success" | "warning" | "danger" {
+  switch (title) {
+    case "Total Revenue":
+    case "Revenue":
+      return "primary";
+    case "Customers":
+    case "Companies":
+      return "success";
+    case "Opportunities":
+      return "warning";
+    case "Open Tickets":
+      return "danger";
+    default:
+      return "default";
+  }
+}
 
 export function DashboardKPIs() {
   return (
-    <div className="grid gap-6 md:grid-cols-3 xl:grid-cols-5">
-      {kpis.map((kpi) => {
-        const Icon = kpi.icon;
-        const isPositive = kpi.change >= 0;
-
-        return (
-          <div
-            key={kpi.title}
-            className="rounded-xl border bg-white p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">{kpi.title}</p>
-                <h2 className="mt-2 text-3xl font-bold">{kpi.value}</h2>
-              </div>
-              <div className="rounded-lg bg-slate-100 p-3">
-                <Icon className="h-6 w-6" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-sm">
-              <span
-                className={`font-medium ${
-                  isPositive ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {isPositive ? "+" : ""}
-                {kpi.change}%
-              </span>
-              <span className="text-slate-400">vs last month</span>
-            </div>
-          </div>
-        );
-      })}
+    <div className="grid gap-5 md:grid-cols-3 xl:grid-cols-5">
+      {kpis.map((kpi) => (
+        <StatCard
+          key={kpi.title}
+          title={kpi.title}
+          value={kpi.value}
+          icon={kpi.icon as import("lucide-react").LucideIcon}
+          variant={getVariant(kpi.title)}
+          trend={{
+            value: `${Math.abs(kpi.change)}%`,
+            positive: kpi.change >= 0,
+          }}
+        />
+      ))}
     </div>
   );
 }

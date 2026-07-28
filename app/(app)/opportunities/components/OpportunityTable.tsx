@@ -1,129 +1,225 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { DataTable } from "@/components/table/DataTable";
+import { useToastContext } from "@/app/(app)/AppProviders";
 
-import { opportunities as initialData } from "../data";
-import { Opportunity, OpportunityStatus, Stage } from "../types";
 import { createColumns } from "../columns";
+import { opportunityService } from "@/services/index";
+import type { Opportunity } from "@/services/opportunity.service";
 import { OpportunityDrawer } from "./OpportunityDrawer";
 import { OpportunityDeleteDialog } from "./OpportunityDeleteDialog";
 import { OpportunityToolbar } from "./OpportunityToolbar";
 
 export function OpportunityTable() {
-  const [data, setData] = useState(initialData);
+  const router = useRouter();
+  const { success, error: showError } = useToastContext();
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [stageFilter, setStageFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedOpportunity, setSelectedOpportunity] =
-    useState<Opportunity | null>(null);
+  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [opportunityToDelete, setOpportunityToDelete] =
-    useState<Opportunity | null>(null);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<{
-    stage: Stage | "all";
-    status: OpportunityStatus | "all";
-  }>({ stage: "all", status: "all" });
+  const [deletingOpportunity, setDeletingOpportunity] = useState<Opportunity | undefined>();
 
-  const filteredData = useMemo(() => {
-    return data.filter((opportunity) => {
-      const matchesSearch =
-        !search ||
-        opportunity.title.toLowerCase().includes(search.toLowerCase()) ||
-        opportunity.customer.toLowerCase().includes(search.toLowerCase()) ||
-        opportunity.owner.toLowerCase().includes(search.toLowerCase());
-      const matchesStage =
-        filters.stage === "all" || opportunity.stage === filters.stage;
-      const matchesStatus =
-        filters.status === "all" || opportunity.status === filters.status;
-      return matchesSearch && matchesStage && matchesStatus;
+  useEffect(() => {
+    opportunityService.findAll().then((result) => {
+      setOpportunities(result.data);
+      setLoading(false);
     });
-  }, [data, search, filters]);
+  }, []);
 
-  function handleAdd() {
-    setSelectedOpportunity(null);
-    setDrawerOpen(true);
-  }
+  const filtered = useMemo(() => {
+    let result = opportunities;
 
-  function handleView(opportunity: Opportunity) {
-    setSelectedOpportunity(opportunity);
-    setDrawerOpen(true);
-  }
-
-  function handleEdit(opportunity: Opportunity) {
-    setSelectedOpportunity(opportunity);
-    setDrawerOpen(true);
-  }
-
-  function handleDelete(opportunity: Opportunity) {
-    setOpportunityToDelete(opportunity);
-    setDeleteDialogOpen(true);
-  }
-
-  function handleSave(opportunity: Opportunity) {
-    if (selectedOpportunity) {
-      setData((prev) =>
-        prev.map((o) =>
-          o.id === selectedOpportunity.id ? opportunity : o
-        )
-      );
-    } else {
-      setData((prev) => [...prev, opportunity]);
-    }
-    setDrawerOpen(false);
-    setSelectedOpportunity(null);
-  }
-
-  function handleConfirmDelete() {
-    if (opportunityToDelete) {
-      setData((prev) =>
-        prev.filter((o) => o.id !== opportunityToDelete.id)
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (o) =>
+          o.title.toLowerCase().includes(q) ||
+          o.customer.toLowerCase().includes(q) ||
+          o.owner.toLowerCase().includes(q),
       );
     }
-    setDeleteDialogOpen(false);
-    setOpportunityToDelete(null);
-  }
 
-  function handleCancelDelete() {
-    setDeleteDialogOpen(false);
-    setOpportunityToDelete(null);
-  }
+    if (stageFilter) {
+      result = result.filter((o) => o.stage === stageFilter);
+    }
 
-  const columns = useMemo(
-    () =>
-      createColumns({
-        onView: handleView,
-        onEdit: handleEdit,
-        onDelete: handleDelete,
-      }),
-    []
+    if (statusFilter) {
+      result = result.filter((o) => o.status === statusFilter);
+    }
+
+    return result;
+  }, [opportunities, searchQuery, stageFilter, statusFilter]);
+
+  const handleEdit = useCallback((opportunity: Opportunity) => {
+    setEditingOpportunity(opportunity);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleView = useCallback(
+    (opportunity: Opportunity) => {
+      router.push(`/opportunities/${opportunity.id}`);
+    },
+    [router],
   );
 
-  return (
-    <>
-      <OpportunityToolbar
-        onAdd={handleAdd}
-        search={search}
-        onSearchChange={setSearch}
-        filters={filters}
-        onFilterChange={setFilters}
-      />
+  const handleDelete = useCallback((opportunity: Opportunity) => {
+    setDeletingOpportunity(opportunity);
+    setDeleteDialogOpen(true);
+  }, []);
 
-      <DataTable columns={columns} data={filteredData} />
+  const handleRowClick = useCallback(
+    (opportunity: Opportunity) => {
+      router.push(`/opportunities/${opportunity.id}`);
+    },
+    [router],
+  );
+
+  const columns = useMemo(
+    () => createColumns({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete }),
+    [handleView, handleEdit, handleDelete],
+  );
+
+  const handleSave = useCallback(
+    async (data: Opportunity) => {
+      try {
+        if (editingOpportunity) {
+          const updated = await opportunityService.update(editingOpportunity.id, data as Partial<Opportunity>);
+          setOpportunities((prev) =>
+            prev.map((o) => (o.id === editingOpportunity.id ? updated : o)),
+          );
+          success("Opportunity updated", `${updated.title} has been updated.`);
+        } else {
+          const created = await opportunityService.create(data as Omit<Opportunity, "id" | "createdAt" | "updatedAt">);
+          setOpportunities((prev) => [created, ...prev]);
+          success("Opportunity created", `${created.title} has been added.`);
+        }
+        setDrawerOpen(false);
+        setEditingOpportunity(undefined);
+      } catch {
+        showError("Error", "Failed to save opportunity.");
+      }
+    },
+    [editingOpportunity, success, showError],
+  );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (deletingOpportunity) {
+      try {
+        await opportunityService.delete(deletingOpportunity.id);
+        setOpportunities((prev) =>
+          prev.filter((o) => o.id !== deletingOpportunity.id),
+        );
+        success("Opportunity deleted", `${deletingOpportunity.title} has been removed.`);
+        setDeletingOpportunity(undefined);
+      } catch {
+        showError("Error", "Failed to delete opportunity.");
+      }
+    }
+  }, [deletingOpportunity, success, showError]);
+
+  const handleAdd = useCallback(() => {
+    setEditingOpportunity(undefined);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setLoading(true);
+    const result = await opportunityService.findAll();
+    setOpportunities(result.data);
+    setLoading(false);
+  }, []);
+
+  const handleBulkAction = useCallback(
+    async (action: string, rows: Opportunity[]) => {
+      if (action === "delete") {
+        for (const row of rows) {
+          await opportunityService.delete(row.id);
+        }
+        setOpportunities((prev) =>
+          prev.filter((o) => !rows.find((r) => r.id === o.id)),
+        );
+        success("Deleted", `${rows.length} opportunity(ies) deleted.`);
+      } else if (action === "export") {
+        const csv = [
+          "Title,Customer,Value,Stage,Status,Created",
+          ...rows.map(
+            (r) =>
+              `${r.title},${r.customer},${r.value},${r.stage},${r.status},${r.createdAt}`,
+          ),
+        ].join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "opportunities.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    },
+    [success],
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <DataTable
+        columns={columns}
+        data={filtered}
+        enableRowSelection={true}
+        onRowClick={handleRowClick}
+        onBulkAction={handleBulkAction}
+        toolbar={
+          <OpportunityToolbar
+            search={searchQuery}
+            onSearchChange={setSearchQuery}
+            filters={{
+              stage: (stageFilter || "all") as Opportunity["stage"] | "all",
+              status: (statusFilter || "all") as Opportunity["status"] | "all",
+            }}
+            onFilterChange={({ stage, status }) => {
+              setStageFilter(stage === "all" ? "" : stage);
+              setStatusFilter(status === "all" ? "" : status);
+            }}
+            onAdd={handleAdd}
+            onRefresh={handleRefresh}
+          />
+        }
+      />
 
       <OpportunityDrawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        opportunity={selectedOpportunity}
+        onOpenChange={(open) => {
+          setDrawerOpen(open);
+          if (!open) setEditingOpportunity(undefined);
+        }}
+        opportunity={editingOpportunity ?? null}
         onSave={handleSave}
       />
 
       <OpportunityDeleteDialog
         open={deleteDialogOpen}
-        opportunity={opportunityToDelete}
+        opportunity={deletingOpportunity ?? null}
         onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
+        onCancel={() => {
+          setDeleteDialogOpen(false);
+          setDeletingOpportunity(undefined);
+        }}
       />
-    </>
+    </div>
   );
 }

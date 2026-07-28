@@ -11,6 +11,7 @@ import { ActivityFilters } from "./ActivityFilters";
 
 interface ActivityToolbarProps {
   onAdd: () => void;
+  onRefresh?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   filters: {
@@ -25,6 +26,7 @@ interface ActivityToolbarProps {
 
 export function ActivityToolbar({
   onAdd,
+  onRefresh,
   search,
   onSearchChange,
   filters,
@@ -49,6 +51,7 @@ export function ActivityToolbar({
           Add Activity
         </Button>
       }
+      onRefresh={onRefresh}
     />
   );
 }
