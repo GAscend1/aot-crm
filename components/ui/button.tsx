@@ -1,5 +1,5 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
-import { Slot } from "@radix-ui/react-slot"
+import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -52,14 +52,21 @@ function Button({
   asChild = false,
   ...props
 }: ButtonProps) {
-  const Comp = asChild ? Slot : ButtonPrimitive
-  return (
-    <Comp
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  )
+  const classes = cn(buttonVariants({ variant, size, className }))
+  if (asChild) {
+    const { children, ...buttonProps } = props
+    if (React.isValidElement(children)) {
+      const childClasses = (children.props as Record<string, unknown>).className
+      const merged = {
+        ...buttonProps,
+        "data-slot": "button" as const,
+        className: childClasses ? `${childClasses} ${classes}` : classes,
+      }
+      return React.cloneElement(children, merged)
+    }
+    return null
+  }
+  return <ButtonPrimitive data-slot="button" className={classes} {...props} />
 }
 
 export { Button, buttonVariants }
