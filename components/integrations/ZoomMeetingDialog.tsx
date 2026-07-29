@@ -53,8 +53,8 @@ export function ZoomMeetingDialog({ open, onClose, entityName }: ZoomMeetingDial
       });
       setMeeting(result);
       success("Zoom meeting created");
-    } catch {
-      showError("Failed to create Zoom meeting");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to create Zoom meeting");
     } finally {
       setCreating(false);
     }

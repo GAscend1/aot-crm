@@ -32,7 +32,7 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
       </div>
       <div>
         <p className="text-xs text-slate-500">{label}</p>
-        <p className="text-sm font-medium text-slate-900 dark:text-white">{value || "-"}</p>
+        <p className="text-sm font-medium text-slate-900 dark:text-white">{value || "\u2014"}</p>
       </div>
     </div>
   );
@@ -41,18 +41,21 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 export default function ProfilePage() {
   const { data: session } = useSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [manager, setManager] = useState<{ name: string; email: string } | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [prof, mgr] = await Promise.all([
-        graphService.getProfile(),
-        graphService.getManager(),
-      ]);
-      setProfile(prof);
-      setManager(mgr);
-      setLoading(false);
+      try {
+        const prof = await graphService.getProfile();
+        setProfile(prof);
+        setProfileError(null);
+      } catch (err) {
+        setProfileError(err instanceof Error ? err.message : "Failed to load profile");
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -72,6 +75,14 @@ export default function ProfilePage() {
     );
   }
 
+  const displayName = profile?.displayName || session?.user?.name || "User";
+  const email = profile?.email || session?.user?.email || "";
+  const jobTitle = profile?.jobTitle || "No title";
+  const department = profile?.department || "";
+  const phone = profile?.phone || "";
+  const mobilePhone = profile?.mobilePhone || "";
+  const officeLocation = profile?.officeLocation || "";
+
   return (
     <PageLayout title="My Profile" description="View and manage your account information.">
       <div className="grid gap-5 lg:grid-cols-3">
@@ -85,21 +96,24 @@ export default function ProfilePage() {
                 </Avatar>
                 <PresenceDot presence={profile?.presence || "Offline"} />
               </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                {profile?.displayName || session?.user?.name || "User"}
-              </h2>
-              <p className="text-sm text-slate-500">{profile?.jobTitle || "No title"}</p>
-              <p className="text-xs text-slate-400 mt-1">{profile?.department || ""}</p>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">{displayName}</h2>
+              <p className="text-sm text-slate-500">{jobTitle}</p>
+              <p className="text-xs text-slate-400 mt-1">{department}</p>
 
-              <div className="mt-6 flex w-full flex-col gap-1">
-                {manager && (
+              {profile?.manager && (
+                <div className="mt-6 w-full">
                   <div className="rounded-lg bg-slate-50 p-3 text-left dark:bg-slate-800">
                     <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Manager</p>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">{manager.name}</p>
-                    <p className="text-xs text-slate-500">{manager.email}</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{profile.manager}</p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {profileError && (
+                <div className="mt-4 rounded-lg bg-red-50 p-3 text-left dark:bg-red-900/20">
+                  <p className="text-xs text-red-600 dark:text-red-400">{profileError}</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -110,12 +124,12 @@ export default function ProfilePage() {
               <CardTitle>Contact Information</CardTitle>
             </CardHeader>
             <CardContent className="divide-y dark:divide-slate-800">
-              <InfoRow icon={Mail} label="Email" value={profile?.email || session?.user?.email || ""} />
-              <InfoRow icon={Briefcase} label="Job Title" value={profile?.jobTitle || ""} />
-              <InfoRow icon={Building2} label="Department" value={profile?.department || ""} />
-              <InfoRow icon={Phone} label="Phone" value={profile?.phone || ""} />
-              <InfoRow icon={Phone} label="Mobile" value={profile?.mobilePhone || ""} />
-              <InfoRow icon={MapPin} label="Office Location" value={profile?.officeLocation || ""} />
+              <InfoRow icon={Mail} label="Email" value={email} />
+              <InfoRow icon={Briefcase} label="Job Title" value={jobTitle} />
+              <InfoRow icon={Building2} label="Department" value={department} />
+              <InfoRow icon={Phone} label="Phone" value={phone} />
+              <InfoRow icon={Phone} label="Mobile" value={mobilePhone} />
+              <InfoRow icon={MapPin} label="Office Location" value={officeLocation} />
             </CardContent>
           </Card>
 

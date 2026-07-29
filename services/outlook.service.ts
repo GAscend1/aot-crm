@@ -2,6 +2,41 @@ import { v4 as uuid } from "uuid";
 import type { EmailMessage, EmailAttachment, EmailTemplate } from "@/types/common";
 import { eventBus } from "./event-bus";
 import { Events } from "./events";
+import { graphApi, GraphClientError } from "./graph-client";
+
+function toEmailMessage(item: Record<string, unknown>): EmailMessage {
+  const sender = (item.sender as { emailAddress?: { name?: string; address?: string } })?.emailAddress;
+  const toRecipients = (item.toRecipients as { emailAddress?: { name?: string; address?: string } }[]) || [];
+  const ccRecipients = (item.ccRecipients as { emailAddress?: { name?: string; address?: string } }[]) || [];
+  return {
+    id: (item.id as string) || uuid(),
+    threadId: (item.conversationId as string) || uuid(),
+    subject: (item.subject as string) || "",
+    body: ((item.body as { content?: string })?.content) || "",
+    bodyPreview: (item.bodyPreview as string) || "",
+    sender: {
+      name: sender?.name || "Unknown",
+      email: sender?.address || "",
+    },
+    to: toRecipients.map((r) => ({
+      name: r.emailAddress?.name || "",
+      email: r.emailAddress?.address || "",
+    })),
+    cc: ccRecipients.map((r) => ({
+      name: r.emailAddress?.name || "",
+      email: r.emailAddress?.address || "",
+    })),
+    bcc: [],
+    attachments: [],
+    isRead: (item.isRead as boolean) ?? true,
+    isDraft: (item.isDraft as boolean) ?? false,
+    hasAttachments: (item.hasAttachments as boolean) ?? false,
+    importance: (item.importance as "low" | "normal" | "high") || "normal",
+    sentAt: (item.sentDateTime as string) || new Date().toISOString(),
+    receivedAt: (item.receivedDateTime as string) || new Date().toISOString(),
+    categories: (item.categories as string[]) || [],
+  };
+}
 
 class OutlookService {
   private messages: EmailMessage[] = [];
@@ -36,15 +71,43 @@ class OutlookService {
   ];
 
   async getMessages(folder = "inbox"): Promise<EmailMessage[]> {
-    return this.messages.filter((m) => {
-      if (folder === "drafts") return m.isDraft;
-      if (folder === "sent") return !m.isDraft;
-      return !m.isDraft;
-    });
+    try {
+      const folderMap: Record<string, string> = {
+        inbox: "/me/mailFolders/inbox/messages",
+        sent: "/me/mailFolders/sentItems/messages",
+        drafts: "/me/mailFolders/drafts/messages",
+      };
+      const graphPath = folderMap[folder] || `/me/mailFolders/${folder}/messages`;
+      const result = await graphApi(graphPath + "?$top=50&$orderby=receivedDateTime DESC") as { value: Record<string, unknown>[] };
+      return (result.value || []).map(toEmailMessage);
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        return this.messages.filter((m) => {
+          if (folder === "drafts") return m.isDraft;
+          if (folder === "sent") return !m.isDraft;
+          return !m.isDraft;
+        });
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to load messages: ${err.message}`);
+      }
+      throw new Error("Failed to load messages");
+    }
   }
 
   async getMessage(id: string): Promise<EmailMessage | null> {
-    return this.messages.find((m) => m.id === id) || null;
+    try {
+      const result = await graphApi(`/me/messages/${id}`) as Record<string, unknown>;
+      return toEmailMessage(result);
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        return this.messages.find((m) => m.id === id) || null;
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to load message: ${err.message}`);
+      }
+      throw new Error("Failed to load message");
+    }
   }
 
   async send(data: {
@@ -55,28 +118,72 @@ class OutlookService {
     body: string;
     attachments?: EmailAttachment[];
   }): Promise<EmailMessage> {
-    const msg: EmailMessage = {
-      id: uuid(),
-      threadId: uuid(),
-      subject: data.subject,
-      body: data.body,
-      bodyPreview: data.body.slice(0, 100),
-      sender: { name: "Current User", email: "user@company.com" },
-      to: data.to,
-      cc: data.cc || [],
-      bcc: data.bcc || [],
-      attachments: data.attachments || [],
-      isRead: true,
-      isDraft: false,
-      hasAttachments: (data.attachments?.length || 0) > 0,
-      importance: "normal",
-      sentAt: new Date().toISOString(),
-      receivedAt: new Date().toISOString(),
-      categories: [],
-    };
-    this.messages.unshift(msg);
-    eventBus.emit(Events.EMAIL_SENT, { to: data.to[0]?.email, subject: data.subject, entityId: msg.id });
-    return msg;
+    try {
+      const message = {
+        message: {
+          subject: data.subject,
+          body: { contentType: "text", content: data.body },
+          toRecipients: data.to.map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+          ccRecipients: (data.cc || []).map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+          bccRecipients: (data.bcc || []).map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+        },
+        saveToSentItems: true,
+      };
+      await graphApi("/me/sendMail", {
+        method: "POST",
+        body: JSON.stringify(message),
+      });
+      const msg: EmailMessage = {
+        id: uuid(),
+        threadId: uuid(),
+        subject: data.subject,
+        body: data.body,
+        bodyPreview: data.body.slice(0, 100),
+        sender: { name: "", email: "" },
+        to: data.to,
+        cc: data.cc || [],
+        bcc: data.bcc || [],
+        attachments: data.attachments || [],
+        isRead: true,
+        isDraft: false,
+        hasAttachments: (data.attachments?.length || 0) > 0,
+        importance: "normal",
+        sentAt: new Date().toISOString(),
+        receivedAt: new Date().toISOString(),
+        categories: [],
+      };
+      eventBus.emit(Events.EMAIL_SENT, { to: data.to[0]?.email, subject: data.subject, entityId: msg.id });
+      return msg;
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        const msg: EmailMessage = {
+          id: uuid(),
+          threadId: uuid(),
+          subject: data.subject,
+          body: data.body,
+          bodyPreview: data.body.slice(0, 100),
+          sender: { name: "Current User", email: "user@company.com" },
+          to: data.to,
+          cc: data.cc || [],
+          bcc: data.bcc || [],
+          attachments: data.attachments || [],
+          isRead: true,
+          isDraft: false,
+          hasAttachments: (data.attachments?.length || 0) > 0,
+          importance: "normal",
+          sentAt: new Date().toISOString(),
+          receivedAt: new Date().toISOString(),
+          categories: [],
+        };
+        this.messages.unshift(msg);
+        eventBus.emit(Events.EMAIL_SENT, { to: data.to[0]?.email, subject: data.subject, entityId: msg.id });
+        return msg;
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to send email: ${err.message}`);
+      }
+      throw new Error("Failed to send email");
+    }
   }
 
   async saveDraft(data: {
@@ -84,63 +191,173 @@ class OutlookService {
     subject?: string;
     body?: string;
   }): Promise<EmailMessage> {
-    const msg: EmailMessage = {
-      id: uuid(),
-      threadId: uuid(),
-      subject: data.subject || "No Subject",
-      body: data.body || "",
-      bodyPreview: (data.body || "").slice(0, 100),
-      sender: { name: "Current User", email: "user@company.com" },
-      to: data.to || [],
-      cc: [],
-      bcc: [],
-      attachments: [],
-      isRead: true,
-      isDraft: true,
-      hasAttachments: false,
-      importance: "normal",
-      sentAt: new Date().toISOString(),
-      receivedAt: new Date().toISOString(),
-      categories: [],
-    };
-    this.messages.unshift(msg);
-    eventBus.emit(Events.EMAIL_DRAFT_SAVED, { subject: data.subject, entityId: msg.id });
-    return msg;
+    try {
+      const draft = {
+        subject: data.subject || "",
+        body: { contentType: "text", content: data.body || "" },
+        toRecipients: (data.to || []).map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+      };
+      const result = await graphApi("/me/messages", {
+        method: "POST",
+        body: JSON.stringify(draft),
+      }) as Record<string, unknown>;
+      const msg: EmailMessage = {
+        id: (result.id as string) || uuid(),
+        threadId: uuid(),
+        subject: data.subject || "No Subject",
+        body: data.body || "",
+        bodyPreview: (data.body || "").slice(0, 100),
+        sender: { name: "", email: "" },
+        to: data.to || [],
+        cc: [],
+        bcc: [],
+        attachments: [],
+        isRead: true,
+        isDraft: true,
+        hasAttachments: false,
+        importance: "normal",
+        sentAt: new Date().toISOString(),
+        receivedAt: new Date().toISOString(),
+        categories: [],
+      };
+      eventBus.emit(Events.EMAIL_DRAFT_SAVED, { subject: data.subject, entityId: msg.id });
+      return msg;
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        const msg: EmailMessage = {
+          id: uuid(),
+          threadId: uuid(),
+          subject: data.subject || "No Subject",
+          body: data.body || "",
+          bodyPreview: (data.body || "").slice(0, 100),
+          sender: { name: "Current User", email: "user@company.com" },
+          to: data.to || [],
+          cc: [],
+          bcc: [],
+          attachments: [],
+          isRead: true,
+          isDraft: true,
+          hasAttachments: false,
+          importance: "normal",
+          sentAt: new Date().toISOString(),
+          receivedAt: new Date().toISOString(),
+          categories: [],
+        };
+        this.messages.unshift(msg);
+        eventBus.emit(Events.EMAIL_DRAFT_SAVED, { subject: data.subject, entityId: msg.id });
+        return msg;
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to save draft: ${err.message}`);
+      }
+      throw new Error("Failed to save draft");
+    }
   }
 
   async reply(messageId: string, body: string): Promise<EmailMessage> {
-    const original = this.messages.find((m) => m.id === messageId);
-    if (!original) throw new Error("Message not found");
-
-    return this.send({
-      to: [original.sender],
-      subject: `Re: ${original.subject}`,
-      body,
-    });
+    try {
+      const reply = { comment: body };
+      await graphApi(`/me/messages/${messageId}/reply`, {
+        method: "POST",
+        body: JSON.stringify(reply),
+      });
+      const msg: EmailMessage = {
+        id: uuid(), threadId: uuid(), subject: "Re: ", body, bodyPreview: body.slice(0, 100),
+        sender: { name: "", email: "" }, to: [], cc: [], bcc: [],
+        attachments: [], isRead: true, isDraft: false, hasAttachments: false,
+        importance: "normal", sentAt: new Date().toISOString(), receivedAt: new Date().toISOString(),
+        categories: [],
+      };
+      eventBus.emit(Events.EMAIL_SENT, { entityId: msg.id });
+      return msg;
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        const original = this.messages.find((m) => m.id === messageId);
+        if (!original) throw new Error("Message not found");
+        return this.send({
+          to: [original.sender],
+          subject: `Re: ${original.subject}`,
+          body,
+        });
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to reply: ${err.message}`);
+      }
+      throw new Error("Failed to reply");
+    }
   }
 
   async replyAll(messageId: string, body: string): Promise<EmailMessage> {
-    const original = this.messages.find((m) => m.id === messageId);
-    if (!original) throw new Error("Message not found");
-
-    return this.send({
-      to: [original.sender, ...original.to],
-      cc: original.cc,
-      subject: `Re: ${original.subject}`,
-      body,
-    });
+    try {
+      const replyAll = { comment: body };
+      await graphApi(`/me/messages/${messageId}/replyAll`, {
+        method: "POST",
+        body: JSON.stringify(replyAll),
+      });
+      const msg: EmailMessage = {
+        id: uuid(), threadId: uuid(), subject: "Re: ", body, bodyPreview: body.slice(0, 100),
+        sender: { name: "", email: "" }, to: [], cc: [], bcc: [],
+        attachments: [], isRead: true, isDraft: false, hasAttachments: false,
+        importance: "normal", sentAt: new Date().toISOString(), receivedAt: new Date().toISOString(),
+        categories: [],
+      };
+      eventBus.emit(Events.EMAIL_SENT, { entityId: msg.id });
+      return msg;
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        const original = this.messages.find((m) => m.id === messageId);
+        if (!original) throw new Error("Message not found");
+        return this.send({
+          to: [original.sender, ...original.to],
+          cc: original.cc,
+          subject: `Re: ${original.subject}`,
+          body,
+        });
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to reply all: ${err.message}`);
+      }
+      throw new Error("Failed to reply all");
+    }
   }
 
   async forward(messageId: string, to: { name: string; email: string }[], body: string): Promise<EmailMessage> {
-    const original = this.messages.find((m) => m.id === messageId);
-    if (!original) throw new Error("Message not found");
-
-    return this.send({
-      to,
-      subject: `Fw: ${original.subject}`,
-      body: `${body}\n\n--- Original Message ---\n${original.body}`,
-      attachments: original.attachments,
-    });
+    try {
+      const forwardPayload = {
+        message: {
+          toRecipients: to.map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+        },
+        comment: body,
+      };
+      await graphApi(`/me/messages/${messageId}/forward`, {
+        method: "POST",
+        body: JSON.stringify(forwardPayload),
+      });
+      const msg: EmailMessage = {
+        id: uuid(), threadId: uuid(), subject: "Fw: ", body, bodyPreview: body.slice(0, 100),
+        sender: { name: "", email: "" }, to, cc: [], bcc: [],
+        attachments: [], isRead: true, isDraft: false, hasAttachments: false,
+        importance: "normal", sentAt: new Date().toISOString(), receivedAt: new Date().toISOString(),
+        categories: [],
+      };
+      eventBus.emit(Events.EMAIL_SENT, { entityId: msg.id });
+      return msg;
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        const original = this.messages.find((m) => m.id === messageId);
+        if (!original) throw new Error("Message not found");
+        return this.send({
+          to,
+          subject: `Fw: ${original.subject}`,
+          body: `${body}\n\n--- Original Message ---\n${original.body}`,
+          attachments: original.attachments,
+        });
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to forward: ${err.message}`);
+      }
+      throw new Error("Failed to forward");
+    }
   }
 
   async getTemplates(): Promise<EmailTemplate[]> {
@@ -171,6 +388,18 @@ class OutlookService {
   }
 
   async deleteMessage(id: string): Promise<void> {
+    try {
+      await graphApi(`/me/messages/${id}`, { method: "DELETE" });
+    } catch (err) {
+      if (err instanceof GraphClientError && err.status === 503) {
+        this.messages = this.messages.filter((m) => m.id !== id);
+        return;
+      }
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to delete message: ${err.message}`);
+      }
+      throw new Error("Failed to delete message");
+    }
     this.messages = this.messages.filter((m) => m.id !== id);
   }
 }

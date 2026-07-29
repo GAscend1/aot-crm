@@ -1,5 +1,5 @@
-import { integrations } from "@/config/integrations";
 import type { UserProfile } from "@/types/common";
+import { graphApi, GraphClientError } from "./graph-client";
 
 const mockProfile: UserProfile = {
   id: "user-1",
@@ -15,88 +15,93 @@ const mockProfile: UserProfile = {
   presence: "Available",
 };
 
-class GraphService {
-  private graphClient: unknown = null;
+function isNotEnabled(err: unknown): boolean {
+  return err instanceof GraphClientError && err.status === 503;
+}
 
+class GraphService {
   async getProfile(): Promise<UserProfile> {
-    if (integrations.useMicrosoftGraph) {
+    try {
+      const profile = await graphApi("/me") as {
+        id: string; displayName: string; email: string;
+        jobTitle: string; department: string; manager: string;
+        phone: string; mobilePhone: string; officeLocation: string;
+      };
+
+      let photoUrl = "";
       try {
-        const client = await this.getClient();
-        const user = await client.api("/me").get() as {
-          id: string; displayName: string; mail?: string; userPrincipalName: string;
-          jobTitle?: string; department?: string; businessPhones?: string[];
-          mobilePhone?: string; officeLocation?: string;
-        };
-        const photo = await this.getPhoto();
-        const presence = await this.getPresence();
-        return {
-          id: user.id,
-          displayName: user.displayName,
-          email: user.mail || user.userPrincipalName,
-          jobTitle: user.jobTitle || "",
-          department: user.department || "",
-          manager: "",
-          phone: user.businessPhones?.[0] || "",
-          mobilePhone: user.mobilePhone || "",
-          officeLocation: user.officeLocation || "",
-          photoUrl: photo,
-          presence,
-        };
+        photoUrl = await this.getPhoto();
       } catch {
-        return mockProfile;
+        photoUrl = "";
       }
+
+      let presence: UserProfile["presence"] = "Available";
+      try {
+        presence = await this.getPresence();
+      } catch {
+        presence = "Available";
+      }
+
+      return {
+        id: profile.id,
+        displayName: profile.displayName,
+        email: profile.email,
+        jobTitle: profile.jobTitle,
+        department: profile.department,
+        manager: profile.manager,
+        phone: profile.phone,
+        mobilePhone: profile.mobilePhone,
+        officeLocation: profile.officeLocation,
+        photoUrl,
+        presence,
+      };
+    } catch (err) {
+      if (isNotEnabled(err)) return mockProfile;
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to load profile: ${err.message}`);
+      }
+      throw new Error("Failed to load profile");
     }
-    return mockProfile;
   }
 
   async getManager(): Promise<{ name: string; email: string } | null> {
-    if (integrations.useMicrosoftGraph) {
-      try {
-        const client = await this.getClient();
-        const manager = await client.api("/me/manager").get() as { displayName: string; mail?: string };
-        return { name: manager.displayName, email: manager.mail || "" };
-      } catch {
-        return { name: "Sarah Chen", email: "sarah.chen@ascendonetech.com" };
+    try {
+      const profile = await graphApi("/me/manager") as { manager: string };
+      return { name: profile.manager, email: "" };
+    } catch (err) {
+      if (isNotEnabled(err)) return { name: "Sarah Chen", email: "sarah.chen@ascendonetech.com" };
+      if (err instanceof GraphClientError) {
+        throw new Error(`Failed to load manager: ${err.message}`);
       }
+      throw new Error("Failed to load manager");
     }
-    return { name: "Sarah Chen", email: "sarah.chen@ascendonetech.com" };
   }
 
   async getPhoto(): Promise<string> {
-    if (integrations.useMicrosoftGraph) {
-      try {
-        const client = await this.getClient();
-        const photo = await client.api("/me/photo/$value").get();
-        const base64 = Buffer.from(photo as ArrayBuffer).toString("base64");
-        return `data:image/jpeg;base64,${base64}`;
-      } catch {
-        return "";
+    try {
+      const res = await fetch("/api/integrations/microsoft/photo");
+      if (!res.ok) {
+        if (res.status === 503) return "";
+        throw new Error("Photo not found");
       }
+      const blob = await res.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return "";
     }
-    return "";
   }
 
   async getPresence(): Promise<UserProfile["presence"]> {
-    if (integrations.useMicrosoftGraph) {
-      try {
-        const client = await this.getClient();
-        const presence = await client.api("/me/presence").get() as { availability: UserProfile["presence"] };
-        return presence.availability;
-      } catch {
-        return "Available";
-      }
+    try {
+      const result = await graphApi("/me/presence") as { availability: UserProfile["presence"] };
+      return result.availability;
+    } catch {
+      return "Available";
     }
-    return "Available";
-  }
-
-  private async getClient(): Promise<{
-    api: (path: string) => { get: () => Promise<unknown> };
-  }> {
-    if (!this.graphClient) {
-      const { Client } = await import("@microsoft/microsoft-graph-client");
-      this.graphClient = Client.initWithMiddleware({ authProvider: { getAccessToken: async () => "" } });
-    }
-    return this.graphClient as never;
   }
 }
 

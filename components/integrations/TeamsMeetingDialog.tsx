@@ -38,8 +38,8 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
       });
       setMeeting(result);
       success("Teams meeting created");
-    } catch {
-      showError("Failed to create Teams meeting");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to create Teams meeting");
     } finally {
       setCreating(false);
     }

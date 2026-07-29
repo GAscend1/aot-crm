@@ -13,8 +13,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "AOT CRM",
-  description: "Customer Relationship Management System for Ascend One Tech",
+  title: {
+    default: "AOT CRM \u2014 Enterprise Customer Relationship Management",
+    template: "%s | AOT CRM",
+  },
+  description: "Manage leads, customers, pipelines, meetings, follow-ups, and Microsoft 365 conversations in one connected CRM platform.",
+  keywords: ["CRM", "customer relationship management", "sales pipeline", "Microsoft 365", "enterprise software"],
+  openGraph: {
+    title: "AOT CRM \u2014 Enterprise Customer Relationship Management",
+    description: "Turn every customer interaction into the next right action.",
+    url: "https://aotcrm.com",
+    siteName: "AOT CRM",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AOT CRM",
+    description: "Enterprise CRM with Microsoft 365 integration.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

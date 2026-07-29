@@ -37,8 +37,8 @@ export function EmailComposer({ open, onClose, to, subject: prefillSubject, onSe
       success("Email sent", `Your message has been sent.`);
       onSent?.();
       onClose();
-    } catch {
-      showError("Failed to send email");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to send email");
     } finally {
       setSending(false);
     }
@@ -53,8 +53,8 @@ export function EmailComposer({ open, onClose, to, subject: prefillSubject, onSe
       });
       success("Draft saved");
       onClose();
-    } catch {
-      showError("Failed to save draft");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to save draft");
     }
   };
 
