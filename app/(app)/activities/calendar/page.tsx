@@ -36,9 +36,9 @@ export default function CalendarPage() {
     return d.toISOString();
   }, [year, month]);
 
-  useEffect(() => {
-    calendarService.getEvents(monthStart, monthEnd).then(setEvents);
-  }, [monthStart, monthEnd]);
+  const loadEvents = () => calendarService.getEvents(monthStart, monthEnd).then(setEvents);
+
+  useEffect(() => { loadEvents(); }, [monthStart, monthEnd]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();

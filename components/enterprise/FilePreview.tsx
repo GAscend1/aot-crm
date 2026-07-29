@@ -31,9 +31,13 @@ function getFileIcon(type: FileItem["type"]) {
   }
 }
 
+function FilePreviewIcon({ type, className }: { type: FileItem["type"]; className?: string }) {
+  const Icon = getFileIcon(type);
+  return <Icon className={className} />;
+}
+
 export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps) {
   const [deleting, setDeleting] = useState(false);
-  const Icon = getFileIcon(file.type);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -60,7 +64,7 @@ export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps)
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border bg-white shadow-2xl dark:bg-slate-950 dark:border-slate-800">
             <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-800">
               <div className="flex items-center gap-2 min-w-0">
-                <Icon className="h-5 w-5 shrink-0 text-slate-500" />
+                <FilePreviewIcon type={file.type} className="h-5 w-5 shrink-0 text-slate-500" />
                 <span className="text-sm font-medium truncate text-slate-900 dark:text-white">
                   {file.name}
                 </span>
@@ -102,7 +106,7 @@ export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps)
               )}
               {(file.type === "office" || file.type === "other") && (
                 <div className="flex flex-col items-center justify-center gap-4 py-16 text-slate-400">
-                  <Icon className="h-16 w-16" />
+                  <FilePreviewIcon type={file.type} className="h-16 w-16" />
                   <p className="text-sm">Preview not available for {file.mimeType}</p>
                   <a
                     href={file.url}

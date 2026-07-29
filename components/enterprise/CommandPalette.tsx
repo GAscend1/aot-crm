@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import {
@@ -9,9 +9,7 @@ import {
   FileText,
   Users,
   Settings,
-  BarChart3,
   Layers,
-  Tag,
   LayoutDashboard,
   Building2,
   Contact,
@@ -76,13 +74,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       )
     : commands;
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (v: boolean) => {
+    if (!v) {
+      onClose();
+    } else {
       setSearch("");
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [open]);
+  };
 
   const execute = useCallback(
     (cmd: CommandItem) => {
@@ -111,7 +111,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const categories = Array.from(new Set(filtered.map((c) => c.category)));
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <DialogPrimitive.Popup className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 transition-all duration-150">
@@ -144,7 +144,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       </div>
                       {filtered
                         .filter((c) => c.category === category)
-                        .map((cmd, index) => {
+                        .map((cmd) => {
                           const globalIndex = filtered.indexOf(cmd);
                           const Icon = cmd.icon;
                           return (
