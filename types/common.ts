@@ -79,3 +79,157 @@ export interface BulkAction {
   icon?: React.ElementType;
   variant?: "default" | "destructive" | "outline";
 }
+
+export interface UserProfile {
+  id: string;
+  displayName: string;
+  email: string;
+  jobTitle: string;
+  department: string;
+  manager: string;
+  phone: string;
+  mobilePhone: string;
+  officeLocation: string;
+  photoUrl: string;
+  presence: "Available" | "Busy" | "DoNotDisturb" | "BeRightBack" | "Away" | "Offline";
+}
+
+export interface EmailMessage {
+  id: string;
+  threadId: string;
+  subject: string;
+  body: string;
+  bodyPreview: string;
+  sender: { name: string; email: string };
+  to: { name: string; email: string }[];
+  cc: { name: string; email: string }[];
+  bcc: { name: string; email: string }[];
+  attachments: EmailAttachment[];
+  isRead: boolean;
+  isDraft: boolean;
+  hasAttachments: boolean;
+  importance: "low" | "normal" | "high";
+  sentAt: string;
+  receivedAt: string;
+  categories: string[];
+}
+
+export interface EmailAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  contentBytes?: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  subject: string;
+  body: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  location: string;
+  onlineMeeting: { provider: string; url: string };
+  attendees: { name: string; email: string; status: string }[];
+  organizer: { name: string; email: string };
+  showAs: "free" | "tentative" | "busy" | "oof" | "workingElsewhere" | "unknown";
+  categories: string[];
+  recurrence: string | null;
+  reminder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamsMeeting {
+  id: string;
+  subject: string;
+  body: string;
+  start: string;
+  end: string;
+  onlineMeetingUrl: string;
+  joinUrl: string;
+  conferenceId: string;
+  dialInNumber: string;
+  participants: { name: string; email: string }[];
+  organizer: { name: string; email: string };
+  createdAt: string;
+}
+
+export interface ZoomMeeting {
+  id: string;
+  topic: string;
+  startTime: string;
+  duration: number;
+  timezone: string;
+  joinUrl: string;
+  password: string;
+  hostId: string;
+  hostName: string;
+  settings: { video: boolean; audio: string; muteUponEntry: boolean };
+  participants: { name: string; email: string; joinTime: string; leaveTime: string }[];
+  status: "upcoming" | "inProgress" | "ended";
+  createdAt: string;
+}
+
+export interface ZoomAccount {
+  connected: boolean;
+  email: string;
+  displayName: string;
+  connectedAt: string;
+}
+
+export interface FileItem {
+  id: string;
+  name: string;
+  type: "image" | "pdf" | "office" | "other";
+  mimeType: string;
+  size: number;
+  url: string;
+  thumbnailUrl?: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  entityType?: string;
+  entityId?: string;
+}
+
+export interface QuickCreateOption {
+  label: string;
+  icon: React.ElementType;
+  href: string;
+  description: string;
+}
+
+export interface Reminder {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  entityType?: string;
+  entityId?: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  entityType: string;
+  entityId: string;
+  assignedTo: string;
+  assignedBy: string;
+  dueDate: string;
+  status: "pending" | "inProgress" | "completed";
+  createdAt: string;
+}

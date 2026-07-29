@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   HelpCircle,
@@ -15,6 +16,7 @@ import {
   Bell,
   Command,
   Keyboard,
+  Plus,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,6 +37,7 @@ import { useTheme } from "@/components/enterprise/ThemeProvider";
 import { useAppNotifications } from "@/app/(app)/AppProviders";
 
 export function AppNavbar() {
+  const router = useRouter();
   const { toggle, toggleMobile } = useSidebar();
   const { toggle: toggleTheme, resolved: theme } = useTheme();
   const { data: session } = useSession();
@@ -159,20 +162,24 @@ export function AppNavbar() {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <User className="mr-2 h-4 w-4" />
                 My Profile
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <Settings className="mr-2 h-4 w-4" />
                 Preferences
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <Bell className="mr-2 h-4 w-4" />
                 Notifications
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Moon className="mr-2 h-4 w-4" />
+              <DropdownMenuItem onClick={toggleTheme}>
+                {theme === "dark" ? (
+                  <Sun className="mr-2 h-4 w-4" />
+                ) : (
+                  <Moon className="mr-2 h-4 w-4" />
+                )}
                 Appearance
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -200,7 +207,7 @@ export function AppNavbar() {
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Info className="mr-2 h-4 w-4" />
-                About
+                About AOT CRM
               </DropdownMenuItem>
             </DropdownMenuGroup>
 

@@ -1,8 +1,12 @@
 "use client";
 
-import { use } from "react";
-import { Mail, Clock } from "lucide-react";
+import { use, useState } from "react";
+import { Mail, Clock, Calendar, Video } from "lucide-react";
 import { RecordDetail } from "@/components/enterprise/RecordDetail";
+import { EmailComposer } from "@/components/integrations/EmailComposer";
+import { EventModal } from "@/components/integrations/EventModal";
+import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog";
+import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 import { ticketService } from "@/services/index";
 import type { Ticket } from "@/services/ticket.service";
 
@@ -22,46 +26,83 @@ const priorityColors: Record<string, string> = {
 
 export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [eventOpen, setEventOpen] = useState(false);
+  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [ticketRecord, setTicketRecord] = useState<Ticket | null>(null);
 
   return (
-    <RecordDetail<Ticket>
-      id={id}
-      service={ticketService}
-      backHref="/tickets"
-      title="Ticket"
-      getTitle={(t) => t.subject}
-      getDescription={(t) => `${t.requester} · ${t.department}`}
-      renderFields={(t) => [
-        { label: "Requester", value: t.requester },
-        { label: "Assignee", value: t.assignee },
-        { label: "Department", value: t.department },
-        { label: "SLA", value: t.sla },
-        { label: "Comments", value: t.comments },
-        { label: "Attachments", value: t.attachments },
-        { label: "Description", value: t.description },
-      ]}
-      renderStatus={(t) => ({
-        label: "Status",
-        value: (
-          <div className="space-y-3">
-            <div>
-              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[t.status] || ""}`}>
-                {t.status}
-              </span>
+    <>
+      <RecordDetail<Ticket>
+        id={id}
+        service={ticketService}
+        backHref="/tickets"
+        title="Ticket"
+        getTitle={(t) => t.subject}
+        getDescription={(t) => `${t.requester} · ${t.department}`}
+        onLoaded={(t) => setTicketRecord(t)}
+        renderFields={(t) => [
+          { label: "Requester", value: t.requester },
+          { label: "Assignee", value: t.assignee },
+          { label: "Department", value: t.department },
+          { label: "SLA", value: t.sla },
+          { label: "Comments", value: t.comments },
+          { label: "Attachments", value: t.attachments },
+          { label: "Description", value: t.description },
+        ]}
+        renderStatus={(t) => ({
+          label: "Status",
+          value: (
+            <div className="space-y-3">
+              <div>
+                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[t.status] || ""}`}>
+                  {t.status}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 mb-1">Priority</p>
+                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityColors[t.priority] || ""}`}>
+                  {t.priority}
+                </span>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500 mb-1">Priority</p>
-              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${priorityColors[t.priority] || ""}`}>
-                {t.priority}
-              </span>
-            </div>
-          </div>
-        ),
-      })}
-      quickActions={() => [
-        { label: "Send Email", icon: Mail, onClick: () => {} },
-        { label: "Update Status", icon: Clock, onClick: () => {} },
-      ]}
-    />
+          ),
+        })}
+        quickActions={(t) => [
+          { label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) },
+          { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },
+          { label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) },
+          { label: "Schedule Meeting", icon: Calendar, onClick: () => setEventOpen(true) },
+        ]}
+      />
+
+      {ticketRecord && (
+        <>
+          <EmailComposer
+            open={emailOpen}
+            onClose={() => setEmailOpen(false)}
+            to={[{ name: ticketRecord.requester, email: `${ticketRecord.requester.toLowerCase().replace(/\s+/g, ".")}@email.com` }]}
+            subject={`Re: ${ticketRecord.subject}`}
+          />
+          <EventModal
+            open={eventOpen}
+            onClose={() => setEventOpen(false)}
+            entityType="ticket"
+            entityId={ticketRecord.id}
+          />
+          <TeamsMeetingDialog
+            open={teamsOpen}
+            onClose={() => setTeamsOpen(false)}
+            entityName={ticketRecord.subject}
+          />
+          <ZoomMeetingDialog
+            open={zoomOpen}
+            onClose={() => setZoomOpen(false)}
+            entityName={ticketRecord.subject}
+          />
+        </>
+      )}
+    </>
   );
 }
