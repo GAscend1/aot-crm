@@ -37,6 +37,7 @@ interface Document {
 
 export class DocumentService extends BaseService<Document> {
   protected repository: MockRepository<Document>;
+  protected entityName = "document";
 
   constructor(initialData: Document[] = []) {
     super();

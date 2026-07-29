@@ -1,15 +1,27 @@
+"use client";
+
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmptyState } from "@/components/common/EmptyState";
-
-import { recentOpportunities } from "../mockData";
+import { useLive } from "@/hooks/use-live";
+import { Events } from "@/services/events";
+import { opportunityService } from "@/services";
 
 export function RecentOpportunities() {
-  if (recentOpportunities.length === 0) {
+  const { data: opportunities } = useLive(
+    () => opportunityService.findAll({ page: 1, pageSize: 5 }).then(r => r.data),
+    [
+      Events.OPPORTUNITY_CREATED, Events.OPPORTUNITY_UPDATED,
+      Events.OPPORTUNITY_DELETED, Events.OPPORTUNITY_WON, Events.OPPORTUNITY_LOST,
+    ],
+    []
+  );
+
+  if (opportunities.length === 0) {
     return (
       <SectionCard title="Recent Opportunities">
         <EmptyState
-          title="No opportunities yet"
-          description="New opportunities will appear here once created."
+          title="No opportunities"
+          description="Opportunities will appear here once created."
         />
       </SectionCard>
     );
@@ -18,35 +30,27 @@ export function RecentOpportunities() {
   return (
     <SectionCard title="Recent Opportunities">
       <div className="-mx-6 -mb-6">
-        {recentOpportunities.map((opportunity, index) => (
+        {opportunities.map((opp: any, index: number) => (
           <div
-            key={opportunity.id}
-            className={`px-6 py-3.5 ${
-              index < recentOpportunities.length - 1
-                ? "border-b border-slate-100"
-                : ""
+            key={opp.id}
+            className={`flex items-center justify-between px-6 py-3 ${
+              index < opportunities.length - 1 ? "border-b border-slate-100" : ""
             }`}
           >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-900">
-                {opportunity.title}
+            <div>
+              <p className="text-sm font-medium text-slate-900">{opp.title}</p>
+              <p className="text-xs text-slate-400">
+                {opp.customer} · ${opp.value?.toLocaleString()}
               </p>
-              <span className="text-sm font-semibold text-slate-900">
-                ${opportunity.value.toLocaleString()}
-              </span>
             </div>
-            <div className="mt-1.5 flex items-center gap-3">
-              <span className="text-xs text-slate-500">
-                {opportunity.customer}
-              </span>
-              <span className="text-xs text-slate-300">·</span>
-              <span className="text-xs text-slate-500">
-                {opportunity.stage}
-              </span>
-              <span className="text-xs text-slate-300">·</span>
-              <span className="text-xs text-slate-500">
-                {opportunity.probability}%
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-16 rounded-full bg-slate-200">
+                <div
+                  className="h-1.5 rounded-full bg-blue-500"
+                  style={{ width: `${opp.probability || 0}%` }}
+                />
+              </div>
+              <span className="text-xs text-slate-400">{opp.stage}</span>
             </div>
           </div>
         ))}

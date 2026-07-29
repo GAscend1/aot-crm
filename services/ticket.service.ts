@@ -23,6 +23,7 @@ interface Ticket {
 
 export class TicketService extends BaseService<Ticket> {
   protected repository: MockRepository<Ticket>;
+  protected entityName = "ticket";
 
   constructor(initialData: Ticket[] = []) {
     super();

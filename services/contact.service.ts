@@ -20,6 +20,7 @@ interface Contact {
 
 export class ContactService extends BaseService<Contact> {
   protected repository: MockRepository<Contact>;
+  protected entityName = "contact";
 
   constructor(initialData: Contact[] = []) {
     super();
