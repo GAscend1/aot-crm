@@ -15,6 +15,8 @@ import {
   Ticket,
   TrendingUp,
   Users,
+  User,
+  FileIcon,
 } from "lucide-react";
 
 import { UserRole } from "./roles";
@@ -42,6 +44,18 @@ export const navigation: NavigationGroup[] = [
         title: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
+        roles: Object.values(UserRole),
+      },
+      {
+        title: "Files",
+        href: "/files",
+        icon: FileIcon,
+        roles: Object.values(UserRole),
+      },
+      {
+        title: "Profile",
+        href: "/profile",
+        icon: User,
         roles: Object.values(UserRole),
       },
     ],

@@ -1,19 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { PageLayout } from "@/components/common/PageLayout";
 import { Button } from "@/components/ui/button";
+import { EventModal } from "@/components/integrations/EventModal";
+import { calendarService } from "@/services/calendar.service";
+import type { CalendarEvent } from "@/types/common";
 
 type ViewType = "month" | "week" | "day";
-
-const events = [
-  { id: "1", title: "Team Standup", date: "2026-07-28", time: "09:00", type: "meeting" },
-  { id: "2", title: "Client Call - Acme Corp", date: "2026-07-28", time: "11:00", type: "call" },
-  { id: "3", title: "Q3 Planning Session", date: "2026-07-29", time: "14:00", type: "meeting" },
-  { id: "4", title: "Follow up with TechStart", date: "2026-07-30", time: "10:30", type: "task" },
-  { id: "5", title: "Revenue Review", date: "2026-07-31", time: "15:00", type: "meeting" },
-];
 
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const monthNames = [
@@ -22,11 +17,28 @@ const monthNames = [
 ];
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 6, 28));
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>("month");
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+
+  const monthStart = useMemo(() => {
+    const d = new Date(year, month, 1);
+    return d.toISOString().slice(0, 10);
+  }, [year, month]);
+
+  const monthEnd = useMemo(() => {
+    const d = new Date(year, month + 1, 0, 23, 59, 59);
+    return d.toISOString();
+  }, [year, month]);
+
+  useEffect(() => {
+    calendarService.getEvents(monthStart, monthEnd).then(setEvents);
+  }, [monthStart, monthEnd]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();
@@ -40,15 +52,35 @@ export default function CalendarPage() {
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const goToday = () => setCurrentDate(new Date());
 
   const getEventsForDay = (day: number) =>
     events.filter((e) => {
-      const d = new Date(e.date);
+      const d = new Date(e.start);
       return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
     });
 
+  const handleEventClick = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setModalOpen(true);
+  };
+
+  const handleAddEvent = () => {
+    setSelectedEvent(null);
+    setModalOpen(true);
+  };
+
   return (
-    <PageLayout title="Calendar" description="View and manage your schedule.">
+    <PageLayout
+      title="Calendar"
+      description="View and manage your schedule."
+      actions={
+        <Button size="sm" onClick={handleAddEvent}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          Add Event
+        </Button>
+      }
+    >
       <div className="flex items-center justify-between rounded-xl border bg-white p-4 dark:bg-slate-900 dark:border-slate-700">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={prevMonth}>
@@ -60,7 +92,7 @@ export default function CalendarPage() {
           <Button variant="outline" size="icon" onClick={nextMonth}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date(2026, 6, 28))}>
+          <Button variant="outline" size="sm" onClick={goToday}>
             Today
           </Button>
         </div>
@@ -80,10 +112,6 @@ export default function CalendarPage() {
               </button>
             ))}
           </div>
-          <Button size="sm">
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add Event
-          </Button>
         </div>
       </div>
 
@@ -101,8 +129,9 @@ export default function CalendarPage() {
         <div className="grid grid-cols-7">
           {calendarDays.map((day, index) => {
             const dayEvents = day ? getEventsForDay(day) : [];
+            const today = new Date();
             const isToday =
-              day === 28 && month === 6 && year === 2026;
+              day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
 
             return (
               <div
@@ -123,14 +152,28 @@ export default function CalendarPage() {
                       {day}
                     </div>
                     <div className="space-y-1">
-                      {dayEvents.map((event) => (
-                        <div
-                          key={event.id}
-                          className="truncate rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                        >
-                          {event.time} {event.title}
-                        </div>
-                      ))}
+                      {dayEvents.map((event) => {
+                        const colorMap: Record<string, string> = {
+                          team: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+                          meeting: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                          call: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                          task: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+                          default: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                        };
+                        const hasTeams = event.onlineMeeting?.provider === "teams";
+                        const color = hasTeams ? "team" : "meeting";
+
+                        return (
+                          <button
+                            key={event.id}
+                            onClick={() => handleEventClick(event)}
+                            className={`w-full truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-left ${colorMap[color] || colorMap.default}`}
+                          >
+                            {new Date(event.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
+                            {event.subject}
+                          </button>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -139,6 +182,13 @@ export default function CalendarPage() {
           })}
         </div>
       </div>
+
+      <EventModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setSelectedEvent(null); }}
+        event={selectedEvent}
+        onSaved={() => { loadEvents(); setModalOpen(false); setSelectedEvent(null); }}
+      />
     </PageLayout>
   );
 }

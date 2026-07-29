@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Phone, Calendar } from "lucide-react";
+import { Mail, Phone, Calendar, Video } from "lucide-react";
 
 import {
   DetailView,
@@ -13,6 +13,11 @@ import {
 import { SectionCard } from "@/components/common/SectionCard";
 import { TagInput } from "@/components/enterprise/TagInput";
 import { Timeline, type TimelineEntry } from "@/components/enterprise/Timeline";
+import { EmailComposer } from "@/components/integrations/EmailComposer";
+import { EmailTimeline } from "@/components/integrations/EmailTimeline";
+import { EventModal } from "@/components/integrations/EventModal";
+import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog";
+import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { customerService } from "@/services/index";
@@ -32,6 +37,10 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [auditLog, setAuditLog] = useState<TimelineEntry[]>([]);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [eventOpen, setEventOpen] = useState(false);
+  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
     customerService.findById(id).then((result) => {
@@ -161,6 +170,10 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
               </DetailSection>
             )}
 
+            <DetailSection title="Email History">
+              <EmailTimeline entityEmail={customer.email} entityName={customer.name} />
+            </DetailSection>
+
             <DetailSection title="Activity Timeline">
               <Timeline
                 entries={
@@ -207,15 +220,31 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
 
             <SectionCard title="Quick Actions">
               <div className="flex flex-col gap-2">
-                <button className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <button
+                  onClick={() => setEmailOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                >
                   <Mail className="h-4 w-4" />
                   Send Email
                 </button>
-                <button className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                  <Phone className="h-4 w-4" />
-                  Log Call
+                <button
+                  onClick={() => setTeamsOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                >
+                  <Video className="h-4 w-4 text-purple-500" />
+                  Teams Meeting
                 </button>
-                <button className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <button
+                  onClick={() => setZoomOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                >
+                  <Video className="h-4 w-4 text-blue-500" />
+                  Zoom Meeting
+                </button>
+                <button
+                  onClick={() => setEventOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                >
                   <Calendar className="h-4 w-4" />
                   Schedule Meeting
                 </button>
@@ -227,9 +256,7 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
 
       <CustomerDrawer
         open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-        }}
+        onOpenChange={(open) => setDrawerOpen(open)}
         customer={customer}
         onSave={handleSave}
       />
@@ -240,9 +267,32 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
         customer={customer}
         onConfirm={handleDelete}
       />
+
+      <EmailComposer
+        open={emailOpen}
+        onClose={() => setEmailOpen(false)}
+        to={[{ name: customer.name, email: customer.email }]}
+        subject=""
+      />
+
+      <EventModal
+        open={eventOpen}
+        onClose={() => setEventOpen(false)}
+        entityType="customer"
+        entityId={customer.id}
+      />
+
+      <TeamsMeetingDialog
+        open={teamsOpen}
+        onClose={() => setTeamsOpen(false)}
+        entityName={customer.name}
+      />
+
+      <ZoomMeetingDialog
+        open={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        entityName={customer.name}
+      />
     </>
   );
 }
-
-
-

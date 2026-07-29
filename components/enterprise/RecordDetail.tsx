@@ -36,6 +36,7 @@ interface RecordDetailProps<T extends { id: string }> {
   onTagsChange?: (record: T, tags: string[]) => Promise<void>;
   quickActions?: (record: T) => QuickAction[];
   extraSections?: (record: T) => ReactNode;
+  onLoaded?: (record: T) => void;
 }
 
 export function RecordDetail<T extends { id: string }>({
@@ -51,6 +52,7 @@ export function RecordDetail<T extends { id: string }>({
   onTagsChange,
   quickActions,
   extraSections,
+  onLoaded,
 }: RecordDetailProps<T>) {
   const router = useRouter();
   const { success, error: showError } = useToastContext();
@@ -65,8 +67,9 @@ export function RecordDetail<T extends { id: string }>({
       }
       setRecord(result);
       setLoading(false);
+      onLoaded?.(result);
     });
-  }, [id, service, router, backHref]);
+  }, [id, service, router, backHref, onLoaded]);
 
   const handleDelete = useCallback(async () => {
     if (!record) return;
