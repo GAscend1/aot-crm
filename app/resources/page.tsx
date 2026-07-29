@@ -1,82 +1,103 @@
-"use client";
+"use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { BookOpen, FileText, HelpCircle, Video, ArrowRight } from "lucide-react";
-import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { BookOpen, FileText, HelpCircle, Video, ArrowRight, Zap } from "lucide-react"
+import Link from "next/link"
+import { MarketingLayout } from "@/components/marketing/MarketingLayout"
+import { ScrollReveal } from "@/components/marketing/ScrollReveal"
+import { cn } from "@/lib/utils"
 
 const sections = [
   {
-    title: "Blog",
-    description: "Insights, tips, and best practices for CRM, sales, and customer success.",
+    title: "Getting Started Guides",
+    description: "Step-by-step guides to set up your team, import your data, and start using AOT CRM productively.",
     icon: BookOpen,
-    href: "#",
+    gradient: "from-blue-500 to-cyan-500",
     articles: [
-      "Getting started with pipeline management",
-      "5 ways to improve lead conversion rates",
-      "Integrating Microsoft 365 with your CRM",
+      "Set up your workspace and invite your team",
+      "Import contacts from Outlook and CSV files",
+      "Create your first pipeline and add deals",
+      "Connect Microsoft 365 integration",
     ],
   },
   {
-    title: "Documentation",
-    description: "Comprehensive guides, API references, and configuration manuals.",
+    title: "Product Documentation",
+    description: "Comprehensive guides, API references, configuration manuals, and integration docs.",
     icon: FileText,
-    href: "#",
+    gradient: "from-purple-500 to-indigo-500",
     articles: [
-      "Installation & setup guide",
-      "API reference documentation",
+      "API reference and webhook documentation",
       "Migration from other CRM platforms",
+      "Workflow automation reference",
+      "Security and compliance guide",
     ],
   },
   {
-    title: "Help Center",
-    description: "Troubleshooting guides, FAQs, and community discussions.",
+    title: "Help Center & FAQ",
+    description: "Troubleshooting guides, account management, and answers to common questions.",
     icon: HelpCircle,
-    href: "#",
+    gradient: "from-amber-500 to-orange-500",
     articles: [
+      "Account setup and billing management",
       "Common troubleshooting steps",
-      "Account & billing FAQs",
-      "Data export and backup guide",
+      "Data export, backup, and restore",
+      "Permission and role management",
     ],
   },
   {
-    title: "Webinars",
-    description: "Live and on-demand sessions covering product features and best practices.",
+    title: "Webinars & Product Demos",
+    description: "Watch live and recorded sessions covering the latest features, best practices, and roadmap previews.",
     icon: Video,
-    href: "#",
+    gradient: "from-emerald-500 to-teal-500",
     articles: [
-      "Product roadmap overview",
-      "Deep dive: automation workflows",
+      "Product roadmap and what is coming next",
+      "Deep dive: workflow automation",
+      "Customer success stories and case studies",
       "Security & compliance best practices",
     ],
   },
-];
+]
+
+const quickLinks = [
+  { label: "API Reference", href: "#" },
+  { label: "Status Page", href: "#" },
+  { label: "Release Notes", href: "#" },
+  { label: "System Requirements", href: "#" },
+  { label: "Glossary", href: "#" },
+]
 
 export default function ResourcesPage() {
   return (
-    <>
-      <Header />
-      <main>
-        <section className="bg-gradient-to-b from-blue-950 to-background py-24 text-center">
-          <div className="mx-auto max-w-3xl px-4">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Resources</h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Everything you need to get the most out of AOT CRM.
-            </p>
+    <MarketingLayout>
+      <section className="relative overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-20 text-center">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute top-[-20%] right-[-5%] size-[400px] rounded-full bg-indigo-500/5 blur-[100px]" />
+        </div>
+        <div className="mx-auto max-w-3xl px-4">
+          <div className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground mb-4">
+            <span className="size-1.5 rounded-full bg-primary" />
+            Learn & Grow
           </div>
-        </section>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Resources</h1>
+          <p className="mt-4 text-lg text-muted-foreground">
+            Everything you need to get the most out of AOT CRM.
+          </p>
+        </div>
+      </section>
 
-        <section className="py-20">
+      <ScrollReveal>
+        <section className="pb-20">
           <div className="mx-auto max-w-7xl px-4">
             <div className="grid gap-6 sm:grid-cols-2">
               {sections.map((s) => {
-                const Icon = s.icon;
+                const Icon = s.icon
                 return (
-                  <Card key={s.title}>
+                  <Card key={s.title} className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
                     <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900">
-                          <Icon className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                      <div className={cn("inline-flex rounded-lg bg-gradient-to-r p-0.5", s.gradient)}>
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-background">
+                          <Icon className="h-5 w-5 text-foreground" />
                         </div>
                       </div>
                       <CardTitle className="mt-3">{s.title}</CardTitle>
@@ -85,66 +106,67 @@ export default function ResourcesPage() {
                     <CardContent className="space-y-4">
                       <ul className="space-y-2">
                         {s.articles.map((a) => (
-                          <li key={a} className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                            &bull; {a}
+                          <li key={a}>
+                            <Link href="#" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                              <ArrowRight className="size-3 shrink-0 text-primary" />
+                              {a}
+                            </Link>
                           </li>
                         ))}
                       </ul>
-                      <Button variant="link" className="h-auto p-0" asChild>
-                        <Link href={s.href}>
-                          View all <ArrowRight className="ml-1 h-3 w-3" />
-                        </Link>
-                      </Button>
                     </CardContent>
                   </Card>
-                );
+                )
               })}
             </div>
           </div>
         </section>
+      </ScrollReveal>
 
-        <section className="bg-muted/50 py-20 text-center">
-          <div className="mx-auto max-w-2xl px-4 space-y-6">
-            <h2 className="text-3xl font-bold">Still have questions?</h2>
-            <p className="text-muted-foreground">Our support team is here to help.</p>
-            <Button size="lg" asChild>
-              <Link href="/contact">Contact Support</Link>
-            </Button>
+      <ScrollReveal>
+        <section className="border-t bg-muted/30 py-20 dark:bg-transparent">
+          <div className="mx-auto max-w-5xl px-4">
+            <div className="grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-1">
+                <h2 className="text-2xl font-bold">Quick Links</h2>
+                <p className="mt-2 text-sm text-muted-foreground">Commonly accessed resources.</p>
+              </div>
+              <div className="lg:col-span-2">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {quickLinks.map((link) => (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm transition-all hover:shadow-sm hover:-translate-y-0.5"
+                    >
+                      <Zap className="size-4 text-primary" />
+                      {link.label}
+                      <ArrowRight className="ml-auto size-3 text-muted-foreground" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
-      </main>
-      <Footer />
-    </>
-  );
-}
+      </ScrollReveal>
 
-function Header() {
-  return (
-    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-lg">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-          <img src="/Logo.png" alt="AOT" className="h-8 w-8" />
-          AOT CRM
-        </Link>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Log In</Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/book-demo">Book a Demo</Link>
-          </Button>
-        </div>
-      </nav>
-    </header>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="border-t bg-background py-12">
-      <div className="mx-auto max-w-7xl px-4 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} Ascend One Tech. All rights reserved.
-      </div>
-    </footer>
-  );
+      <ScrollReveal>
+        <section className="py-20 text-center">
+          <div className="mx-auto max-w-2xl px-4 space-y-6">
+            <h2 className="text-3xl font-bold">Need help getting started?</h2>
+            <p className="text-muted-foreground">Our team is ready to help you make the most of AOT CRM.</p>
+            <div className="flex justify-center gap-4">
+              <Button asChild>
+                <Link href="/book-demo">Book Onboarding <ArrowRight className="ml-1.5 h-4 w-4" /></Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/contact">Contact Support</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      </ScrollReveal>
+    </MarketingLayout>
+  )
 }
