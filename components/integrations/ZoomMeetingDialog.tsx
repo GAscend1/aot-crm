@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { X, Video, ExternalLink, Copy, Clock, Link2 } from "lucide-react";
+import { X, Video, ExternalLink, Copy, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { zoomService } from "@/services/zoom.service";
 import { useToastContext } from "@/app/(app)/AppProviders";

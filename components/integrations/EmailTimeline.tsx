@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Mail, Reply, Forward, ChevronRight } from "lucide-react";
+import { Mail, Reply, Forward } from "lucide-react";
 import { outlookService } from "@/services/outlook.service";
 import { EmailComposer } from "./EmailComposer";
 import type { EmailMessage } from "@/types/common";

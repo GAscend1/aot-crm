@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
-import { Mail, Clock, Calendar, Video } from "lucide-react";
+import { Mail, Calendar, Video } from "lucide-react";
 import { RecordDetail } from "@/components/enterprise/RecordDetail";
 import { EmailComposer } from "@/components/integrations/EmailComposer";
 import { EventModal } from "@/components/integrations/EventModal";
@@ -69,7 +69,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             </div>
           ),
         })}
-        quickActions={(t) => [
+        quickActions={() => [
           { label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) },
           { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },
           { label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) },

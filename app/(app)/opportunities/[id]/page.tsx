@@ -71,7 +71,7 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
             </div>
           ) : null
         }
-        quickActions={(o) => [
+        quickActions={() => [
           { label: "Send Proposal", icon: FileText, onClick: () => setEmailOpen(true) },
           { label: "Email Customer", icon: Mail, onClick: () => setEmailOpen(true) },
           { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },

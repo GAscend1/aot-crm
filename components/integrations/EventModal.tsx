@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { X, Calendar, Clock, MapPin, Video, Users } from "lucide-react";
+import { X, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { calendarService } from "@/services/calendar.service";
 import { teamsService } from "@/services/teams.service";
@@ -19,6 +19,7 @@ interface EventModalProps {
 }
 
 export function EventModal({ open, onClose, event, entityType, entityId, onSaved }: EventModalProps) {
+  void entityId;
   const { success, error: showError } = useToastContext();
   const isEditing = !!event;
   const [subject, setSubject] = useState(event?.subject || "");

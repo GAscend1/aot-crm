@@ -12,11 +12,10 @@ interface EmailComposerProps {
   onClose: () => void;
   to: { name: string; email: string }[];
   subject?: string;
-  templateId?: string;
   onSent?: () => void;
 }
 
-export function EmailComposer({ open, onClose, to, subject: prefillSubject, templateId, onSent }: EmailComposerProps) {
+export function EmailComposer({ open, onClose, to, subject: prefillSubject, onSent }: EmailComposerProps) {
   const { success, error: showError } = useToastContext();
   const [toInput, setToInput] = useState(to.map((t) => t.email).join(", "));
   const [subject, setSubject] = useState(prefillSubject || "");

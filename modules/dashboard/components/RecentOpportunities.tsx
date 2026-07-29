@@ -30,7 +30,7 @@ export function RecentOpportunities() {
   return (
     <SectionCard title="Recent Opportunities">
       <div className="-mx-6 -mb-6">
-        {opportunities.map((opp: any, index: number) => (
+        {opportunities.map((opp, index: number) => (
           <div
             key={opp.id}
             className={`flex items-center justify-between px-6 py-3 ${

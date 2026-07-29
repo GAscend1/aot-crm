@@ -22,15 +22,6 @@ import { FilePreview } from "@/components/enterprise/FilePreview";
 import { fileManagementService } from "@/services/file-management.service";
 import type { FileItem } from "@/types/common";
 
-function getFileIcon(type: FileItem["type"]) {
-  switch (type) {
-    case "image": return FileImage;
-    case "pdf": return FileText;
-    case "office": return FileSpreadsheet;
-    default: return FileIcon;
-  }
-}
-
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -38,8 +29,12 @@ function formatSize(bytes: number) {
 }
 
 function FileIconDisplay({ type, className }: { type: FileItem["type"]; className?: string }) {
-  const Icon = getFileIcon(type);
-  return <Icon className={className} />;
+  switch (type) {
+    case "image": return <FileImage className={className} />;
+    case "pdf": return <FileText className={className} />;
+    case "office": return <FileSpreadsheet className={className} />;
+    default: return <FileIcon className={className} />;
+  }
 }
 
 export default function FilesPage() {

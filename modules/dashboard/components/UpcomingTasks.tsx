@@ -20,9 +20,9 @@ export function UpcomingTasks() {
     []
   );
 
-  const tasks = activities.filter((a: any) => a.type === "Task");
-  const activeTasks = tasks.filter((t: any) => t.status !== "Completed");
-  const completedTasks = tasks.filter((t: any) => t.status === "Completed");
+  const tasks = activities.filter((a) => a.type === "Task");
+  const activeTasks = tasks.filter((t) => t.status !== "Completed");
+  const completedTasks = tasks.filter((t) => t.status === "Completed");
 
   if (tasks.length === 0) {
     return (
@@ -38,7 +38,7 @@ export function UpcomingTasks() {
   return (
     <SectionCard title="Upcoming Tasks">
       <div className="-mx-6 -mb-6">
-        {activeTasks.map((task: any, index: number) => (
+        {activeTasks.map((task, index: number) => (
           <div
             key={task.id}
             className={`flex items-start gap-3 px-6 py-3 ${
@@ -64,7 +64,7 @@ export function UpcomingTasks() {
             <div className="border-b border-slate-100 px-6 py-2">
               <p className="text-xs font-medium text-slate-400">Completed</p>
             </div>
-            {completedTasks.map((task: any) => (
+            {completedTasks.map((task) => (
               <div
                 key={task.id}
                 className="flex items-start gap-3 px-6 py-3 opacity-60"

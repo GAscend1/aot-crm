@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useState } from "react";
-import { Mail, Phone, TrendingUp, Calendar, Video } from "lucide-react";
+import { Mail, Calendar, Video } from "lucide-react";
 import { RecordDetail } from "@/components/enterprise/RecordDetail";
 import { EmailComposer } from "@/components/integrations/EmailComposer";
 import { EventModal } from "@/components/integrations/EventModal";
@@ -56,7 +56,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </span>
           ),
         })}
-        quickActions={(l) => [
+        quickActions={() => [
           { label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) },
           { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },
           { label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) },

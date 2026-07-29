@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { PageLayout } from "@/components/common/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -36,9 +36,13 @@ export default function CalendarPage() {
     return d.toISOString();
   }, [year, month]);
 
-  const loadEvents = () => calendarService.getEvents(monthStart, monthEnd).then(setEvents);
+  const loadEvents = useCallback(() => {
+    calendarService.getEvents(monthStart, monthEnd).then(setEvents);
+  }, [monthStart, monthEnd]);
 
-  useEffect(() => { loadEvents(); }, [monthStart, monthEnd]);
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();

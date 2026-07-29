@@ -48,7 +48,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
             </span>
           ),
         })}
-        quickActions={(c) => [
+        quickActions={() => [
           { label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) },
           { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },
           { label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) },

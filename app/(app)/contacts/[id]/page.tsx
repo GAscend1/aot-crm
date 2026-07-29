@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useCallback, useState } from "react";
-import { Mail, Phone, Calendar, Video } from "lucide-react";
+import { Mail, Calendar, Video } from "lucide-react";
 import { RecordDetail } from "@/components/enterprise/RecordDetail";
 import { EmailComposer } from "@/components/integrations/EmailComposer";
 import { EmailTimeline } from "@/components/integrations/EmailTimeline";
@@ -64,7 +64,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
             <EmailTimeline entityEmail={c.email} entityName={`${c.firstName} ${c.lastName}`} />
           </div>
         )}
-        quickActions={(c) => [
+        quickActions={() => [
           { label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) },
           { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },
           { label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) },

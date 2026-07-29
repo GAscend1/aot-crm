@@ -1,7 +1,6 @@
 import { v4 as uuid } from "uuid";
 import { eventBus } from "./event-bus";
 import { Events, type EntityEventPayload } from "./events";
-import type { AuditEntry, Notification } from "@/types/common";
 
 interface TimelineActivity {
   id: string;

@@ -1,20 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  BarChart3,
   TrendingUp,
   DollarSign,
   Users,
   Target,
-  PieChart,
-  Activity,
   Ticket,
   Briefcase,
   Building2,
   FileText,
-  ArrowUpRight,
   Download,
 } from "lucide-react";
 
@@ -24,7 +19,6 @@ import { ChartCard } from "@/components/charts/ChartCard";
 import { Button } from "@/components/ui/button";
 
 import {
-  LineChart,
   Line,
   AreaChart,
   Area,
@@ -96,12 +90,24 @@ const teamPerformance = [
   { name: "Lisa P", deals: 9, revenue: 61000, winRate: 70 },
 ];
 
-function ChartTooltip({ active, payload, label }: any) {
+interface ChartTooltipPayloadEntry {
+  name: string;
+  value: number | string;
+  color: string;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: ChartTooltipPayloadEntry[];
+  label?: string;
+}
+
+function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border bg-white p-3 shadow-lg dark:bg-slate-900 dark:border-slate-700">
       <p className="text-sm font-medium text-slate-900 dark:text-white">{label}</p>
-      {payload.map((entry: any, i: number) => (
+      {payload.map((entry, i) => (
         <p key={i} className="text-sm" style={{ color: entry.color }}>
           {entry.name}: {typeof entry.value === "number" ? entry.value.toLocaleString() : entry.value}
         </p>

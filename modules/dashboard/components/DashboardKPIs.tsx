@@ -50,8 +50,8 @@ export function DashboardKPIs() {
     []
   );
 
-  const totalRevenue = opportunities.reduce((sum, opp) => sum + (opp as any).value || 0, 0);
-  const openTickets = tickets.filter((t: any) => t.status === "Open" || t.status === "In Progress");
+  const totalRevenue = opportunities.reduce((sum, opp) => sum + opp.value || 0, 0);
+  const openTickets = tickets.filter((t) => t.status === "Open" || t.status === "In Progress");
 
   const kpis = [
     { title: "Total Revenue", value: `$${totalRevenue.toLocaleString()}`, change: 12.5, icon: DollarSign },

@@ -22,18 +22,13 @@ interface FilePreviewProps {
   onDelete?: (id: string) => void;
 }
 
-function getFileIcon(type: FileItem["type"]) {
-  switch (type) {
-    case "image": return FileImage;
-    case "pdf": return FileText;
-    case "office": return FileSpreadsheet;
-    default: return FileIcon;
-  }
-}
-
 function FilePreviewIcon({ type, className }: { type: FileItem["type"]; className?: string }) {
-  const Icon = getFileIcon(type);
-  return <Icon className={className} />;
+  switch (type) {
+    case "image": return <FileImage className={className} />;
+    case "pdf": return <FileText className={className} />;
+    case "office": return <FileSpreadsheet className={className} />;
+    default: return <FileIcon className={className} />;
+  }
 }
 
 export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps) {

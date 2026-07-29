@@ -27,7 +27,7 @@ export function RecentCustomers() {
   return (
     <SectionCard title="Recent Customers">
       <div className="-mx-6 -mb-6">
-        {customers.map((customer: any, index: number) => (
+        {customers.map((customer, index: number) => (
           <div
             key={customer.id}
             className={`flex items-center justify-between px-6 py-3 ${

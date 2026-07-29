@@ -12,21 +12,21 @@ class SynchronizedNotificationService {
 
   private initHandlers(): void {
     const handlers: [string, (payload: unknown) => Record<string, unknown> | null][] = [
-      [Events.CALENDAR_EVENT_CREATED, (_p) => ({ type: "info", title: "Event created", message: "A new calendar event has been scheduled", category: "calendar" })],
-      [Events.CALENDAR_EVENT_UPDATED, (_p) => ({ type: "info", title: "Event updated", message: "A calendar event has been modified", category: "calendar" })],
-      [Events.CALENDAR_EVENT_DELETED, (_p) => ({ type: "warning", title: "Event cancelled", message: "A calendar event has been cancelled", category: "calendar" })],
-      [Events.TEAMS_MEETING_CREATED, (_p) => ({ type: "info", title: "Teams meeting created", message: "A new Teams meeting has been scheduled", category: "meetings" })],
-      [Events.TEAMS_MEETING_UPDATED, (_p) => ({ type: "info", title: "Teams meeting updated", message: "A Teams meeting has been modified", category: "meetings" })],
-      [Events.ZOOM_MEETING_CREATED, (_p) => ({ type: "info", title: "Zoom meeting created", message: "A new Zoom meeting has been scheduled", category: "meetings" })],
-      [Events.ZOOM_MEETING_UPDATED, (_p) => ({ type: "info", title: "Zoom meeting updated", message: "A Zoom meeting has been modified", category: "meetings" })],
-      [Events.EMAIL_SENT, (_p) => ({ type: "success", title: "Email sent", message: "Your email has been sent successfully", category: "email" })],
-      [Events.EMAIL_FAILED, (_p) => ({ type: "error", title: "Email failed", message: "Failed to send email", category: "email" })],
+      [Events.CALENDAR_EVENT_CREATED, () => ({ type: "info", title: "Event created", message: "A new calendar event has been scheduled", category: "calendar" })],
+      [Events.CALENDAR_EVENT_UPDATED, () => ({ type: "info", title: "Event updated", message: "A calendar event has been modified", category: "calendar" })],
+      [Events.CALENDAR_EVENT_DELETED, () => ({ type: "warning", title: "Event cancelled", message: "A calendar event has been cancelled", category: "calendar" })],
+      [Events.TEAMS_MEETING_CREATED, () => ({ type: "info", title: "Teams meeting created", message: "A new Teams meeting has been scheduled", category: "meetings" })],
+      [Events.TEAMS_MEETING_UPDATED, () => ({ type: "info", title: "Teams meeting updated", message: "A Teams meeting has been modified", category: "meetings" })],
+      [Events.ZOOM_MEETING_CREATED, () => ({ type: "info", title: "Zoom meeting created", message: "A new Zoom meeting has been scheduled", category: "meetings" })],
+      [Events.ZOOM_MEETING_UPDATED, () => ({ type: "info", title: "Zoom meeting updated", message: "A Zoom meeting has been modified", category: "meetings" })],
+      [Events.EMAIL_SENT, () => ({ type: "success", title: "Email sent", message: "Your email has been sent successfully", category: "email" })],
+      [Events.EMAIL_FAILED, () => ({ type: "error", title: "Email failed", message: "Failed to send email", category: "email" })],
       [Events.OPPORTUNITY_WON, (p) => ({ type: "success", title: "Opportunity won", message: `Opportunity ${(p as unknown as EntityEventPayload).data?.title || ""} has been won`, category: "crm" })],
       [Events.OPPORTUNITY_LOST, (p) => ({ type: "error", title: "Opportunity lost", message: `Opportunity ${(p as unknown as EntityEventPayload).data?.title || ""} has been lost`, category: "crm" })],
-      [Events.CUSTOMER_CREATED, (_p) => ({ type: "success", title: "New customer", message: "A new customer has been added", category: "crm" })],
-      [Events.CONTACT_CREATED, (_p) => ({ type: "info", title: "New contact", message: "A new contact has been created", category: "crm" })],
-      [Events.TASK_ASSIGNED, (_p) => ({ type: "info", title: "Task assigned", message: "A new task has been assigned to you", category: "tasks" })],
-      [Events.TASK_COMPLETED, (_p) => ({ type: "success", title: "Task completed", message: "A task has been completed", category: "tasks" })],
+      [Events.CUSTOMER_CREATED, () => ({ type: "success", title: "New customer", message: "A new customer has been added", category: "crm" })],
+      [Events.CONTACT_CREATED, () => ({ type: "info", title: "New contact", message: "A new contact has been created", category: "crm" })],
+      [Events.TASK_ASSIGNED, () => ({ type: "info", title: "Task assigned", message: "A new task has been assigned to you", category: "tasks" })],
+      [Events.TASK_COMPLETED, () => ({ type: "success", title: "Task completed", message: "A task has been completed", category: "tasks" })],
     ];
 
     for (const [event, builder] of handlers) {
