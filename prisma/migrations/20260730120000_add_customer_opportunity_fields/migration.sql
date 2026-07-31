@@ -1,0 +1,13 @@
+-- Add fields for Customer
+ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "position" TEXT;
+ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "notes" TEXT;
+ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "tags" JSONB NOT NULL DEFAULT '[]';
+
+-- Add fields for Lead
+ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "score" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "notes" TEXT;
+
+-- Add fields for Opportunity
+ALTER TABLE "Opportunity" ADD COLUMN IF NOT EXISTS "expectedCloseDate" TIMESTAMPTZ;
+ALTER TABLE "Opportunity" ADD COLUMN IF NOT EXISTS "notes" TEXT;
+ALTER TABLE "Opportunity" ADD COLUMN IF NOT EXISTS "ownerId" TEXT;

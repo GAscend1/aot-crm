@@ -1,12 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import { monthlyRevenue } from "../mockData";
+import { useState, useEffect } from "react";
+
+interface MonthlyData {
+  month: string;
+  revenue: number;
+  target: number;
+}
 
 export function RevenueChart() {
   const [view, setView] = useState<"revenue" | "target">("revenue");
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/dashboard/revenue");
+        if (res.ok) {
+          const json = await res.json();
+          setMonthlyData(json.monthlyRevenue || []);
+        }
+      } catch {
+        // Silently fail
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (monthlyData.length === 0) return null;
+
   const maxValue = Math.max(
-    ...monthlyRevenue.map((m) => Math.max(m.revenue, m.target))
+    ...monthlyData.map((m) => Math.max(m.revenue, m.target))
   );
 
   return (
@@ -43,7 +67,7 @@ export function RevenueChart() {
       </div>
       <div className="p-6">
         <div className="flex items-end gap-2" style={{ height: 200 }}>
-          {monthlyRevenue.map((m) => {
+          {monthlyData.map((m) => {
             const value = view === "revenue" ? m.revenue : m.target;
             const height = (value / maxValue) * 100;
 

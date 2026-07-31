@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import type { UserRole } from "@/config/roles";
+import { getCrmUser } from "@/lib/server/api";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -18,11 +20,14 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const user = await getCrmUser();
+  const role = (user?.role ?? "VIEWER") as UserRole;
+
   return (
     <SidebarProvider>
       <AppProviders>
         <AppShell
-          sidebar={<AppSidebar />}
+          sidebar={<AppSidebar role={role} />}
           navbar={<AppNavbar />}
         >
           {children}

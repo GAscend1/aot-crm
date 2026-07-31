@@ -1,5 +1,5 @@
 import { BaseService } from "./base/BaseService";
-import { MockRepository } from "@/repositories/mock/MockRepository";
+import type { IRepository } from "@/repositories/base/IRepository";
 
 export type DocumentCategory =
   | "Contract"
@@ -19,7 +19,7 @@ export type DocumentType =
 
 export type DocumentStatus = "Active" | "Archived";
 
-interface Document {
+export interface Document {
   id: string;
   name: string;
   category: DocumentCategory;
@@ -36,13 +36,11 @@ interface Document {
 }
 
 export class DocumentService extends BaseService<Document> {
-  protected repository: MockRepository<Document>;
+  protected repository: IRepository<Document>;
   protected entityName = "document";
 
-  constructor(initialData: Document[] = []) {
+  constructor(repository: IRepository<Document>) {
     super();
-    this.repository = new MockRepository<Document>(initialData);
+    this.repository = repository;
   }
 }
-
-export type { Document };

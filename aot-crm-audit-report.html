@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOT CRM — Persistence &amp; Integration Audit Report</title>
+<style>
+  @page { margin: 0.75in; size: letter; @top-center { content: "AOT CRM Audit Report — July 2026"; font-size: 8pt; color: #888; } @bottom-center { content: "Page " counter(page); font-size: 8pt; color: #888; } }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 10pt; line-height: 1.5; color: #1a1a1a; max-width: 8.5in; margin: 0 auto; padding: 0.25in; }
+  h1 { font-size: 20pt; margin-bottom: 0; color: #1e3a5f; border-bottom: 3px solid #1e3a5f; padding-bottom: 6pt; }
+  h2 { font-size: 14pt; margin-top: 18pt; margin-bottom: 6pt; color: #1e3a5f; border-bottom: 1px solid #ccc; padding-bottom: 3pt; }
+  h3 { font-size: 11pt; margin-top: 14pt; margin-bottom: 4pt; color: #2d5a87; }
+  h4 { font-size: 10pt; margin-top: 10pt; margin-bottom: 3pt; color: #333; }
+  p { margin: 4pt 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8pt 0; font-size: 9pt; page-break-inside: auto; }
+  th, td { border: 1px solid #bbb; padding: 3pt 5pt; text-align: left; vertical-align: top; }
+  th { background: #1e3a5f; color: #fff; font-weight: 600; }
+  tr:nth-child(even) { background: #f5f7fa; }
+  .status-working { background: #d4edda; color: #155724; padding: 1pt 5pt; border-radius: 3pt; font-weight: 600; font-size: 8pt; white-space: nowrap; }
+  .status-mock { background: #fff3cd; color: #856404; padding: 1pt 5pt; border-radius: 3pt; font-weight: 600; font-size: 8pt; white-space: nowrap; }
+  .status-partial { background: #ffeeba; color: #664d03; padding: 1pt 5pt; border-radius: 3pt; font-weight: 600; font-size: 8pt; white-space: nowrap; }
+  .status-ui { background: #e2e3e5; color: #383d41; padding: 1pt 5pt; border-radius: 3pt; font-weight: 600; font-size: 8pt; white-space: nowrap; }
+  .status-blocked { background: #f8d7da; color: #721c24; padding: 1pt 5pt; border-radius: 3pt; font-weight: 600; font-size: 8pt; white-space: nowrap; }
+  .status-notimpl { background: #d6d8d9; color: #1c1e21; padding: 1pt 5pt; border-radius: 3pt; font-weight: 600; font-size: 8pt; white-space: nowrap; }
+  .subtitle { color: #666; font-size: 10pt; margin-top: 2pt; }
+  .meta { font-size: 9pt; color: #666; margin: 2pt 0; }
+  .exec-block { background: #f0f4f8; padding: 8pt 12pt; border-left: 4px solid #1e3a5f; margin: 8pt 0; font-size: 10pt; }
+  .warn-block { background: #fff3cd; padding: 8pt 12pt; border-left: 4px solid #856404; margin: 8pt 0; font-size: 10pt; }
+  code { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 8.5pt; background: #f0f0f0; padding: 1pt 3pt; border-radius: 2pt; }
+  ul { margin: 3pt 0; padding-left: 18pt; }
+  li { margin: 1pt 0; }
+  .page-break { page-break-before: always; }
+  @media print { body { padding: 0; } table { page-break-inside: avoid; } tr { page-break-inside: avoid; } h2, h3 { page-break-after: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>AOT CRM — Persistence &amp; Integration Audit Report</h1>
+<p class="subtitle">Post-overhaul audit: PostgreSQL persistence, mock/static-data removal, and integration status as of July 31, 2026</p>
+<p class="meta">Generated from code at <code>C:\Users\GUgay\Dev\aot-crm</code></p>
+
+<!-- ===== 1. EXECUTIVE SUMMARY ===== -->
+<h2>1. Executive Summary</h2>
+<div class="exec-block">
+<p><strong>AOT CRM</strong> is a <strong>Next.js 16</strong> (App Router, React 19, TypeScript strict) enterprise CRM. Authentication is <strong>Microsoft Entra ID</strong> (next-auth v5 beta).</p>
+<p>All CRM data now persists to <strong>PostgreSQL</strong> through <strong>Prisma 7.9.1</strong> with the <code>@prisma/adapter-pg</code> driver adapter (Supabase PostgreSQL). Files/attachments persist to <strong>Supabase Storage</strong> (bucket <code>crm-documents</code>) via the Storage REST API.</p>
+<p><strong>Every CRUD module reads/writes the database.</strong> All mock repositories, hardcoded <code>data.ts</code> fixtures, and static module seed arrays have been removed from application code. The in-memory <code>MockRepository</code> survives only as a test fixture under <code>tests/fixtures/</code>.</p>
+<p><strong>Data survives restart/redeploy.</strong> Page refresh, server restart, and redeployment no longer reset CRM data.</p>
+<p class="meta" style="margin-top:6pt;">Verification: <code>npx tsc --noEmit</code> clean &bull; <code>npm run build</code> succeeds (all 58 routes compile).</p>
+</div>
+
+<!-- ===== 2. ARCHITECTURE ===== -->
+<h2>2. Current Architecture</h2>
+<table>
+<tr><th>Layer</th><th>Technology</th><th>Status</th><th>Detail</th></tr>
+<tr><td>Framework</td><td>Next.js 16.2.10 (App Router)</td><td><span class="status-working">WORKING</span></td><td>Production build compiles all routes</td></tr>
+<tr><td>UI</td><td>React 19.2.4, Tailwind v4, shadcn/ui, Base UI, TanStack Table, Recharts</td><td><span class="status-working">WORKING</span></td><td>Responsive + accessible components</td></tr>
+<tr><td>Authentication</td><td>next-auth v5 beta + Microsoft Entra ID</td><td><span class="status-working">WORKING</span></td><td>OIDC + PKCE, JWT sessions, token refresh</td></tr>
+<tr><td>Database</td><td>Prisma 7.9.1 + @prisma/adapter-pg → Supabase PostgreSQL</td><td><span class="status-working">WORKING</span></td><td>5 migrations applied; <code>prisma.config.ts</code> → <code>DIRECT_URL || DATABASE_URL</code></td></tr>
+<tr><td>File storage</td><td>Storage REST API → Supabase Storage (bucket <code>crm-documents</code>)</td><td><span class="status-working">WORKING</span></td><td>Signed download URLs (900s) via <code>SUPABASE_URL</code> + <code>SUPABASE_SERVICE_ROLE_KEY</code></td></tr>
+<tr><td>Validation</td><td>Zod 4.4.3</td><td><span class="status-working">WORKING</span></td><td>Every write endpoint validates its payload</td></tr>
+<tr><td>Audit</td><td>Prisma <code>AuditLog</code> table</td><td><span class="status-working">WORKING</span></td><td>All create/update/delete actions logged (<code>logAudit</code>)</td></tr>
+<tr><td>API routes</td><td>Route handlers with auth + Zod + audit</td><td><span class="status-working">WORKING</span></td><td>~28 CRM endpoints; Graph/meeting proxies separate</td></tr>
+<tr><td>Integrations</td><td>Microsoft Graph proxies, Zoom stub</td><td><span class="status-blocked">PENDING</span></td><td>Real-endpoint-only; no fabricated data (see §5)</td></tr>
+</table>
+
+<!-- ===== 3. PERSISTENCE AUDIT TABLE ===== -->
+<div class="page-break"></div>
+<h2>3. Data-Persistence Audit</h2>
+<p>Every CRUD module writes to PostgreSQL. Column <em>Mock removed</em> marks deletion of the old fabricated data paths.</p>
+<table>
+<tr><th>Module</th><th>API Surface</th><th>Storage</th><th>Auth</th><th>Zod</th><th>Audit</th><th>Mock Removed</th></tr>
+<tr><td>Customers</td><td><code>/api/customers</code>, <code>/[id]</code></td><td>PostgreSQL <code>Customer</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Companies</td><td><code>/api/companies</code>, <code>/[id]</code></td><td>PostgreSQL <code>Company</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Contacts</td><td><code>/api/contacts</code>, <code>/[id]</code></td><td>PostgreSQL <code>Contact</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Leads</td><td><code>/api/leads</code>, <code>/[id]</code>, <code>favorite</code>, <code>duplicate</code>, <code>convert</code>, <code>assign</code>, <code>tags</code>, <code>attachments</code>, <code>reminders</code>, <code>history</code>, <code>download/[documentId]</code></td><td>PostgreSQL <code>Lead</code> + <code>Document</code> + Supabase Storage</td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Opportunities</td><td><code>/api/opportunities</code>, <code>/[id]</code> (+ kanban stage move)</td><td>PostgreSQL <code>Opportunity</code> + <code>OpportunityStageHistory</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Activities</td><td><code>/api/activities</code>, <code>/[id]</code></td><td>PostgreSQL <code>Activity</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Reminders</td><td><code>/api/reminders</code>, <code>/[id]</code></td><td>PostgreSQL <code>Reminder</code> (userId-scoped, 403 foreign)</td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>reminders.service.ts</code> deleted</td></tr>
+<tr><td>Tickets</td><td><code>/api/tickets</code>, <code>/[id]</code></td><td>PostgreSQL <code>Ticket</code> (<code>InProgress</code> ↔ "In Progress" mapping)</td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Documents</td><td><code>/api/documents</code>, <code>/[id]</code></td><td>PostgreSQL <code>Document</code> (+ <code>uploadedBy</code>)</td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>data.ts</code> + <code>mockData.ts</code> deleted</td></tr>
+<tr><td>Reports (manage)</td><td><code>/api/reports/manage</code>, <code>/[id]</code></td><td>PostgreSQL <code>Report</code> (new model, migration 5)</td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>reports/data.ts</code> deleted</td></tr>
+<tr><td>Administration users</td><td><code>/api/admin/users</code>, <code>/[id]</code></td><td>PostgreSQL <code>User</code> (+ role/department/team/status/lastLogin)</td><td>✅</td><td>✅</td><td>✅</td><td>✅ <code>administration/data.ts</code> deleted</td></tr>
+<tr><td>Users (dropdowns)</td><td><code>/api/users</code></td><td>PostgreSQL <code>User</code></td><td>✅</td><td>—</td><td>—</td><td>✅</td></tr>
+<tr><td>Dashboard KPIs / charts</td><td><code>/api/dashboard</code>, <code>/api/dashboard/revenue</code></td><td>Live Prisma aggregates</td><td>✅</td><td>—</td><td>—</td><td>✅ 6 Stats components rewritten to <code>useApiList</code></td></tr>
+<tr><td>Reports analytics</td><td><code>/api/reports</code> (aggregates)</td><td>Live Prisma aggregates</td><td>✅</td><td>—</td><td>—</td><td>✅ hardcoded <code>monthlyData</code> replaced with real API series</td></tr>
+</table>
+
+<h3>3.1 Migration history</h3>
+<p>5 migrations applied: base schema + 4 prior + <code>20260731045458_add_report_model_and_user_fields</code> (additive — new <code>Report</code> model; <code>User.role</code>, <code>User.department</code>, <code>User.team</code>, <code>User.status</code>, <code>User.lastLogin</code>).</p>
+
+<!-- ===== 4. WORKFLOW STATE ===== -->
+<h2>4. Workflow State</h2>
+<table>
+<tr><th>Workflow</th><th>Status</th><th>Detail</th></tr>
+<tr><td>Lead conversion</td><td><span class="status-working">WORKING</span></td><td><code>/api/leads/[id]/convert</code> in a <code>$transaction</code>; 409 on re-convert; routes to opportunity or customer</td></tr>
+<tr><td>Lead assignment</td><td><span class="status-working">WORKING</span></td><td><code>/api/leads/[id]/assign</code></td></tr>
+<tr><td>Lead tags</td><td><span class="status-working">WORKING</span></td><td>Per-tag POST/DELETE at <code>/api/leads/[id]/tags</code>; UI reconciles</td></tr>
+<tr><td>Lead favorites / duplicate / history</td><td><span class="status-working">WORKING</span></td><td>Dedicated endpoints; history reads <code>AuditLog</code> + <code>LeadStatusChange</code></td></tr>
+<tr><td>Lead attachments</td><td><span class="status-working">WORKING</span></td><td>Upload → Supabase Storage; signed download URL (900s)</td></tr>
+<tr><td>Kanban stage move</td><td><span class="status-working">WORKING</span></td><td>Optimistic update + rollback; writes <code>OpportunityStageHistory</code> + Note + audit</td></tr>
+<tr><td>Enhanced lead detail page</td><td><span class="status-working">WORKING</span></td><td>Header/status badge/star, quick actions, more-menu, 5 tabs (Details/History/Activities/Documents/Reminders), tags editor</td></tr>
+<tr><td>Ticket status enum mapping</td><td><span class="status-working">WORKING</span></td><td>UI <code>"In Progress"</code> ↔ DB <code>InProgress</code> via <code>uiTicketStatusToDb</code>/<code>dbTicketStatusToUi</code></td></tr>
+</table>
+
+<!-- ===== 5. INTEGRATIONS ===== -->
+<div class="page-break"></div>
+<h2>5. Integration Status</h2>
+<h3>5.1 Microsoft 365 / Zoom</h3>
+<p>All mock/fabricated integration paths were removed. Services call real endpoints only; nothing falls back to fake data.</p>
+<table>
+<tr><th>Area</th><th>Status</th><th>Detail</th></tr>
+<tr><td>Graph gate</td><td><span class="status-working">WORKING</span></td><td><code>integration-gate.ts</code> returns <code>GraphUnavailableError</code> when <code>USE_MICROSOFT_GRAPH !== "true"</code>; no mock data emitted</td></tr>
+<tr><td>Graph services (<code>graph/calendar/outlook/teams/zoom.service.ts</code>)</td><td><span class="status-working">WORKING</span></td><td>Real-endpoint-only; fabricated URLs/dial-in/conference IDs removed</td></tr>
+<tr><td>Meetings proxies</td><td><span class="status-working">WORKING</span></td><td><code>/api/integrations/microsoft/meetings</code> + <code>/[id]</code> proxy Graph; Zoom <code>/meetings</code> returns 503 stub until configured</td></tr>
+<tr><td>Consent-gated features (profile, photo, presence, mail, calendar, Teams)</td><td><span class="status-blocked">PENDING CONSENT</span></td><td>Env: <code>USE_MICROSOFT_GRAPH=false</code>, <code>MICROSOFT_GRAPH_MODE=pending</code>; features surface a clear error via <code>logServerError</code> rather than fake data</td></tr>
+</table>
+<p>Storage provider selection is env-driven (<code>NEXT_PUBLIC_STORAGE_PROVIDER</code>), defaulting to <code>supabase</code>; <code>DocumentStorage</code> interface with <code>SupabaseDocumentStorage</code> (REST) and an <code>AzureBlobDocumentStorage</code> stub for future swap.</p>
+
+<h2>6. Known Remaining Surfaces (deferred)</h2>
+<div class="warn-block">
+<p>The following were reviewed and intentionally deferred to a later phase (client-only / demo surfaces with no DB-write impact):</p>
+</div>
+<table>
+<tr><th>Surface</th><th>Current Behavior</th><th>Planned Fix</th></tr>
+<tr><td><code>/files</code></td><td>localStorage via <code>file-management.service.ts</code></td><td>Move to <code>Document</code> + Storage-backed APIs</td></tr>
+<tr><td>Notifications</td><td>Client-side only (<code>use-synced-notifications</code>)</td><td>Server APIs over <code>Notification</code> table (model exists)</td></tr>
+<tr><td>Recent activity feed</td><td>Client-only <code>RecentActivity.tsx</code></td><td>Read from <code>AuditLog</code>/<code>Activity</code></td></tr>
+<tr><td>Role-based access enforcement</td><td><span class="status-working">WORKING</span></td><td><code>hasRole</code>/<code>isAdmin</code>/<code>isReportsManager</code> in <code>lib/server/api.ts</code>; <code>/api/admin/users</code>, <code>/api/reports</code>, <code>/api/reports/manage</code> return 403 to unauthorized roles; administration + reports pages server-gated (redirect); sidebar filters nav by <code>User.role</code></td></tr>
+</table>
+
+<!-- ===== 7. VERIFICATION ===== -->
+<h2>7. Verification</h2>
+<ul>
+<li><code>npm run lint</code> — zero errors (4 pre-existing warnings: 3 <code>&lt;img&gt;</code> in deferred surfaces, 1 TanStack Table / React Compiler memoization note).</li>
+<li><code>npx tsc --noEmit</code> — clean, zero type errors.</li>
+<li><code>npm run build</code> — production build succeeds; all 58 routes compile, including new <code>/api/reports/manage</code>, <code>/api/admin/users</code>, and lead sub-resources.</li>
+<li><code>npx prisma migrate dev</code> — migration 5 applied against Supabase PostgreSQL (additive, no reset).</li>
+<li><code>npx prisma generate</code> — client regenerated with new <code>Report</code> + <code>User</code> fields.</li>
+<li>No references remain to deleted <code>data.ts</code>/<code>mockData.ts</code> files (grep-verified).</li>
+</ul>
+
+<h2>8. Remaining Work / Next Steps</h2>
+<ol>
+<li>Convert deferred surfaces (§6) to server-side persistence.</li>
+<li>Grant Microsoft Entra admin consent to activate profile/mail/calendar/Teams; verify live Graph calls.</li>
+<li>Grant admin consent to Zoom OAuth to replace the <code>/api/integrations/zoom/meetings</code> 503 stub.</li>
+<li>Run end-to-end browser checks for the newly wired reports/manage and administration CRUD screens.</li>
+</ol>
+
+<p style="margin-top: 16pt; text-align: center; color: #888; font-size: 9pt;">— End of Report —</p>
+<p style="text-align: center; color: #888; font-size: 9pt;">Generated July 31, 2026</p>
+
+</body>
+</html>

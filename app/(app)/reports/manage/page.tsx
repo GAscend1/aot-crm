@@ -1,12 +1,18 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PageLayout } from "@/components/common/PageLayout";
 import { Button } from "@/components/ui/button";
+import { getCrmUser } from "@/lib/server/api";
 
 import { ReportStats } from "../components/ReportStats";
 import { ReportTable } from "../components/ReportTable";
 
-export default function ReportsManagePage() {
+export default async function ReportsManagePage() {
+  const user = await getCrmUser();
+  if (!user) redirect("/login");
+  if (!["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(user.role)) redirect("/dashboard");
+
   return (
     <PageLayout
       title="Report Management"

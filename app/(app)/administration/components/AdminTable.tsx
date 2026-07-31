@@ -3,16 +3,18 @@
 import { useMemo, useState } from "react";
 
 import { DataTable } from "@/components/table/DataTable";
+import { useApiList } from "@/hooks/use-api-list";
 
-import { users as initialData } from "../data";
 import { Department, User, UserStatus } from "../types";
 import { createColumns } from "../columns";
 import { AdminDrawer } from "./AdminDrawer";
 import { AdminDeleteDialog } from "./AdminDeleteDialog";
 import { AdminToolbar } from "./AdminToolbar";
 
+const USERS_PATH = "/api/admin/users?pageSize=1000";
+
 export function AdminTable() {
-  const [data, setData] = useState(initialData);
+  const { data, refresh } = useApiList<User>(USERS_PATH);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -67,21 +69,45 @@ export function AdminTable() {
     setDeleteDialogOpen(true);
   }
 
-  function handleSave(user: User) {
-    if (selectedUser) {
-      setData((prev) =>
-        prev.map((u) => (u.id === selectedUser.id ? user : u))
-      );
-    } else {
-      setData((prev) => [...prev, user]);
+  async function handleSave(user: User) {
+    const payload = {
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+      team: user.team,
+      status: user.status,
+    };
+    try {
+      if (selectedUser) {
+        await fetch(`/api/admin/users/${selectedUser.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+      refresh();
+    } catch {
+      // Keep current data on failure
     }
     setDrawerOpen(false);
     setSelectedUser(null);
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (userToDelete) {
-      setData((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      try {
+        await fetch(`/api/admin/users/${userToDelete.id}`, { method: "DELETE" });
+        refresh();
+      } catch {
+        // Keep current data on failure
+      }
     }
     setDeleteDialogOpen(false);
     setUserToDelete(null);

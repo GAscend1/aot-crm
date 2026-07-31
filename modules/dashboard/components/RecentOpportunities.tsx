@@ -2,21 +2,12 @@
 
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmptyState } from "@/components/common/EmptyState";
-import { useLive } from "@/hooks/use-live";
-import { Events } from "@/services/events";
-import { opportunityService } from "@/services";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
 
 export function RecentOpportunities() {
-  const { data: opportunities } = useLive(
-    () => opportunityService.findAll({ page: 1, pageSize: 5 }).then(r => r.data),
-    [
-      Events.OPPORTUNITY_CREATED, Events.OPPORTUNITY_UPDATED,
-      Events.OPPORTUNITY_DELETED, Events.OPPORTUNITY_WON, Events.OPPORTUNITY_LOST,
-    ],
-    []
-  );
+  const { recentOpportunities } = useDashboardData();
 
-  if (opportunities.length === 0) {
+  if (recentOpportunities.length === 0) {
     return (
       <SectionCard title="Recent Opportunities">
         <EmptyState
@@ -30,11 +21,11 @@ export function RecentOpportunities() {
   return (
     <SectionCard title="Recent Opportunities">
       <div className="-mx-6 -mb-6">
-        {opportunities.map((opp, index: number) => (
+        {recentOpportunities.map((opp, index: number) => (
           <div
             key={opp.id}
             className={`flex items-center justify-between px-6 py-3 ${
-              index < opportunities.length - 1 ? "border-b border-slate-100" : ""
+              index < recentOpportunities.length - 1 ? "border-b border-slate-100" : ""
             }`}
           >
             <div>

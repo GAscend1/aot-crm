@@ -1,7 +1,7 @@
 import { BaseService } from "./base/BaseService";
-import { MockRepository } from "@/repositories/mock/MockRepository";
+import type { IRepository } from "@/repositories/base/IRepository";
 
-interface Contact {
+export interface Contact {
   id: string;
   firstName: string;
   lastName: string;
@@ -19,13 +19,11 @@ interface Contact {
 }
 
 export class ContactService extends BaseService<Contact> {
-  protected repository: MockRepository<Contact>;
+  protected repository: IRepository<Contact>;
   protected entityName = "contact";
 
-  constructor(initialData: Contact[] = []) {
+  constructor(repository: IRepository<Contact>) {
     super();
-    this.repository = new MockRepository<Contact>(initialData);
+    this.repository = repository;
   }
 }
-
-export type { Contact };

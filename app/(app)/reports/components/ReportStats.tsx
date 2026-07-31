@@ -1,19 +1,24 @@
+"use client";
+
 import { BarChart3, FileText, FolderOpen, RefreshCw } from "lucide-react";
 
 import { StatCard } from "@/components/common/StatCard";
+import { useApiList } from "@/hooks/use-api-list";
 
-import { reports } from "../data";
+import { Report } from "../types";
 
 export function ReportStats() {
-  const published = reports.filter((r) => r.status === "Published").length;
-  const categories = new Set(reports.map((r) => r.category)).size;
-  const distinctDates = new Set(reports.map((r) => r.lastRun)).size;
+  const { data } = useApiList<Report>("/api/reports/manage?pageSize=1000");
+
+  const published = data.filter((r) => r.status === "Published").length;
+  const categories = new Set(data.map((r) => r.category)).size;
+  const distinctDates = new Set(data.filter((r) => r.lastRun).map((r) => r.lastRun)).size;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <StatCard
         title="Total Reports"
-        value={reports.length}
+        value={data.length}
         icon={FileText}
       />
 

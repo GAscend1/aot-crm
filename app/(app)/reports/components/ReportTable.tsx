@@ -1,18 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { DataTable } from "@/components/table/DataTable";
+import { useApiList } from "@/hooks/use-api-list";
 
-import { reports as initialData } from "../data";
 import { Report, ReportCategory, ReportStatus } from "../types";
 import { createColumns } from "../columns";
 import { ReportDrawer } from "./ReportDrawer";
 import { ReportDeleteDialog } from "./ReportDeleteDialog";
 import { ReportToolbar } from "./ReportToolbar";
 
+const REPORTS_PATH = "/api/reports/manage?pageSize=1000";
+
 export function ReportTable() {
-  const [data, setData] = useState(initialData);
+  const { data, refresh } = useApiList<Report>(REPORTS_PATH);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -42,51 +44,78 @@ export function ReportTable() {
     });
   }, [data, search, filters]);
 
-  function handleAdd() {
+  const handleAdd = useCallback(() => {
     setSelectedReport(null);
     setDrawerOpen(true);
-  }
+  }, []);
 
-  function handleView(report: Report) {
+  const handleView = useCallback((report: Report) => {
     setSelectedReport(report);
     setDrawerOpen(true);
-  }
+  }, []);
 
-  function handleEdit(report: Report) {
+  const handleEdit = useCallback((report: Report) => {
     setSelectedReport(report);
     setDrawerOpen(true);
-  }
+  }, []);
 
-  function handleDelete(report: Report) {
+  const handleDelete = useCallback((report: Report) => {
     setReportToDelete(report);
     setDeleteDialogOpen(true);
-  }
+  }, []);
 
-  function handleRun(report: Report) {
-    setData((prev) =>
-      prev.map((r) =>
-        r.id === report.id
-          ? { ...r, lastRun: new Date().toISOString().split("T")[0] }
-          : r
-      )
-    );
-  }
+  const handleRun = useCallback(async (report: Report) => {
+    try {
+      await fetch(`/api/reports/manage/${report.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lastRun: new Date().toISOString().split("T")[0] }),
+      });
+      refresh();
+    } catch {
+      // Keep current data on failure
+    }
+  }, [refresh]);
 
-  function handleSave(report: Report) {
-    if (selectedReport) {
-      setData((prev) =>
-        prev.map((r) => (r.id === selectedReport.id ? report : r))
-      );
-    } else {
-      setData((prev) => [...prev, report]);
+  async function handleSave(report: Report) {
+    const payload = {
+      name: report.name,
+      category: report.category,
+      type: report.type,
+      description: report.description,
+      status: report.status,
+      lastRun: report.lastRun || undefined,
+    };
+    try {
+      if (selectedReport) {
+        await fetch(`/api/reports/manage/${selectedReport.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch("/api/reports/manage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+      refresh();
+    } catch {
+      // Keep current data on failure
     }
     setDrawerOpen(false);
     setSelectedReport(null);
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (reportToDelete) {
-      setData((prev) => prev.filter((r) => r.id !== reportToDelete.id));
+      try {
+        await fetch(`/api/reports/manage/${reportToDelete.id}`, { method: "DELETE" });
+        refresh();
+      } catch {
+        // Keep current data on failure
+      }
     }
     setDeleteDialogOpen(false);
     setReportToDelete(null);
@@ -105,7 +134,7 @@ export function ReportTable() {
         onDelete: handleDelete,
         onRun: handleRun,
       }),
-    []
+    [handleView, handleEdit, handleDelete, handleRun]
   );
 
   return (

@@ -1,0 +1,753 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EntityStatus {
+  Active
+  Inactive
+  Prospect
+}
+
+enum LeadStatus {
+  New
+  Contacted
+  Qualified
+  Proposal
+  Negotiation
+  ClosedWon
+  ClosedLost
+  Converted
+  Disqualified
+}
+
+enum PipelineStageName {
+  Discovery
+  Qualification
+  Proposal
+  Negotiation
+  ClosedWon
+  ClosedLost
+}
+
+enum ActivityType {
+  Call
+  Email
+  Meeting
+  Task
+  Note
+  Comment
+}
+
+enum ActivityStatus {
+  Planned
+  Completed
+  Cancelled
+}
+
+enum TicketStatus {
+  Open
+  InProgress
+  Resolved
+  Closed
+}
+
+enum TicketPriority {
+  Low
+  Medium
+  High
+  Critical
+}
+
+enum NotificationType {
+  Info
+  Warning
+  Success
+  Error
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum CallOutcome {
+  NoAnswer
+  Voicemail
+  Contacted
+  Interested
+  FollowUp
+  NotInterested
+  InvalidNumber
+}
+
+model User {
+  id         String     @id @default(uuid())
+  email      String     @unique
+  name       String?
+  image      String?
+  role       String     @default("VIEWER")
+  department String?
+  team       String?
+  status     String     @default("Active")
+  lastLogin  DateTime?
+  assignedAt DateTime   @default(now())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  assignedLeads          Lead[]
+  assignedTickets        Ticket[]
+  activities             Activity[]
+  calendarEvents         CalendarEvent[]
+  reminders              Reminder[]
+  notifications          Notification[]
+  auditLogs              AuditLog[]
+  createdDocuments       Document[]
+  stageChanges           OpportunityStageHistory[] @relation("StageChangeBy")
+  opportunities          Opportunity[]
+  convertedLeads         Lead[]                    @relation("LeadConvertedBy")
+  notes                  Note[]
+  assignmentsReceived    Assignment[]             @relation("AssignmentAssignee")
+  assignmentsAssigned    Assignment[]             @relation("AssignmentAssignedBy")
+  quotesCreated          Quote[]
+  invoicesCreated        Invoice[]
+  prospectingLists       ProspectingList[]
+  prospects              Prospect[]
+  campaignsCreated       CallCampaign[]
+  callQueueEntries       CallQueueEntry[]
+  salesGoals             SalesGoal[]
+  automationsCreated     Automation[]
+  createdReports         Report[]
+}
+
+model Company {
+  id            String   @id @default(uuid())
+  companyName   String
+  industry      String?
+  website       String?
+  email         String?
+  phone         String?
+  country       String?
+  city          String?
+  address       String?
+  employeeCount Int?
+  size          String?
+  revenue       String?
+  status        String   @default("Active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  contacts  Contact[]
+  customers Customer[]
+  documents Document[]
+  quotes    Quote[]
+  invoices  Invoice[]
+}
+
+model Customer {
+  id        String       @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  status    EntityStatus @default(Active)
+  companyId String?
+  company   Company?     @relation(fields: [companyId], references: [id])
+  position  String?
+  notes     String?
+  tags      Json         @default("[]")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  opportunities   Opportunity[]
+  tickets         Ticket[]
+  activities      Activity[]
+  documents       Document[]
+  leads           Lead[]
+  calendarEvents  CalendarEvent[]
+  quotes          Quote[]
+  invoices        Invoice[]
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  position  String?
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  country   String?
+  city      String?
+  notes     String?
+  tags      Json     @default("[]")
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lead {
+  id              String       @id @default(uuid())
+  firstName       String
+  lastName        String
+  title           String?
+  email           String?
+  phone           String?
+  companyName     String?
+  source          String?
+  status          LeadStatus   @default(New)
+  assignedToId    String?
+  assignedTo      User?        @relation(fields: [assignedToId], references: [id])
+  probability     Int          @default(0)
+  expectedRevenue Float        @default(0)
+  expectedCloseDate DateTime?
+  convertedAt     DateTime?
+  convertedById   String?
+  convertedBy     User?        @relation("LeadConvertedBy", fields: [convertedById], references: [id])
+  opportunityId   String?      @unique
+  opportunity     Opportunity? @relation("LeadConversion", fields: [opportunityId], references: [id])
+  customerId      String?
+  customer        Customer?    @relation(fields: [customerId], references: [id])
+  score           Int          @default(0)
+  isFavorite      Boolean      @default(false)
+  notes           String?
+  tags            Json         @default("[]")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  activities    Activity[]
+  tagLinks      LeadTag[]
+  reminders     Reminder[]
+  documents     Document[]
+  quotes        Quote[]
+  invoices      Invoice[]
+  calendarEvents CalendarEvent[]
+  convertedFromProspect Prospect?
+
+  @@index([assignedToId])
+  @@index([status])
+}
+
+model PipelineStage {
+  id        String            @id @default(uuid())
+  name      PipelineStageName @default(Discovery)
+  order     Int               @default(0)
+  createdAt DateTime          @default(now())
+
+  opportunities    Opportunity[]
+  stageHistoryFrom OpportunityStageHistory[] @relation("FromStage")
+  stageHistoryTo   OpportunityStageHistory[] @relation("ToStage")
+}
+
+model Opportunity {
+  id                String         @id @default(uuid())
+  title             String
+  value             Float          @default(0)
+  probability       Int            @default(0)
+  stageId           String?
+  stage             PipelineStage? @relation(fields: [stageId], references: [id])
+  customerId        String?
+  customer          Customer?      @relation(fields: [customerId], references: [id])
+  lead              Lead?          @relation("LeadConversion")
+  expectedCloseDate DateTime?
+  notes             String?
+  status            String         @default("Open")
+  ownerId           String?
+  owner             User?          @relation(fields: [ownerId], references: [id])
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  stageHistory   OpportunityStageHistory[]
+  activities     Activity[]
+  documents      Document[]
+  calendarEvents CalendarEvent[]
+  quotes         Quote[]
+  invoices       Invoice[]
+
+  @@index([stageId])
+  @@index([ownerId])
+}
+
+model OpportunityStageHistory {
+  id            String         @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity    @relation(fields: [opportunityId], references: [id])
+  fromStageId   String?
+  fromStage     PipelineStage? @relation("FromStage", fields: [fromStageId], references: [id])
+  toStageId     String
+  toStage       PipelineStage  @relation("ToStage", fields: [toStageId], references: [id])
+  changedById   String?
+  changedBy     User?          @relation("StageChangeBy", fields: [changedById], references: [id])
+  createdAt     DateTime       @default(now())
+
+  @@index([opportunityId])
+}
+
+model Activity {
+  id            String         @id @default(uuid())
+  type          ActivityType   @default(Note)
+  subject       String
+  description   String?
+  status        ActivityStatus @default(Planned)
+  priority      String         @default("Normal")
+  dueDate       DateTime?
+  completedAt   DateTime?
+  leadId        String?
+  lead          Lead?          @relation(fields: [leadId], references: [id])
+  opportunityId String?
+  opportunity   Opportunity?   @relation(fields: [opportunityId], references: [id])
+  customerId    String?
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  ticketId      String?
+  ticket        Ticket?        @relation(fields: [ticketId], references: [id])
+  assigneeId    String?
+  assignee      User?          @relation(fields: [assigneeId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+model CalendarEvent {
+  id               String   @id @default(uuid())
+  title            String
+  description      String?
+  startTime        DateTime
+  endTime          DateTime
+  allDay           Boolean  @default(false)
+  location         String?
+  graphSyncStatus  String   @default("PENDING_CONSENT")
+  reminderMinutes  Int      @default(0)
+  leadId           String?
+  lead             Lead?    @relation(fields: [leadId], references: [id])
+  opportunityId    String?
+  opportunity      Opportunity? @relation(fields: [opportunityId], references: [id])
+  customerId       String?
+  customer         Customer?   @relation(fields: [customerId], references: [id])
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@index([startTime])
+}
+
+model Reminder {
+  id         String   @id @default(uuid())
+  title      String
+  dueDate    DateTime
+  completed  Boolean  @default(false)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  leadId     String?
+  lead       Lead?    @relation(fields: [leadId], references: [id])
+  entityType String?
+  entityId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, completed])
+  @@index([leadId])
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  type       NotificationType @default(Info)
+  title      String
+  message    String?
+  read       Boolean          @default(false)
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  entityType String?
+  entityId   String?
+  actionLink String?
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model Ticket {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  status      TicketStatus   @default(Open)
+  priority    TicketPriority @default(Medium)
+  customerId  String?
+  customer    Customer?      @relation(fields: [customerId], references: [id])
+  assigneeId  String?
+  assignee    User?          @relation(fields: [assigneeId], references: [id])
+  sla         String?
+  requester   String?
+  department  String?
+  comments    Int            @default(0)
+  attachments Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  activities Activity[]
+
+  @@index([status])
+  @@index([assigneeId])
+}
+
+model Document {
+  id              String       @id @default(uuid())
+  name            String
+  type            String?
+  mimeType        String?
+  size            Int?
+  checksum        String?
+  storageProvider String       @default("supabase")
+  category        String?
+  description     String?
+  tags            Json         @default("[]")
+  version         String?
+  status          String       @default("Active")
+  url             String?
+  storageKey      String?
+  customerId      String?
+  customer        Customer?    @relation(fields: [customerId], references: [id])
+  opportunityId   String?
+  opportunity     Opportunity? @relation(fields: [opportunityId], references: [id])
+  leadId          String?
+  lead            Lead?        @relation(fields: [leadId], references: [id])
+  companyId       String?
+  company         Company?     @relation(fields: [companyId], references: [id])
+  uploadedById    String?
+  uploadedBy      User?        @relation(fields: [uploadedById], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  archivedAt      DateTime?
+
+  @@index([leadId])
+  @@index([customerId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  description String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  data       Json?
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String?
+  category  String?
+  createdAt DateTime @default(now())
+
+  leadLinks LeadTag[]
+}
+
+model LeadTag {
+  id      String @id @default(uuid())
+  leadId  String
+  tagId   String
+  lead    Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, tagId])
+  @@index([tagId])
+}
+
+model Note {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  content    String
+  authorId   String?
+  author     User?    @relation(fields: [authorId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([entityType, entityId])
+}
+
+model Assignment {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?
+  entityType   String
+  entityId     String
+  assigneeId   String?
+  assignee     User?    @relation("AssignmentAssignee", fields: [assigneeId], references: [id])
+  assignedById String?
+  assignedBy   User?    @relation("AssignmentAssignedBy", fields: [assignedById], references: [id])
+  dueDate      DateTime?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([entityType, entityId])
+}
+
+model Quote {
+  id            String      @id @default(uuid())
+  quoteNumber   String      @unique
+  status        QuoteStatus @default(DRAFT)
+  currency      String      @default("USD")
+  subtotal      Float       @default(0)
+  tax           Float       @default(0)
+  discount      Float       @default(0)
+  total         Float       @default(0)
+  validUntil    DateTime?
+  notes         String?
+  leadId        String?
+  lead          Lead?       @relation(fields: [leadId], references: [id])
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
+  customerId    String?
+  customer      Customer?   @relation(fields: [customerId], references: [id])
+  companyId     String?
+  company       Company?    @relation(fields: [companyId], references: [id])
+  createdById   String?
+  createdBy     User?       @relation(fields: [createdById], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  items    QuoteItem[]
+  invoices Invoice[]
+
+  @@index([leadId])
+  @@index([opportunityId])
+}
+
+model QuoteItem {
+  id          String  @id @default(uuid())
+  quoteId     String
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float   @default(0)
+  amount      Float   @default(0)
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  status        InvoiceStatus @default(DRAFT)
+  currency      String        @default("USD")
+  subtotal      Float         @default(0)
+  tax           Float         @default(0)
+  discount      Float         @default(0)
+  total         Float         @default(0)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime?
+  paidAt        DateTime?
+  notes         String?
+  quoteId       String?
+  quote         Quote?        @relation(fields: [quoteId], references: [id])
+  leadId        String?
+  lead          Lead?         @relation(fields: [leadId], references: [id])
+  opportunityId String?
+  opportunity   Opportunity?  @relation(fields: [opportunityId], references: [id])
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  companyId     String?
+  company       Company?      @relation(fields: [companyId], references: [id])
+  createdById   String?
+  createdBy     User?         @relation(fields: [createdById], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items InvoiceItem[]
+
+  @@index([leadId])
+  @@index([opportunityId])
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float   @default(0)
+  amount      Float   @default(0)
+}
+
+model ProspectingList {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  archived    Boolean    @default(false)
+  createdById String?
+  createdBy   User?      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  prospects Prospect[]
+  campaigns CallCampaign[]
+}
+
+model Prospect {
+  id              String          @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  companyName     String?
+  notes           String?
+  ownerId         String?
+  owner           User?           @relation(fields: [ownerId], references: [id])
+  contacted       Boolean         @default(false)
+  convertedAt     DateTime?
+  convertedLeadId String?         @unique
+  convertedLead   Lead?           @relation(fields: [convertedLeadId], references: [id])
+  listId          String
+  list            ProspectingList @relation(fields: [listId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  callQueueEntries CallQueueEntry[]
+
+  @@index([listId])
+}
+
+model CallCampaign {
+  id          String   @id @default(uuid())
+  name        String
+  listId      String?
+  list        ProspectingList? @relation(fields: [listId], references: [id])
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String   @default("Draft")
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  queue CallQueueEntry[]
+}
+
+model CallQueueEntry {
+  id            String      @id @default(uuid())
+  campaignId    String
+  campaign      CallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  prospectId    String?
+  prospect      Prospect?   @relation(fields: [prospectId], references: [id])
+  assignedToId  String?
+  assignedTo    User?       @relation(fields: [assignedToId], references: [id])
+  outcome       CallOutcome?
+  notes         String?
+  followUpDate  DateTime?
+  calledAt      DateTime?
+  createdAt     DateTime    @default(now())
+}
+
+model SalesGoal {
+  id        String   @id @default(uuid())
+  name      String
+  metric    String
+  target    Float
+  period    String   @default("month")
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Automation {
+  id          String   @id @default(uuid())
+  name        String
+  enabled     Boolean  @default(true)
+  triggerType String
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  conditions AutomationCondition[]
+  actions    AutomationAction[]
+  runs       AutomationRun[]
+}
+
+model AutomationCondition {
+  id           String      @id @default(uuid())
+  automationId String
+  automation   Automation  @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  field        String
+  operator     String
+  value        String?
+}
+
+model AutomationAction {
+  id             String      @id @default(uuid())
+  automationId   String
+  automation     Automation  @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  type           String
+  payload        Json
+  position       Int         @default(0)
+  graphDependent Boolean     @default(false)
+}
+
+model AutomationRun {
+  id           String      @id @default(uuid())
+  automationId String
+  automation   Automation  @relation(fields: [automationId], references: [id])
+  entityType   String
+  entityId     String
+  status       String      @default("running")
+  startedAt    DateTime    @default(now())
+  finishedAt   DateTime?
+
+  logs AutomationRunLog[]
+}
+
+model AutomationRunLog {
+  id        String        @id @default(uuid())
+  runId     String
+  run       AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  level     String        @default("info")
+  message   String
+  createdAt DateTime      @default(now())
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  type        String
+  description String?
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  lastRun     DateTime?
+  status      String   @default("Draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdById])
+}

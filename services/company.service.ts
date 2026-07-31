@@ -1,7 +1,7 @@
 import { BaseService } from "./base/BaseService";
-import { MockRepository } from "@/repositories/mock/MockRepository";
+import type { IRepository } from "@/repositories/base/IRepository";
 
-interface Company {
+export interface Company {
   id: string;
   name: string;
   industry: string;
@@ -20,13 +20,11 @@ interface Company {
 }
 
 export class CompanyService extends BaseService<Company> {
-  protected repository: MockRepository<Company>;
+  protected repository: IRepository<Company>;
   protected entityName = "company";
 
-  constructor(initialData: Company[] = []) {
+  constructor(repository: IRepository<Company>) {
     super();
-    this.repository = new MockRepository<Company>(initialData);
+    this.repository = repository;
   }
 }
-
-export type { Company };

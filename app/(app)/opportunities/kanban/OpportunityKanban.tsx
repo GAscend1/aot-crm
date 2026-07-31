@@ -27,7 +27,7 @@ const stageColors: Record<string, string> = {
 export function OpportunityKanban() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const { success } = useToastContext();
+  const { success, error: showError } = useToastContext();
 
   useEffect(() => {
     opportunityService.findAll().then((result) => {
@@ -55,6 +55,7 @@ export function OpportunityKanban() {
 
   const handleCardMove = useCallback(
     async (cardId: string, _fromColumn: string, toColumn: string) => {
+      const previous = opportunities;
       setOpportunities((prev) =>
         prev.map((opp) =>
           opp.id === cardId
@@ -62,12 +63,17 @@ export function OpportunityKanban() {
             : opp
         )
       );
-      await opportunityService.update(cardId, {
-        stage: toColumn as Opportunity["stage"],
-      });
-      success("Opportunity updated", `Moved to ${toColumn}`);
+      try {
+        await opportunityService.update(cardId, {
+          stage: toColumn as Opportunity["stage"],
+        });
+        success("Opportunity updated", `Moved to ${toColumn}`);
+      } catch {
+        setOpportunities(previous);
+        showError("Update failed", "Could not move opportunity. Reverting.");
+      }
     },
-    [success]
+    [opportunities, success, showError]
   );
 
   if (loading) {

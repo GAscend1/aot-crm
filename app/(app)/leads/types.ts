@@ -13,9 +13,13 @@ export interface Lead {
   score: number;
   probability: number;
   owner: string;
+  ownerId: string;
   expectedRevenue: number;
+  expectedCloseDate: string;
   status: LeadStatus;
   notes: string;
+  isFavorite: boolean;
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
 }

@@ -5,6 +5,7 @@ export interface QueryOptions {
   sortOrder?: "asc" | "desc";
   page?: number;
   pageSize?: number;
+  include?: Record<string, boolean>;
 }
 
 export interface PaginatedResult<T> {

@@ -12,12 +12,6 @@ class AuditService {
     };
     this.entries.unshift(entry);
 
-    try {
-      const stored = JSON.parse(localStorage.getItem("crm-audit-log") || "[]");
-      stored.unshift(entry);
-      localStorage.setItem("crm-audit-log", JSON.stringify(stored.slice(0, 1000)));
-    } catch {}
-
     return entry;
   }
 

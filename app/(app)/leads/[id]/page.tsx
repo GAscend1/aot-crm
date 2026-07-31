@@ -1,14 +1,33 @@
 "use client";
 
-import { use, useState } from "react";
-import { Mail, Calendar, Video } from "lucide-react";
-import { RecordDetail } from "@/components/enterprise/RecordDetail";
+import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Star, MoreHorizontal, Mail, UserRound, Copy, Repeat, Trash2, Pencil, ListTodo, History, FileUp, Bell, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { DetailField, DetailGrid, DetailSection } from "@/components/enterprise/DetailView";
+import { TagInput } from "@/components/enterprise/TagInput";
+import { SectionCard } from "@/components/common/SectionCard";
 import { EmailComposer } from "@/components/integrations/EmailComposer";
-import { EventModal } from "@/components/integrations/EventModal";
-import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog";
-import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
+import { useToastContext } from "@/app/(app)/AppProviders";
 import { leadService } from "@/services/index";
-import type { Lead } from "@/services/lead.service";
+import type { Lead } from "../types";
+import { LeadForm } from "../components/LeadForm";
+import { LeadDeleteDialog } from "../components/LeadDeleteDialog";
+import { AssignLeadDialog } from "../components/AssignLeadDialog";
+import { ConvertLeadDialog } from "../components/ConvertLeadDialog";
+import { LeadHistoryTab } from "../components/LeadHistoryTab";
+import { LeadActivitiesTab } from "../components/LeadActivitiesTab";
+import { LeadDocumentsTab } from "../components/LeadDocumentsTab";
+import { LeadRemindersTab } from "../components/LeadRemindersTab";
 
 const statusColors: Record<string, string> = {
   New: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
@@ -18,76 +37,388 @@ const statusColors: Record<string, string> = {
   Negotiation: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
   "Closed Won": "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   "Closed Lost": "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  Converted: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
+  Disqualified: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
+
+type TabKey = "details" | "history" | "activities" | "documents" | "reminders";
+
+const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  { key: "details", label: "Details", icon: Info },
+  { key: "history", label: "History", icon: History },
+  { key: "activities", label: "Activities", icon: ListTodo },
+  { key: "documents", label: "Documents", icon: FileUp },
+  { key: "reminders", label: "Reminders", icon: Bell },
+];
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
+  const { success, error: showError } = useToastContext();
+
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<TabKey>("details");
+  const [editOpen, setEditOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
-  const [eventOpen, setEventOpen] = useState(false);
-  const [teamsOpen, setTeamsOpen] = useState(false);
-  const [zoomOpen, setZoomOpen] = useState(false);
-  const [leadRecord, setLeadRecord] = useState<Lead | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    leadService
+      .findById(id)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result) {
+          router.replace("/leads");
+          return;
+        }
+        setLead(result);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoading(false);
+          showError("Error", "Failed to load lead.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, router, showError]);
+
+  const handleFavorite = async () => {
+    if (!lead) return;
+    const next = !lead.isFavorite;
+    setLead({ ...lead, isFavorite: next });
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/favorite`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Failed");
+    } catch {
+      setLead({ ...lead, isFavorite: !next });
+      showError("Error", "Could not update favorite.");
+    }
+  };
+
+  const handleDuplicate = async () => {
+    if (!lead) return;
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error("Failed to duplicate lead");
+      const created = (await res.json()) as { id: string };
+      success("Lead duplicated", `Opened copy of "${lead.title}".`);
+      router.push(`/leads/${created.id}`);
+    } catch {
+      showError("Error", "Could not duplicate lead.");
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!lead) return;
+    try {
+      await leadService.delete(lead.id);
+      success("Lead deleted");
+      router.replace("/leads");
+    } catch {
+      showError("Error", "Failed to delete lead.");
+    }
+  };
+
+  const handleEditSave = async (data: Lead) => {
+    try {
+      const updated = await leadService.update(lead!.id, {
+        title: data.title,
+        contactName: data.contactName,
+        company: data.company,
+        email: data.email,
+        phone: data.phone,
+        source: data.source,
+        status: data.status,
+        probability: data.probability,
+        expectedRevenue: data.expectedRevenue,
+        notes: data.notes,
+      } as Partial<Lead>);
+      setLead(updated);
+      success("Lead updated");
+      setEditOpen(false);
+    } catch {
+      showError("Error", "Failed to update lead.");
+    }
+  };
+
+  const handleTagsChange = async (tags: string[]) => {
+    if (!lead) return;
+    const previous = lead;
+    const current = lead.tags ?? [];
+    setLead({ ...lead, tags });
+    try {
+      const added = tags.filter((t) => !current.includes(t));
+      const removed = current.filter((t) => !tags.includes(t));
+      for (const tag of added) {
+        const res = await fetch(`/api/leads/${lead.id}/tags`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tag }),
+        });
+        if (!res.ok) throw new Error("Failed");
+      }
+      for (const tag of removed) {
+        const res = await fetch(`/api/leads/${lead.id}/tags`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tag }),
+        });
+        if (!res.ok) throw new Error("Failed");
+      }
+    } catch {
+      setLead(previous);
+      showError("Error", "Could not update tags.");
+    }
+  };
+
+  const handleConverted = (opportunityId?: string) => {
+    if (opportunityId) {
+      router.push(`/opportunities/${opportunityId}`);
+    } else {
+      router.push("/customers");
+    }
+  };
+
+  if (loading || !lead) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+      </div>
+    );
+  }
 
   return (
     <>
-      <RecordDetail<Lead>
-        id={id}
-        service={leadService}
-        backHref="/leads"
-        title="Lead"
-        getTitle={(l) => l.title}
-        getDescription={(l) => l.company}
-        onLoaded={(l) => setLeadRecord(l)}
-        renderFields={(l) => [
-          { label: "Contact", value: l.contactName },
-          { label: "Email", value: <a href={`mailto:${l.email}`} className="text-blue-600 hover:underline">{l.email}</a> },
-          { label: "Phone", value: l.phone || "-" },
-          { label: "Source", value: l.source },
-          { label: "Owner", value: l.owner },
-          { label: "Score", value: l.score },
-          { label: "Probability", value: `${l.probability}%` },
-          { label: "Expected Revenue", value: `$${l.expectedRevenue.toLocaleString()}` },
-        ]}
-        renderStatus={(l) => ({
-          label: "Status",
-          value: (
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[l.status] || ""}`}>
-              {l.status}
-            </span>
-          ),
-        })}
-        quickActions={() => [
-          { label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) },
-          { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },
-          { label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) },
-          { label: "Schedule Meeting", icon: Calendar, onClick: () => setEventOpen(true) },
-        ]}
-      />
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/leads"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                {lead.title}
+              </h1>
+              {lead.status && (
+                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[lead.status] || ""}`}>
+                  {lead.status}
+                </span>
+              )}
+            </div>
+            {lead.company && <p className="text-sm text-slate-500">{lead.company}</p>}
+          </div>
+        </div>
 
-      {leadRecord && (
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setEmailOpen(true)}>
+            <Mail className="mr-2 h-4 w-4" />
+            Email
+          </Button>
+          <Button variant="outline" onClick={() => setAssignOpen(true)}>
+            <UserRound className="mr-2 h-4 w-4" />
+            Assign
+          </Button>
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleFavorite} title={lead.isFavorite ? "Unstar" : "Star"}>
+            <Star className={`h-4 w-4 ${lead.isFavorite ? "fill-amber-400 text-amber-400" : ""}`} />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => void handleDuplicate()} disabled={duplicating}>
+                <Copy className="mr-2 h-4 w-4" />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setConvertOpen(true)}>
+                <Repeat className="mr-2 h-4 w-4" />
+                Convert to Customer
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-1 border-b dark:border-slate-800">
+        {tabs.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              tab === key
+                ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "details" && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <DetailSection title="Details">
+              <DetailGrid>
+                <DetailField label="Contact" value={lead.contactName || "-"} />
+                <DetailField
+                  label="Email"
+                  value={
+                    lead.email ? (
+                      <a href={`mailto:${lead.email}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                        {lead.email}
+                      </a>
+                    ) : (
+                      "-"
+                    )
+                  }
+                />
+                <DetailField label="Phone" value={lead.phone || "-"} />
+                <DetailField label="Source" value={lead.source || "-"} />
+                <DetailField label="Owner" value={lead.owner || "Unassigned"} />
+                <DetailField label="Score" value={lead.score} />
+                <DetailField label="Probability" value={`${lead.probability}%`} />
+                <DetailField label="Expected Revenue" value={`$${lead.expectedRevenue.toLocaleString()}`} />
+                <DetailField label="Expected Close" value={lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toLocaleDateString() : "-"} />
+              </DetailGrid>
+            </DetailSection>
+
+            <DetailSection title="Notes">
+              <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+                {lead.notes || "No notes added yet."}
+              </p>
+            </DetailSection>
+
+            <DetailSection title="Tags">
+              <TagInput
+                tags={lead.tags ?? []}
+                onChange={handleTagsChange}
+                suggestions={["enterprise", "tech", "saas", "startup", "hot", "follow-up"]}
+              />
+            </DetailSection>
+          </div>
+
+          <div className="space-y-6">
+            <SectionCard title="Quick Actions">
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setEmailOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 dark:border-slate-700 transition-colors"
+                >
+                  <Mail className="h-4 w-4" />
+                  Send Email
+                </button>
+                <button
+                  onClick={() => {
+                    setTab("activities");
+                  }}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 dark:border-slate-700 transition-colors"
+                >
+                  <ListTodo className="h-4 w-4" />
+                  Add Task
+                </button>
+                <button
+                  onClick={() => setAssignOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 dark:border-slate-700 transition-colors"
+                >
+                  <UserRound className="h-4 w-4" />
+                  Assign Lead
+                </button>
+              </div>
+            </SectionCard>
+
+            <DetailSection title="Timestamps">
+              <DetailField label="Created" value={new Date(lead.createdAt).toLocaleString()} />
+              <div className="mt-4">
+                <DetailField label="Updated" value={new Date(lead.updatedAt).toLocaleString()} />
+              </div>
+            </DetailSection>
+          </div>
+        </div>
+      )}
+
+      {tab === "history" && <LeadHistoryTab leadId={lead.id} />}
+      {tab === "activities" && <LeadActivitiesTab leadId={lead.id} />}
+      {tab === "documents" && <LeadDocumentsTab leadId={lead.id} />}
+      {tab === "reminders" && <LeadRemindersTab leadId={lead.id} />}
+
+      {lead && (
         <>
           <EmailComposer
             open={emailOpen}
             onClose={() => setEmailOpen(false)}
-            to={[{ name: leadRecord.contactName, email: leadRecord.email }]}
+            to={[{ name: lead.contactName, email: lead.email }]}
             subject=""
           />
-          <EventModal
-            open={eventOpen}
-            onClose={() => setEventOpen(false)}
-            entityType="lead"
-            entityId={leadRecord.id}
+          <AssignLeadDialog
+            open={assignOpen}
+            onClose={() => setAssignOpen(false)}
+            leadId={lead.id}
+            leadTitle={lead.title}
+            currentOwnerId={lead.ownerId}
+            onAssigned={() => {
+              leadService.findById(lead.id).then((updated) => updated && setLead(updated));
+            }}
           />
-          <TeamsMeetingDialog
-            open={teamsOpen}
-            onClose={() => setTeamsOpen(false)}
-            entityName={leadRecord.title}
+          <ConvertLeadDialog
+            open={convertOpen}
+            onClose={() => setConvertOpen(false)}
+            leadId={lead.id}
+            leadTitle={lead.title}
+            onConverted={handleConverted}
           />
-          <ZoomMeetingDialog
-            open={zoomOpen}
-            onClose={() => setZoomOpen(false)}
-            entityName={leadRecord.title}
+          <LeadDeleteDialog
+            open={deleteOpen}
+            lead={lead}
+            onConfirm={() => void handleDelete()}
+            onCancel={() => setDeleteOpen(false)}
           />
+
+          <Sheet open={editOpen} onOpenChange={setEditOpen}>
+            <SheetContent side="right" className="w-full sm:max-w-lg">
+              <SheetHeader>
+                <SheetTitle>Edit Lead</SheetTitle>
+                <SheetDescription>Update details for {lead.title}</SheetDescription>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto px-4">
+                <LeadForm
+                  initialData={lead}
+                  onSubmit={(data) => void handleEditSave(data)}
+                  onCancel={() => setEditOpen(false)}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
         </>
       )}
     </>

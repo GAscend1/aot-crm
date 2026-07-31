@@ -1,23 +1,6 @@
 import type { UserProfile } from "@/types/common";
 import { graphApi, GraphClientError } from "./graph-client";
-
-const mockProfile: UserProfile = {
-  id: "user-1",
-  displayName: "Glenn Ugay",
-  email: "glennu@ascendonetech.com",
-  jobTitle: "Senior Software Engineer",
-  department: "Engineering",
-  manager: "Sarah Chen",
-  phone: "+1 (555) 123-4567",
-  mobilePhone: "+1 (555) 987-6543",
-  officeLocation: "San Francisco, CA",
-  photoUrl: "",
-  presence: "Available",
-};
-
-function isNotEnabled(err: unknown): boolean {
-  return err instanceof GraphClientError && err.status === 503;
-}
+import { graphPendingError, isGraphPending } from "./integration-gate";
 
 class GraphService {
   async getProfile(): Promise<UserProfile> {
@@ -56,7 +39,7 @@ class GraphService {
         presence,
       };
     } catch (err) {
-      if (isNotEnabled(err)) return mockProfile;
+      if (isGraphPending(err)) throw graphPendingError("Microsoft profile");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to load profile: ${err.message}`);
       }
@@ -69,7 +52,7 @@ class GraphService {
       const profile = await graphApi("/me/manager") as { manager: string };
       return { name: profile.manager, email: "" };
     } catch (err) {
-      if (isNotEnabled(err)) return { name: "Sarah Chen", email: "sarah.chen@ascendonetech.com" };
+      if (isGraphPending(err)) throw graphPendingError("Microsoft profile");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to load manager: ${err.message}`);
       }

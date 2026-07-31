@@ -1,11 +1,10 @@
-import { v4 as uuid } from "uuid";
 import type { TeamsMeeting } from "@/types/common";
 import { eventBus } from "./event-bus";
 import { Events } from "./events";
+import { integrations } from "@/config/integrations";
+import { graphPendingError } from "./integration-gate";
 
 class TeamsService {
-  private meetings: TeamsMeeting[] = [];
-
   async createMeeting(data: {
     subject: string;
     body?: string;
@@ -13,40 +12,45 @@ class TeamsService {
     end: string;
     participants: { name: string; email: string }[];
   }): Promise<TeamsMeeting> {
-    const meetingId = uuid();
-    const meeting: TeamsMeeting = {
-      id: meetingId,
-      subject: data.subject,
-      body: data.body || "",
-      start: data.start,
-      end: data.end,
-      onlineMeetingUrl: `https://teams.microsoft.com/meeting/${meetingId}`,
-      joinUrl: `https://teams.microsoft.com/l/meetup-join/19:${meetingId}/0`,
-      conferenceId: Math.random().toString(36).substring(2, 10).toUpperCase(),
-      dialInNumber: "+1 (555) 123-4567",
-      participants: data.participants,
-      organizer: { name: "Current User", email: "user@company.com" },
-      createdAt: new Date().toISOString(),
-    };
-    this.meetings.push(meeting);
+    if (integrations.microsoftGraphMode !== "active") {
+      throw graphPendingError("Microsoft Teams");
+    }
+    const res = await fetch("/api/integrations/microsoft/meetings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 503) throw graphPendingError("Microsoft Teams");
+      throw new Error(body.error || "Failed to create Teams meeting");
+    }
+    const meeting = (await res.json()) as TeamsMeeting;
     eventBus.emit(Events.TEAMS_MEETING_CREATED, { ...meeting, entityId: meeting.id });
     return meeting;
   }
 
   async getMeetings(): Promise<TeamsMeeting[]> {
-    return this.meetings.sort((a, b) => a.start.localeCompare(b.start));
+    const res = await fetch("/api/integrations/microsoft/meetings");
+    if (!res.ok) {
+      if (res.status === 503) throw graphPendingError("Microsoft Teams");
+      throw new Error("Failed to load Teams meetings");
+    }
+    const data = (await res.json()) as TeamsMeeting[];
+    return data.sort((a, b) => a.start.localeCompare(b.start));
   }
 
   async getMeeting(id: string): Promise<TeamsMeeting | null> {
-    return this.meetings.find((m) => m.id === id) || null;
+    const meetings = await this.getMeetings();
+    return meetings.find((m) => m.id === id) || null;
   }
 
   async deleteMeeting(id: string): Promise<void> {
-    this.meetings = this.meetings.filter((m) => m.id !== id);
-  }
-
-  getJoinUrl(meeting: TeamsMeeting): string {
-    return meeting.joinUrl;
+    const res = await fetch(`/api/integrations/microsoft/meetings/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      if (res.status === 503) throw graphPendingError("Microsoft Teams");
+      throw new Error("Failed to delete Teams meeting");
+    }
   }
 }
 

@@ -2,18 +2,12 @@
 
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmptyState } from "@/components/common/EmptyState";
-import { useLive } from "@/hooks/use-live";
-import { Events } from "@/services/events";
-import { companyService } from "@/services";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
 
 export function RecentCompanies() {
-  const { data: companies } = useLive(
-    () => companyService.findAll({ page: 1, pageSize: 5 }).then(r => r.data),
-    [Events.COMPANY_CREATED, Events.COMPANY_UPDATED, Events.COMPANY_DELETED],
-    []
-  );
+  const { recentCompanies } = useDashboardData();
 
-  if (companies.length === 0) {
+  if (recentCompanies.length === 0) {
     return (
       <SectionCard title="Recent Companies">
         <EmptyState
@@ -27,11 +21,11 @@ export function RecentCompanies() {
   return (
     <SectionCard title="Recent Companies">
       <div className="-mx-6 -mb-6">
-        {companies.map((company, index: number) => (
+        {recentCompanies.map((company, index: number) => (
           <div
             key={company.id}
             className={`flex items-center justify-between px-6 py-3 ${
-              index < companies.length - 1 ? "border-b border-slate-100" : ""
+              index < recentCompanies.length - 1 ? "border-b border-slate-100" : ""
             }`}
           >
             <div>

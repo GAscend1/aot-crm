@@ -1,11 +1,11 @@
 import { BaseService } from "./base/BaseService";
-import { MockRepository } from "@/repositories/mock/MockRepository";
+import type { IRepository } from "@/repositories/base/IRepository";
 
 export type TicketPriority = "Low" | "Medium" | "High" | "Critical";
 export type TicketStatus = "Open" | "In Progress" | "Resolved" | "Closed";
 export type TicketSla = "4h" | "8h" | "24h" | "48h" | "1 week";
 
-interface Ticket {
+export interface Ticket {
   id: string;
   subject: string;
   description: string;
@@ -22,13 +22,11 @@ interface Ticket {
 }
 
 export class TicketService extends BaseService<Ticket> {
-  protected repository: MockRepository<Ticket>;
+  protected repository: IRepository<Ticket>;
   protected entityName = "ticket";
 
-  constructor(initialData: Ticket[] = []) {
+  constructor(repository: IRepository<Ticket>) {
     super();
-    this.repository = new MockRepository<Ticket>(initialData);
+    this.repository = repository;
   }
 }
-
-export type { Ticket };

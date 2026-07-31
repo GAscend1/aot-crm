@@ -8,6 +8,7 @@ import { X, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { navigation } from "@/config/navigation";
+import type { UserRole } from "@/config/roles";
 import { useSidebar } from "@/components/layout/SidebarProvider";
 import { Button } from "@/components/ui/button";
 
@@ -114,7 +115,7 @@ function NavGroup({
   );
 }
 
-export function AppSidebar() {
+export function AppSidebar({ role }: { role: UserRole }) {
   const pathname = usePathname();
   const { collapsed, mobileOpen, closeMobile } = useSidebar();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
@@ -127,6 +128,13 @@ export function AppSidebar() {
     }
     return {};
   });
+
+  const visibleGroups = navigation
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.roles.includes(role)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const toggleGroup = useCallback((group: string) => {
     setExpandedGroups((prev) => {
@@ -152,7 +160,7 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin">
-        {navigation.map((group) => (
+        {visibleGroups.map((group) => (
           <NavGroup
             key={group.group}
             group={group}
@@ -216,7 +224,7 @@ export function AppSidebar() {
                 </Button>
               </div>
               <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-                {navigation.map((group) => (
+                {visibleGroups.map((group) => (
                   <NavGroup
                     key={group.group}
                     group={group}

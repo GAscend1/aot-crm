@@ -3,28 +3,21 @@
 import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmptyState } from "@/components/common/EmptyState";
-import { useLive } from "@/hooks/use-live";
-import { Events } from "@/services/events";
-import { activityService } from "@/services";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
 
-const priorityColors = {
+const priorityColors: Record<string, string> = {
   High: "text-red-500",
   Medium: "text-amber-500",
   Low: "text-slate-400",
-} as const;
+};
 
 export function UpcomingTasks() {
-  const { data: activities } = useLive(
-    () => activityService.findAll({ page: 1, pageSize: 20 }).then(r => r.data),
-    [Events.ACTIVITY_CREATED, Events.ACTIVITY_UPDATED, Events.ACTIVITY_DELETED, Events.ACTIVITY_COMPLETED],
-    []
-  );
+  const { recentTasks } = useDashboardData();
 
-  const tasks = activities.filter((a) => a.type === "Task");
-  const activeTasks = tasks.filter((t) => t.status !== "Completed");
-  const completedTasks = tasks.filter((t) => t.status === "Completed");
+  const activeTasks = recentTasks.filter((t) => t.status !== "Completed");
+  const completedTasks = recentTasks.filter((t) => t.status === "Completed");
 
-  if (tasks.length === 0) {
+  if (recentTasks.length === 0) {
     return (
       <SectionCard title="Upcoming Tasks">
         <EmptyState
@@ -51,12 +44,12 @@ export function UpcomingTasks() {
             <div className="min-w-0 flex-1">
               <p className="text-sm text-slate-900">{task.subject}</p>
               <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
-                <span>{task.owner}</span>
+                <span>{task.assignee || "Unassigned"}</span>
                 <span>·</span>
-                <span>Due {task.date}</span>
+                <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
               </div>
             </div>
-            <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${priorityColors.High}`} />
+            <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${priorityColors[task.priority] || "text-slate-400"}`} />
           </div>
         ))}
         {completedTasks.length > 0 && (
@@ -75,9 +68,9 @@ export function UpcomingTasks() {
                     {task.subject}
                   </p>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
-                    <span>{task.owner}</span>
+                    <span>{task.assignee || "Unassigned"}</span>
                     <span>·</span>
-                    <span>{task.date}</span>
+                    <span>{new Date(task.dueDate).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>

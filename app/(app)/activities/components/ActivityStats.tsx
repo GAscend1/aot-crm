@@ -1,3 +1,5 @@
+"use client";
+
 import {
   AlertCircle,
   CalendarCheck,
@@ -6,36 +8,34 @@ import {
 } from "lucide-react";
 
 import { StatCard } from "@/components/common/StatCard";
+import { useApiList } from "@/hooks/use-api-list";
 
-import { activities } from "../data";
-
-const today = "2026-07-27";
+type ActivityRow = {
+  date: string;
+  status: string;
+};
 
 export function ActivityStats() {
-  const total = activities.length;
-  const completedToday = activities.filter(
+  const { data, loading } = useApiList<ActivityRow>("/api/activities?pageSize=1000");
+
+  const today = new Date().toISOString().split("T")[0];
+  const total = data.length;
+  const completedToday = data.filter(
     (a) => a.date === today && a.status === "Completed"
   ).length;
-  const upcoming = activities.filter(
+  const upcoming = data.filter(
     (a) => a.date > today && a.status !== "Cancelled"
   ).length;
-  const overdue = activities.filter(
+  const overdue = data.filter(
     (a) => a.date < today && a.status !== "Completed" && a.status !== "Cancelled"
   ).length;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <StatCard title="Total Activities" value={total} icon={ListChecks} />
-
-      <StatCard
-        title="Completed Today"
-        value={completedToday}
-        icon={CheckCircle2}
-      />
-
-      <StatCard title="Upcoming" value={upcoming} icon={CalendarCheck} />
-
-      <StatCard title="Overdue" value={overdue} icon={AlertCircle} />
+      <StatCard title="Total Activities" value={loading ? "…" : total} icon={ListChecks} />
+      <StatCard title="Completed Today" value={loading ? "…" : completedToday} icon={CheckCircle2} />
+      <StatCard title="Upcoming" value={loading ? "…" : upcoming} icon={CalendarCheck} />
+      <StatCard title="Overdue" value={loading ? "…" : overdue} icon={AlertCircle} />
     </div>
   );
 }

@@ -1,15 +1,15 @@
-import { v4 as uuid } from "uuid";
 import type { CalendarEvent } from "@/types/common";
 import { eventBus } from "./event-bus";
 import { Events } from "./events";
 import { graphApi, GraphClientError } from "./graph-client";
+import { graphPendingError, isGraphPending } from "./integration-gate";
 
 function toCalendarEvent(item: Record<string, unknown>): CalendarEvent {
   const onlineMeeting = item.onlineMeeting as { joinUrl?: string; conferenceId?: string } | undefined;
   const organizer = (item.organizer as { emailAddress?: { name?: string; address?: string } })?.emailAddress;
   const attendees = (item.attendees as { emailAddress?: { name?: string; address?: string }; status?: { response?: string } }[]) || [];
   return {
-    id: (item.id as string) || uuid(),
+    id: (item.id as string) || "",
     subject: (item.subject as string) || "",
     body: ((item.body as { content?: string })?.content) || "",
     start: (item.start as { dateTime?: string })?.dateTime || "",
@@ -39,8 +39,6 @@ function toCalendarEvent(item: Record<string, unknown>): CalendarEvent {
 }
 
 class CalendarService {
-  private events: CalendarEvent[] = [];
-
   async getEvents(start: string, end: string): Promise<CalendarEvent[]> {
     try {
       const result = await graphApi(
@@ -48,11 +46,7 @@ class CalendarService {
       ) as { value: Record<string, unknown>[] };
       return (result.value || []).map(toCalendarEvent);
     } catch (err) {
-      if (err instanceof GraphClientError && err.status === 503) {
-        return this.events.filter((e) => {
-          return e.start >= start && e.end <= end;
-        }).sort((a, b) => a.start.localeCompare(b.start));
-      }
+      if (isGraphPending(err)) throw graphPendingError("Microsoft Calendar");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to load events: ${err.message}`);
       }
@@ -65,9 +59,7 @@ class CalendarService {
       const result = await graphApi(`/me/events/${id}`) as Record<string, unknown>;
       return toCalendarEvent(result);
     } catch (err) {
-      if (err instanceof GraphClientError && err.status === 503) {
-        return this.events.find((e) => e.id === id) || null;
-      }
+      if (isGraphPending(err)) throw graphPendingError("Microsoft Calendar");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to load event: ${err.message}`);
       }
@@ -109,17 +101,7 @@ class CalendarService {
       eventBus.emit(Events.CALENDAR_EVENT_CREATED, { ...event, entityId: event.id });
       return event;
     } catch (err) {
-      if (err instanceof GraphClientError && err.status === 503) {
-        const event: CalendarEvent = {
-          ...data,
-          id: uuid(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        this.events.push(event);
-        eventBus.emit(Events.CALENDAR_EVENT_CREATED, { ...event, entityId: event.id });
-        return event;
-      }
+      if (isGraphPending(err)) throw graphPendingError("Microsoft Calendar");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to create event: ${err.message}`);
       }
@@ -165,13 +147,7 @@ class CalendarService {
       eventBus.emit(Events.CALENDAR_EVENT_UPDATED, { ...event, entityId: event.id });
       return event;
     } catch (err) {
-      if (err instanceof GraphClientError && err.status === 503) {
-        const idx = this.events.findIndex((e) => e.id === id);
-        if (idx === -1) throw new Error("Event not found");
-        this.events[idx] = { ...this.events[idx], ...data, updatedAt: new Date().toISOString() };
-        eventBus.emit(Events.CALENDAR_EVENT_UPDATED, { ...this.events[idx], entityId: this.events[idx].id });
-        return this.events[idx];
-      }
+      if (isGraphPending(err)) throw graphPendingError("Microsoft Calendar");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to update event: ${err.message}`);
       }
@@ -184,14 +160,7 @@ class CalendarService {
       await graphApi(`/me/events/${id}`, { method: "DELETE" });
       eventBus.emit(Events.CALENDAR_EVENT_DELETED, { entityId: id });
     } catch (err) {
-      if (err instanceof GraphClientError && err.status === 503) {
-        const event = this.events.find((e) => e.id === id);
-        this.events = this.events.filter((e) => e.id !== id);
-        if (event) {
-          eventBus.emit(Events.CALENDAR_EVENT_DELETED, { ...event, entityId: event.id });
-        }
-        return;
-      }
+      if (isGraphPending(err)) throw graphPendingError("Microsoft Calendar");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to delete event: ${err.message}`);
       }
@@ -199,18 +168,14 @@ class CalendarService {
     }
   }
 
-  async findEventsForEntity(entityType: string, entityId: string): Promise<CalendarEvent[]> {
+  async findEventsForEntity(entityType: string): Promise<CalendarEvent[]> {
     try {
       const result = await graphApi(
         `/me/events?$top=50&$orderby=start/dateTime ASC&$filter=categories/any(c:c eq '${encodeURIComponent(entityType)}')`,
       ) as { value: Record<string, unknown>[] };
       return (result.value || []).map(toCalendarEvent);
     } catch (err) {
-      if (err instanceof GraphClientError && err.status === 503) {
-        return this.events.filter((e) =>
-          e.categories.includes(entityType) || e.body.includes(entityId)
-        ).sort((a, b) => a.start.localeCompare(b.start));
-      }
+      if (isGraphPending(err)) throw graphPendingError("Microsoft Calendar");
       if (err instanceof GraphClientError) {
         throw new Error(`Failed to find events: ${err.message}`);
       }

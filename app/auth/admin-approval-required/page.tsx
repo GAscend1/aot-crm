@@ -10,11 +10,7 @@ export default function AdminApprovalRequiredPage() {
   const { status } = useSession();
   const router = useRouter();
 
-  const tenantId = process.env.NEXT_PUBLIC_AUTH_MICROSOFT_ENTRA_ID_TENANT_ID;
-  const clientId = process.env.NEXT_PUBLIC_AUTH_MICROSOFT_ENTRA_ID_ID;
-  const adminConsentUrl = tenantId && clientId
-    ? `https://login.microsoftonline.com/${tenantId}/adminconsent?client_id=${clientId}&redirect_uri=${encodeURIComponent(typeof window !== "undefined" ? `${window.location.origin}/api/auth/callback/microsoft-entra-id` : "")}`
-    : null;
+  const adminConsentUrl = null;
 
   if (status === "loading") {
     return (

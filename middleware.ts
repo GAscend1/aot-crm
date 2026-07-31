@@ -11,7 +11,7 @@ export default auth((req) => {
     "/auth/admin-approval-required",
   ];
 
-  if (pathname.startsWith("/api/auth")) return;
+  if (pathname.startsWith("/api")) return;
 
   if (pathname.startsWith("/_next") || pathname.startsWith("/static") || pathname === "/favicon.ico") return;
 
@@ -30,5 +30,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico).*)"],
 };

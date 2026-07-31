@@ -1,7 +1,7 @@
 import { BaseService } from "./base/BaseService";
-import { MockRepository } from "@/repositories/mock/MockRepository";
+import type { IRepository } from "@/repositories/base/IRepository";
 
-interface Lead {
+export interface Lead {
   id: string;
   title: string;
   company: string;
@@ -12,7 +12,10 @@ interface Lead {
   score: number;
   probability: number;
   owner: string;
+  ownerId: string;
   expectedRevenue: number;
+  expectedCloseDate: string;
+  isFavorite: boolean;
   status: "New" | "Contacted" | "Qualified" | "Proposal" | "Negotiation" | "Closed Won" | "Closed Lost";
   notes: string;
   tags?: string[];
@@ -21,13 +24,11 @@ interface Lead {
 }
 
 export class LeadService extends BaseService<Lead> {
-  protected repository: MockRepository<Lead>;
+  protected repository: IRepository<Lead>;
   protected entityName = "lead";
 
-  constructor(initialData: Lead[] = []) {
+  constructor(repository: IRepository<Lead>) {
     super();
-    this.repository = new MockRepository<Lead>(initialData);
+    this.repository = repository;
   }
 }
-
-export type { Lead };

@@ -1,11 +1,11 @@
 import { BaseService } from "./base/BaseService";
-import { MockRepository } from "@/repositories/mock/MockRepository";
+import type { IRepository } from "@/repositories/base/IRepository";
 
 export type ActivityType = "Meeting" | "Call" | "Email" | "Task" | "Reminder";
 export type ActivityStatus = "Planned" | "In Progress" | "Completed" | "Cancelled";
 export type RelatedType = "lead" | "opportunity" | "customer" | "ticket";
 
-interface Activity {
+export interface Activity {
   id: string;
   type: ActivityType;
   subject: string;
@@ -22,13 +22,11 @@ interface Activity {
 }
 
 export class ActivityService extends BaseService<Activity> {
-  protected repository: MockRepository<Activity>;
+  protected repository: IRepository<Activity>;
   protected entityName = "activity";
 
-  constructor(initialData: Activity[] = []) {
+  constructor(repository: IRepository<Activity>) {
     super();
-    this.repository = new MockRepository<Activity>(initialData);
+    this.repository = repository;
   }
 }
-
-export type { Activity };

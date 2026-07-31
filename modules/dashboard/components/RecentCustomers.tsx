@@ -2,18 +2,12 @@
 
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmptyState } from "@/components/common/EmptyState";
-import { useLive } from "@/hooks/use-live";
-import { Events } from "@/services/events";
-import { customerService } from "@/services";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
 
 export function RecentCustomers() {
-  const { data: customers } = useLive(
-    () => customerService.findAll({ page: 1, pageSize: 5 }).then(r => r.data),
-    [Events.CUSTOMER_CREATED, Events.CUSTOMER_UPDATED, Events.CUSTOMER_DELETED],
-    []
-  );
+  const { recentCustomers } = useDashboardData();
 
-  if (customers.length === 0) {
+  if (recentCustomers.length === 0) {
     return (
       <SectionCard title="Recent Customers">
         <EmptyState
@@ -27,11 +21,11 @@ export function RecentCustomers() {
   return (
     <SectionCard title="Recent Customers">
       <div className="-mx-6 -mb-6">
-        {customers.map((customer, index: number) => (
+        {recentCustomers.map((customer, index: number) => (
           <div
             key={customer.id}
             className={`flex items-center justify-between px-6 py-3 ${
-              index < customers.length - 1 ? "border-b border-slate-100" : ""
+              index < recentCustomers.length - 1 ? "border-b border-slate-100" : ""
             }`}
           >
             <div>
