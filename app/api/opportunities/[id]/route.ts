@@ -5,6 +5,7 @@ import { logAudit, createActivity } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
 import { opportunityToUI, uiStageToDb, dbStageToUi } from "../route";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: NextRequest,

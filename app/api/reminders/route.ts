@@ -4,6 +4,7 @@ import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/ser
 import { logAudit } from "@/lib/server/records";
 import { reminderSchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
+export const dynamic = "force-dynamic";
 
 export type UIReminder = {
   id: string;

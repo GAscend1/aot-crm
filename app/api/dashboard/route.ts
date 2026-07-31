@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const [customerCount, companyCount, opportunityCount, ticketCount, oppAgg, customers, companies, opportunities, tickets, activities] = await Promise.all([
     prisma.customer.count(),

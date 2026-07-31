@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { reminderSchema } from "@/lib/validation/entities";
+export const dynamic = "force-dynamic";
 
 export type LeadReminder = {
   id: string;

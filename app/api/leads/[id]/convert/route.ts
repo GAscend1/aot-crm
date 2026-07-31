@@ -4,6 +4,7 @@ import { getCrmUser, unauthorized, serverError, logServerError, notFound } from 
 import { leadConvertSchema } from "@/lib/validation/entities";
 import { leadToUI } from "../../route";
 import type { LeadStatus, PipelineStageName } from "@/generated/prisma/client";
+export const dynamic = "force-dynamic";
 
 function stageToEnum(stage?: string): PipelineStageName | undefined {
   const map: Record<string, PipelineStageName> = {

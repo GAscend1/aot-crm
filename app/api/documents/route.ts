@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { documentSchema } from "@/lib/validation/entities";
+export const dynamic = "force-dynamic";
 
 export type UIDocument = {
   id: string; name: string; category: string; type: string;

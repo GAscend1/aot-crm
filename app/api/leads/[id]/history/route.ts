@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+export const dynamic = "force-dynamic";
 
 export type LeadHistoryEntry = {
   id: string;

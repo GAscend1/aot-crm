@@ -4,6 +4,7 @@ import type { User } from "@/generated/prisma/client";
 import { getCrmUser, unauthorized, forbidden, serverError, logServerError, badRequest, isAdmin } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { adminUserSchema } from "@/lib/validation/entities";
+export const dynamic = "force-dynamic";
 
 export type UIAdminUser = {
   id: string;

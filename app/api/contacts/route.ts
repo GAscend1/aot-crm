@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
 import { logAudit, findOrCreateCompany } from "@/lib/server/records";
 import { contactSchema } from "@/lib/validation/entities";
+export const dynamic = "force-dynamic";
 
 export type UIContact = {
   id: string;

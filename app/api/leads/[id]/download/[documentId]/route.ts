@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
 import { resolveDocumentStorage, resolveBucket } from "@/lib/storage/DocumentStorage";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: NextRequest,

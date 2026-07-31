@@ -9,6 +9,8 @@ import { AppNavbar } from "@/components/layout/AppNavbar";
 import { SidebarProvider } from "@/components/layout/SidebarProvider";
 import { AppProviders } from "./AppProviders";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {

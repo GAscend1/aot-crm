@@ -4,6 +4,7 @@ import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/ser
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { leadCreateSchema } from "@/lib/validation/entities";
 import type { LeadStatus, Prisma } from "@/generated/prisma/client";
+export const dynamic = "force-dynamic";
 
 export type UILead = {
   id: string;

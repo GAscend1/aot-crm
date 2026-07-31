@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getCrmUser, unauthorized, forbidden, serverError, logServerError, isReportsManager } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { reportSchema } from "@/lib/validation/entities";
+export const dynamic = "force-dynamic";
 
 export type UIReport = {
   id: string;

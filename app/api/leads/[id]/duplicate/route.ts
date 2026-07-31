@@ -5,6 +5,7 @@ import { getCrmUser, unauthorized, serverError, logServerError, notFound } from 
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { leadDuplicateSchema } from "@/lib/validation/entities";
 import { leadToUI } from "../../route";
+export const dynamic = "force-dynamic";
 
 export async function POST(
   request: NextRequest,

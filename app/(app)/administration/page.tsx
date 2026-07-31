@@ -6,6 +6,8 @@ import { getCrmUser } from "@/lib/server/api";
 import { AdminStats } from "./components/AdminStats";
 import { AdminTable } from "./components/AdminTable";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdministrationPage() {
   const user = await getCrmUser();
   if (!user) redirect("/login");

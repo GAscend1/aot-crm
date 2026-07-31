@@ -4,6 +4,7 @@ import type { Prisma, TicketStatus, TicketPriority } from "@/generated/prisma/cl
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { ticketSchema } from "@/lib/validation/entities";
+export const dynamic = "force-dynamic";
 
 export type UITicket = {
   id: string; subject: string; description: string; priority: string;

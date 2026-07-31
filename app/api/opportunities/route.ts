@@ -4,6 +4,7 @@ import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/ser
 import { logAudit, createActivity } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import type { PipelineStageName, Prisma } from "@/generated/prisma/client";
+export const dynamic = "force-dynamic";
 
 export type UIOpportunity = {
   id: string;

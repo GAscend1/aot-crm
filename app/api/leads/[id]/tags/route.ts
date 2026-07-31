@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { z } from "zod";
+export const dynamic = "force-dynamic";
 
 const tagSchema = z.object({ tag: z.string().min(1) });
 

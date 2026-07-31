@@ -5,6 +5,7 @@ import { getCrmUser, unauthorized, serverError, logServerError, notFound } from 
 import { logAudit } from "@/lib/server/records";
 import { documentSchema } from "@/lib/validation/entities";
 import { documentToUI } from "../route";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: NextRequest,

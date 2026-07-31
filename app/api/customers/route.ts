@@ -4,6 +4,7 @@ import type { Prisma, EntityStatus } from "@/generated/prisma/client";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
 import { logAudit, findOrCreateCompany } from "@/lib/server/records";
 import { customerSchema } from "@/lib/validation/entities";
+export const dynamic = "force-dynamic";
 
 export type UICustomer = {
   id: string;

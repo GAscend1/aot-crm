@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
 import { logAudit, leadDisplayName } from "@/lib/server/records";
 import { leadToUI } from "../../route";
+export const dynamic = "force-dynamic";
 
 export async function PATCH(
   _request: NextRequest,

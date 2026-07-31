@@ -6,6 +6,7 @@ import { leadUpdateSchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
 import { leadToUI, uiStatusToDb, dbStatusToUi } from "../route";
 import type { UILead } from "../route";
+export const dynamic = "force-dynamic";
 
 type LeadWithOwner = Prisma.LeadGetPayload<{ include: { assignedTo: true } }>;
 

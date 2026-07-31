@@ -8,6 +8,8 @@ import { getCrmUser } from "@/lib/server/api";
 import { ReportStats } from "../components/ReportStats";
 import { ReportTable } from "../components/ReportTable";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportsManagePage() {
   const user = await getCrmUser();
   if (!user) redirect("/login");

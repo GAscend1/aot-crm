@@ -4,6 +4,7 @@ import { getCrmUser, unauthorized, serverError, logServerError, notFound } from 
 import { logAudit } from "@/lib/server/records";
 import { reminderSchema } from "@/lib/validation/entities";
 import { reminderToUI } from "../route";
+export const dynamic = "force-dynamic";
 
 export async function PATCH(
   request: NextRequest,
