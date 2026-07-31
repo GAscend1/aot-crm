@@ -8,7 +8,6 @@ import { X, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { navigation } from "@/config/navigation";
-import type { UserRole } from "@/config/roles";
 import { useSidebar } from "@/components/layout/SidebarProvider";
 import { Button } from "@/components/ui/button";
 
@@ -115,7 +114,7 @@ function NavGroup({
   );
 }
 
-export function AppSidebar({ role }: { role: UserRole }) {
+export function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, mobileOpen, closeMobile } = useSidebar();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
@@ -129,12 +128,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
     return {};
   });
 
-  const visibleGroups = navigation
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => item.roles.includes(role)),
-    }))
-    .filter((group) => group.items.length > 0);
+  const visibleGroups = navigation;
 
   const toggleGroup = useCallback((group: string) => {
     setExpandedGroups((prev) => {

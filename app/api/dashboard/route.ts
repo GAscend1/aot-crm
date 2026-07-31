@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { dbStageToUi } from "@/lib/server/opportunity-stages";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ export async function GET() {
     title: o.title,
     customer: o.customer?.name ?? "",
     value: o.value,
-    stage: o.stage?.name ?? "Discovery",
+    stage: dbStageToUi(o.stage?.name ?? "Discovery"),
     probability: o.probability,
     createdAt: o.createdAt.toISOString(),
   }));

@@ -6,26 +6,23 @@ import {
   ClipboardList,
   Contact,
   FolderOpen,
-  Kanban,
   LayoutDashboard,
   PieChart,
   Settings,
   Shield,
   Target,
-  Ticket,
   TrendingUp,
   Users,
   User,
   FileIcon,
+  Ticket,
+  Kanban,
 } from "lucide-react";
-
-import { UserRole } from "./roles";
 
 export interface NavigationItem {
   title: string;
   href: string;
   icon: React.ElementType;
-  roles: UserRole[];
   badge?: string;
 }
 
@@ -44,92 +41,60 @@ export const navigation: NavigationGroup[] = [
         title: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
-        roles: Object.values(UserRole),
       },
       {
         title: "Files",
         href: "/files",
         icon: FileIcon,
-        roles: Object.values(UserRole),
       },
       {
         title: "Profile",
         href: "/profile",
         icon: User,
-        roles: Object.values(UserRole),
       },
     ],
   },
 
   {
-    group: "Sales",
+    group: "CRM",
     icon: TrendingUp,
     items: [
       {
         title: "Customers",
         href: "/customers",
         icon: Users,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-          UserRole.SALES,
-        ],
       },
       {
         title: "Companies",
         href: "/companies",
         icon: Building2,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-          UserRole.SALES,
-        ],
       },
       {
         title: "Contacts",
         href: "/contacts",
         icon: Contact,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-          UserRole.SALES,
-        ],
       },
       {
         title: "Leads",
         href: "/leads",
         icon: Target,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-          UserRole.SALES,
-        ],
       },
       {
         title: "Opportunities",
         href: "/opportunities",
         icon: Briefcase,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-          UserRole.SALES,
-        ],
       },
+    ],
+  },
+
+  {
+    group: "Sales",
+    icon: Kanban,
+    items: [
       {
         title: "Pipeline",
         href: "/opportunities/kanban",
         icon: Kanban,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-          UserRole.SALES,
-        ],
       },
     ],
   },
@@ -142,68 +107,45 @@ export const navigation: NavigationGroup[] = [
         title: "Activities",
         href: "/activities",
         icon: ClipboardList,
-        roles: Object.values(UserRole),
       },
       {
         title: "Calendar",
         href: "/activities/calendar",
         icon: CalendarDays,
-        roles: Object.values(UserRole),
       },
       {
         title: "Tickets",
         href: "/tickets",
         icon: Ticket,
-        roles: Object.values(UserRole),
       },
       {
         title: "Documents",
         href: "/documents",
         icon: FolderOpen,
-        roles: Object.values(UserRole),
       },
     ],
   },
 
   {
-    group: "Analytics",
+    group: "Insights",
     icon: PieChart,
     items: [
       {
-        title: "Dashboard",
+        title: "Reports",
         href: "/reports",
         icon: BarChart3,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-        ],
-      },
-      {
-        title: "Reports",
-        href: "/reports/manage",
-        icon: PieChart,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-          UserRole.SALES_MANAGER,
-        ],
       },
     ],
   },
 
   {
-    group: "Administration",
+    group: "Management",
     icon: Shield,
     items: [
       {
         title: "Administration",
         href: "/administration",
         icon: Shield,
-        roles: [
-          UserRole.SUPER_ADMIN,
-          UserRole.ADMIN,
-        ],
       },
     ],
   },

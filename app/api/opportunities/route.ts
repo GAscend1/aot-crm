@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
 import { logAudit, createActivity } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
+import { uiStageToDb, dbStageToUi } from "@/lib/server/opportunity-stages";
 import type { PipelineStageName, Prisma } from "@/generated/prisma/client";
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
     customer: c.customer?.name ?? "",
     customerId: c.customerId ?? "",
     value: c.value,
-    stage: c.stage?.name ?? "",
+    stage: dbStageToUi(c.stage?.name ?? ""),
     stageId: c.stageId ?? "",
     probability: c.probability,
     expectedCloseDate: c.expectedCloseDate?.toISOString() ?? "",
@@ -48,21 +49,7 @@ export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
   };
 }
 
-export function uiStageToDb(stage: string): PipelineStageName | undefined {
-  const map: Record<string, PipelineStageName> = {
-    Qualification: "Qualification",
-    Discovery: "Discovery",
-    Proposal: "Proposal",
-    Negotiation: "Negotiation",
-    "Closed Won": "ClosedWon",
-    "Closed Lost": "ClosedLost",
-  };
-  return map[stage];
-}
-
-export function dbStageToUi(stage: string): string {
-  return stage === "ClosedWon" ? "Closed Won" : stage === "ClosedLost" ? "Closed Lost" : stage;
-}
+export { uiStageToDb, dbStageToUi };
 
 export async function GET(request: NextRequest) {
   const user = await getCrmUser();
