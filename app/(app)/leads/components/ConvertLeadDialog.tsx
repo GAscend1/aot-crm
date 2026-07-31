@@ -15,8 +15,8 @@ interface ConvertLeadDialogProps {
 }
 
 const stageOptions = [
-  "Qualification",
   "Discovery",
+  "Qualification",
   "Proposal",
   "Negotiation",
   "Closed Won",
@@ -35,7 +35,7 @@ export function ConvertLeadDialog({
   const [createOpportunity, setCreateOpportunity] = useState(true);
   const [opportunityTitle, setOpportunityTitle] = useState("");
   const [opportunityValue, setOpportunityValue] = useState("");
-  const [opportunityStage, setOpportunityStage] = useState("Qualification");
+  const [opportunityStage, setOpportunityStage] = useState("Discovery");
   const [saving, setSaving] = useState(false);
 
   const handleConvert = async () => {

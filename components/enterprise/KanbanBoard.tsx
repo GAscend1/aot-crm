@@ -8,6 +8,9 @@ interface KanbanCard {
   id: string;
   title: string;
   subtitle?: string;
+  company?: string;
+  priority?: string;
+  expectedClose?: string;
   value?: string | number;
   probability?: number;
   assignee?: string;
@@ -141,6 +144,26 @@ export function KanbanBoard({
                           {card.subtitle}
                         </p>
                       )}
+                      {card.company && (
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {card.company}
+                        </p>
+                      )}
+                      {card.priority && (
+                        <span
+                          className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                            card.priority === "High"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                              : card.priority === "Urgent"
+                                ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                                : card.priority === "Low"
+                                  ? "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+                          }`}
+                        >
+                          {card.priority}
+                        </span>
+                      )}
                       {card.value && (
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
                           {typeof card.value === "number"
@@ -173,8 +196,13 @@ export function KanbanBoard({
                           ))}
                         </div>
                       )}
-                      {card.assignee && (
+                      {card.expectedClose && (
                         <p className="mt-2 text-[11px] text-slate-400">
+                          Close: {card.expectedClose}
+                        </p>
+                      )}
+                      {card.assignee && (
+                        <p className="mt-1 text-[11px] text-slate-400">
                           {card.assignee}
                         </p>
                       )}

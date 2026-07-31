@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Star, MoreHorizontal, Mail, UserRound, Copy, Repeat, Trash2, Pencil, ListTodo, History, FileUp, Bell, Info } from "lucide-react";
+import { ArrowLeft, Star, MoreHorizontal, Mail, UserRound, Copy, Repeat, Trash2, Pencil, ListTodo, History, FileUp, Bell, Info, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -186,6 +186,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const handleArchive = async () => {
+    if (!lead) return;
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/archive`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to archive lead");
+      success("Lead archived", `${lead.title} has been archived.`);
+      router.replace("/leads");
+    } catch {
+      showError("Error", "Could not archive lead.");
+    }
+  };
+
   const handleConverted = (opportunityId?: string) => {
     if (opportunityId) {
       router.push(`/opportunities/${opportunityId}`);
@@ -257,6 +269,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               <DropdownMenuItem onClick={() => setConvertOpen(true)}>
                 <Repeat className="mr-2 h-4 w-4" />
                 Convert to Customer
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleArchive()}>
+                <Archive className="mr-2 h-4 w-4" />
+                Archive
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>

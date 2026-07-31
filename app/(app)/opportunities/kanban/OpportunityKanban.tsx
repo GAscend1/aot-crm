@@ -7,8 +7,8 @@ import type { Opportunity } from "@/services/opportunity.service";
 import { useToastContext } from "@/app/(app)/AppProviders";
 
 const stages = [
-  "Qualification",
   "Discovery",
+  "Qualification",
   "Proposal",
   "Negotiation",
   "Closed Won",
@@ -46,6 +46,9 @@ export function OpportunityKanban() {
         id: opp.id,
         title: opp.title,
         subtitle: opp.customer,
+        company: opp.company,
+        priority: opp.priority,
+        expectedClose: opp.expectedCloseDate ? new Date(opp.expectedCloseDate).toLocaleDateString() : undefined,
         value: opp.value,
         probability: opp.probability,
         assignee: opp.owner,

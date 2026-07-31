@@ -42,6 +42,14 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
 
   const where: Prisma.DocumentWhereInput = {};
+  const leadId = searchParams.get("leadId");
+  const opportunityId = searchParams.get("opportunityId");
+  const customerId = searchParams.get("customerId");
+  const companyId = searchParams.get("companyId");
+  if (leadId) where.leadId = leadId;
+  if (opportunityId) where.opportunityId = opportunityId;
+  if (customerId) where.customerId = customerId;
+  if (companyId) where.companyId = companyId;
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },

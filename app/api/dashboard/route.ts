@@ -5,7 +5,7 @@ import { dbStageToUi } from "@/lib/server/opportunity-stages";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [customerCount, companyCount, opportunityCount, ticketCount, oppAgg, customers, companies, opportunities, tickets, activities] = await Promise.all([
+  const [customerCount, companyCount, opportunityCount, ticketCount, oppAgg, customers, companies, opportunities, tickets, activities, quoteCount, invoiceCount, paidAgg] = await Promise.all([
     prisma.customer.count(),
     prisma.company.count(),
     prisma.opportunity.count(),
@@ -37,6 +37,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       where: { type: "Task" },
     }),
+    prisma.quote.count({ where: { archivedAt: null } }),
+    prisma.invoice.count({ where: { archivedAt: null } }),
+    prisma.invoice.aggregate({ _sum: { total: true }, where: { status: "PAID", archivedAt: null } }),
   ]);
 
   const kpis = [
@@ -45,6 +48,9 @@ export async function GET() {
     { title: "Companies", value: companyCount, change: -2.4 },
     { title: "Opportunities", value: opportunityCount, change: 16.1 },
     { title: "Open Tickets", value: ticketCount, change: -11.3 },
+    { title: "Quotes", value: quoteCount, change: 0 },
+    { title: "Invoices", value: invoiceCount, change: 0 },
+    { title: "Paid Revenue", value: `$${((paidAgg._sum.total || 0) / 1000).toFixed(1)}k`, change: 0 },
   ];
 
   const recentCustomers = customers.map((c) => ({

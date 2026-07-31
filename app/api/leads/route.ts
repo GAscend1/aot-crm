@@ -89,6 +89,7 @@ export async function GET(request: NextRequest) {
   const filters = searchParams.get("filters");
 
   const where: Prisma.LeadWhereInput = {};
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { firstName: { contains: search, mode: "insensitive" } },

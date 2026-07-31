@@ -230,6 +230,7 @@ model Lead {
   tags            Json         @default("[]")
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  archivedAt      DateTime?
 
   activities    Activity[]
   tagLinks      LeadTag[]
@@ -260,6 +261,7 @@ model Opportunity {
   title             String
   value             Float          @default(0)
   probability       Int            @default(0)
+  priority          String         @default("Medium")
   stageId           String?
   stage             PipelineStage? @relation(fields: [stageId], references: [id])
   customerId        String?
@@ -272,6 +274,7 @@ model Opportunity {
   owner             User?          @relation(fields: [ownerId], references: [id])
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+  archivedAt        DateTime?
 
   stageHistory   OpportunityStageHistory[]
   activities     Activity[]
@@ -534,6 +537,7 @@ model Quote {
   createdBy     User?       @relation(fields: [createdById], references: [id])
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  archivedAt    DateTime?
 
   items    QuoteItem[]
   invoices Invoice[]
@@ -546,6 +550,7 @@ model QuoteItem {
   id          String  @id @default(uuid())
   quoteId     String
   quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  name        String  @default("")
   description String
   quantity    Float   @default(1)
   unitPrice   Float   @default(0)
@@ -579,6 +584,7 @@ model Invoice {
   createdBy     User?         @relation(fields: [createdById], references: [id])
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  archivedAt    DateTime?
 
   items InvoiceItem[]
 
@@ -590,6 +596,7 @@ model InvoiceItem {
   id          String  @id @default(uuid())
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  name        String  @default("")
   description String
   quantity    Float   @default(1)
   unitPrice   Float   @default(0)

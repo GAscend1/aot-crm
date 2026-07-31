@@ -4,7 +4,7 @@ import { getCrmUser, unauthorized, serverError, logServerError, notFound } from 
 import { logAudit, createActivity } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
-import { opportunityToUI, uiStageToDb, dbStageToUi } from "../route";
+import { opportunityToUI, opportunityInclude, uiStageToDb, dbStageToUi } from "../route";
 export const dynamic = "force-dynamic";
 
 export async function GET(
@@ -17,7 +17,7 @@ export async function GET(
   try {
     const opp = await prisma.opportunity.findUnique({
       where: { id },
-      include: { customer: true, stage: true, owner: true },
+      include: opportunityInclude,
     });
     if (!opp) return notFound("Opportunity not found");
     return NextResponse.json(opportunityToUI(opp));
@@ -46,6 +46,7 @@ export async function PATCH(
     if (parsed.title !== undefined) data.title = parsed.title;
     if (parsed.value !== undefined) data.value = parsed.value;
     if (parsed.probability !== undefined) data.probability = parsed.probability;
+    if (parsed.priority !== undefined) data.priority = parsed.priority;
     if (parsed.status !== undefined) data.status = parsed.status;
     if (parsed.notes !== undefined) data.notes = parsed.notes || null;
     if (parsed.expectedCloseDate !== undefined) {
@@ -80,7 +81,7 @@ export async function PATCH(
     const updated = await prisma.opportunity.update({
       where: { id },
       data,
-      include: { customer: true, stage: true, owner: true },
+      include: opportunityInclude,
     });
 
     if (stageChanged && toStageId) {
@@ -132,18 +133,18 @@ export async function DELETE(
   try {
     const existing = await prisma.opportunity.findUnique({ where: { id } });
     if (!existing) return notFound("Opportunity not found");
-    await prisma.opportunity.delete({ where: { id } });
+    await prisma.opportunity.update({ where: { id }, data: { archivedAt: new Date() } });
     await logAudit({
       entityType: "opportunity",
       entityId: id,
-      action: "opportunity.deleted",
-      description: `Opportunity "${existing.title}" deleted`,
+      action: "opportunity.archived",
+      description: `Opportunity "${existing.title}" archived`,
       userId: user.id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
     logServerError(`DELETE /api/opportunities/${id}`, err);
-    return serverError("Failed to delete opportunity");
+    return serverError("Failed to archive opportunity");
   }
 }
 

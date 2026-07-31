@@ -148,6 +148,7 @@ export const opportunitySchema = z.object({
   title: z.string().min(1, "Title is required"),
   value: z.coerce.number().optional(),
   probability: z.coerce.number().min(0).max(100).optional(),
+  priority: z.enum(["Low", "Medium", "High", "Urgent"]).optional(),
   stage: z.enum(pipelineStageValues).optional(),
   stageId: z.string().optional().nullable(),
   customerId: z.string().optional().nullable(),
@@ -241,6 +242,7 @@ export const tagSchema = z.object({
 });
 
 export const quoteItemSchema = z.object({
+  name: z.string().optional().default(""),
   description: z.string().min(1),
   quantity: z.coerce.number().min(0).default(1),
   unitPrice: z.coerce.number().min(0).default(0),

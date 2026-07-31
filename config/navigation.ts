@@ -15,6 +15,8 @@ import {
   Users,
   User,
   FileIcon,
+  FileText,
+  Receipt,
   Ticket,
   Kanban,
 } from "lucide-react";
@@ -95,6 +97,16 @@ export const navigation: NavigationGroup[] = [
         title: "Pipeline",
         href: "/opportunities/kanban",
         icon: Kanban,
+      },
+      {
+        title: "Quotes",
+        href: "/quotes",
+        icon: FileText,
+      },
+      {
+        title: "Invoices",
+        href: "/invoices",
+        icon: Receipt,
       },
     ],
   },

@@ -12,7 +12,12 @@ export type UIOpportunity = {
   title: string;
   customer: string;
   customerId: string;
+  company: string;
+  companyId: string;
+  contact: string;
+  leadSource: string;
   value: number;
+  priority: string;
   stage: string;
   stageId: string;
   probability: number;
@@ -26,8 +31,20 @@ export type UIOpportunity = {
 };
 
 export type OpportunityWithRelations = Prisma.OpportunityGetPayload<{
-  include: { customer: true; stage: true; owner: true };
+  include: {
+    customer: { include: { company: true } };
+    stage: true;
+    owner: true;
+    lead: { select: { source: true } };
+  };
 }>;
+
+export const opportunityInclude = {
+  customer: { include: { company: true } },
+  stage: true,
+  owner: true,
+  lead: { select: { source: true } },
+} as const;
 
 export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
   return {
@@ -35,7 +52,12 @@ export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
     title: c.title,
     customer: c.customer?.name ?? "",
     customerId: c.customerId ?? "",
+    company: c.customer?.company?.companyName ?? "",
+    companyId: c.customer?.companyId ?? "",
+    contact: c.customer?.name ?? "",
+    leadSource: c.lead?.source ?? "",
     value: c.value,
+    priority: c.priority ?? "Medium",
     stage: dbStageToUi(c.stage?.name ?? ""),
     stageId: c.stageId ?? "",
     probability: c.probability,
@@ -63,6 +85,7 @@ export async function GET(request: NextRequest) {
   const filters = searchParams.get("filters");
 
   const where: Prisma.OpportunityWhereInput = {};
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { title: { contains: search, mode: "insensitive" } },
@@ -89,7 +112,7 @@ export async function GET(request: NextRequest) {
     const [data, total] = await Promise.all([
       prisma.opportunity.findMany({
         where,
-        include: { customer: true, stage: true, owner: true },
+        include: opportunityInclude,
         orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -120,6 +143,7 @@ export async function POST(request: NextRequest) {
       title: parsed.title,
       value: parsed.value ?? 0,
       probability: parsed.probability ?? 0,
+      priority: parsed.priority ?? "Medium",
       notes: parsed.notes || undefined,
       status: parsed.status ?? "Open",
     };
@@ -134,7 +158,7 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.opportunity.create({
       data,
-      include: { customer: true, stage: true, owner: true },
+      include: opportunityInclude,
     });
 
     await logAudit({

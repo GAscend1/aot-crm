@@ -6,6 +6,8 @@ import { OpportunityService } from "./opportunity.service";
 import { ActivityService } from "./activity.service";
 import { TicketService } from "./ticket.service";
 import { DocumentService } from "./document.service";
+import { QuoteService } from "./quote.service";
+import { InvoiceService } from "./invoice.service";
 import { resolveRepository } from "@/repositories/RepositoryFactory";
 
 export const customerService = new CustomerService(resolveRepository("customer"));
@@ -16,6 +18,8 @@ export const opportunityService = new OpportunityService(resolveRepository("oppo
 export const activityService = new ActivityService(resolveRepository("activity"));
 export const ticketService = new TicketService(resolveRepository("ticket"));
 export const documentService = new DocumentService(resolveRepository("document"));
+export const quoteService = new QuoteService(resolveRepository("quote"));
+export const invoiceService = new InvoiceService(resolveRepository("invoice"));
 
 export { auditService } from "./audit.service";
 export { graphService } from "./graph.service";

@@ -13,7 +13,6 @@ export const dynamic = "force-dynamic";
 export default async function ReportsManagePage() {
   const user = await getCrmUser();
   if (!user) redirect("/login");
-  if (!["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(user.role)) redirect("/dashboard");
 
   return (
     <PageLayout

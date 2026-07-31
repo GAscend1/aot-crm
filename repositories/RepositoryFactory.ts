@@ -12,6 +12,8 @@ const entityMap: Record<string, string> = {
   activity: "activities",
   ticket: "tickets",
   document: "documents",
+  quote: "quotes",
+  invoice: "invoices",
   notification: "notifications",
   reminder: "reminders",
   calendar: "calendar",
