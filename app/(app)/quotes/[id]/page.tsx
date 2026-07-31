@@ -12,15 +12,20 @@ import {
   Download,
   FileText,
   Mail,
+  Pencil,
   Printer,
+  TimerOff,
   Trash2,
   User,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToastContext } from "@/app/(app)/AppProviders";
+import { quoteService } from "@/services/index";
 import type { Quote } from "@/services/quote.service";
 import { quoteStatusColors, quoteStatusLabels } from "../types";
+import { QuoteDrawer } from "../components/QuoteDrawer";
+import { ConvertQuoteDialog } from "../components/ConvertQuoteDialog";
 
 const currencyFmt = (value: number, currency = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
@@ -31,6 +36,8 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
   const { success, error: showError } = useToastContext();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +113,66 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
+  const handleSave = async (data: Quote) => {
+    if (!quote) return;
+    try {
+      const updated = await quoteService.update(quote.id, data as Partial<Quote>);
+      setQuote(updated);
+      setEditOpen(false);
+      success("Quote updated", `${updated.quoteNumber} has been updated.`);
+    } catch {
+      showError("Error", "Failed to update quote.");
+    }
+  };
+
   const handlePrint = () => window.print();
+
+  const handleExportPdf = () => {
+    if (!quote) return;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${quote.quoteNumber}</title><style>
+      body { font-family: system-ui, sans-serif; color: #0f172a; padding: 40px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .muted { color: #64748b; font-size: 12px; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 24px 0; }
+      .label { text-transform: uppercase; font-size: 10px; color: #94a3b8; letter-spacing: 0.05em; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th { text-align: left; border-bottom: 1px solid #e2e8f0; padding: 8px; font-size: 11px; text-transform: uppercase; color: #94a3b8; }
+      td { border-bottom: 1px solid #e2e8f0; padding: 8px; }
+      .totals { margin-left: auto; width: 280px; margin-top: 16px; font-size: 13px; }
+      .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
+      .totals .total { border-top: 1px solid #e2e8f0; font-weight: 700; font-size: 15px; }
+    </style></head><body>
+      <h1>Sales Quote</h1><p class="muted">${quote.quoteNumber} · ${quote.status}</p>
+      <div class="grid">
+        <div><div class="label">Customer</div><div>${quote.customer || "-"}</div></div>
+        <div><div class="label">Company</div><div>${quote.company || "-"}</div></div>
+        <div><div class="label">Valid Until</div><div>${quote.validUntil || "-"}</div></div>
+      </div>
+      <table><thead><tr><th>Item</th><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+        ${quote.items
+          .map(
+            (i) =>
+              `<tr><td>${i.name || i.description}</td><td>${i.description}</td><td style="text-align:right">${i.quantity}</td><td style="text-align:right">${currencyFmt(i.unitPrice, quote.currency)}</td><td style="text-align:right">${currencyFmt(i.amount, quote.currency)}</td></tr>`
+          )
+          .join("")}
+      </tbody></table>
+      <div class="totals">
+        <div><span>Subtotal</span><span>${currencyFmt(quote.subtotal, quote.currency)}</span></div>
+        <div><span>Tax</span><span>${currencyFmt(quote.tax, quote.currency)}</span></div>
+        <div><span>Discount</span><span>-${currencyFmt(quote.discount, quote.currency)}</span></div>
+        <div class="total"><span>Total</span><span>${currencyFmt(quote.total, quote.currency)}</span></div>
+      </div>
+    </body></html>`;
+    const win = window.open("", "_blank");
+    if (!win) {
+      showError("Error", "Pop-up blocked. Allow pop-ups to export as PDF.");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
 
   const handleExport = () => {
     if (!quote) return;
@@ -165,11 +231,21 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             </Button>
           )}
           {quote.status === "ACCEPTED" && (
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => void runAction(`/api/quotes/${quote.id}/convert`)}>
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setConvertOpen(true)}>
               <FileText className="mr-2 h-4 w-4" />
               Convert to Invoice
             </Button>
           )}
+          {(quote.status === "DRAFT" || quote.status === "SENT") && (
+            <Button variant="outline" onClick={() => void setQuoteStatus("EXPIRED")}>
+              <TimerOff className="mr-2 h-4 w-4 text-orange-600" />
+              Expire
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
           {quote.status !== "ACCEPTED" && quote.status !== "REJECTED" && (
             <Button variant="outline" onClick={() => void setQuoteStatus("ACCEPTED")}>
               <Check className="mr-2 h-4 w-4 text-green-600" />
@@ -188,7 +264,11 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           </Button>
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
-            Export
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={() => void handleExportPdf()}>
+            <Printer className="mr-2 h-4 w-4" />
+            Export PDF
           </Button>
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
@@ -300,6 +380,21 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </div>
+
+      <QuoteDrawer
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open);
+        }}
+        quote={quote}
+        onSave={handleSave}
+      />
+      <ConvertQuoteDialog
+        open={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        quoteId={quote.id}
+        quoteNumber={quote.quoteNumber}
+      />
     </>
   );
 }

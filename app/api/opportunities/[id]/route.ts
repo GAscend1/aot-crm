@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
-import { logAudit, createActivity } from "@/lib/server/records";
+import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
 import { opportunityToUI, opportunityInclude, uiStageToDb, dbStageToUi } from "../route";
@@ -103,6 +103,27 @@ export async function PATCH(
         status: "Completed",
         opportunityId: id,
         customerId: updated.customerId,
+      });
+      await createNotification({
+        userId: user.id,
+        type: "Info",
+        title: `Opportunity "${updated.title}" moved to ${dbStageToUi(updated.stage?.name ?? "")}`,
+        message: `Stage changed from "${fromStageId ? await stageName(fromStageId) : "—"}" to "${dbStageToUi(updated.stage?.name ?? "")}"`,
+        entityType: "opportunity",
+        entityId: id,
+        actionLink: `/opportunities/${id}`,
+      });
+    }
+
+    if (parsed.ownerId !== undefined && parsed.ownerId !== existing.ownerId && parsed.ownerId) {
+      await createNotification({
+        userId: parsed.ownerId,
+        type: "Info",
+        title: `Opportunity "${updated.title}" assigned to you`,
+        message: `You have been assigned as the owner of ${updated.title}`,
+        entityType: "opportunity",
+        entityId: id,
+        actionLink: `/opportunities/${id}`,
       });
     }
 

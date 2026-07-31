@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest } from "@/lib/server/api";
-import { logAudit, createActivity } from "@/lib/server/records";
+import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { quoteSchema, quoteStatusSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, quoteToUI } from "@/lib/server/billing";
 import type { Prisma, QuoteStatus } from "@/generated/prisma/client";
@@ -192,6 +192,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       opportunityId: updated.opportunityId,
       customerId: updated.customerId,
     });
+    if (updated.status === "ACCEPTED" && updated.opportunityId) {
+      await createNotification({
+        userId: user.id,
+        type: "Success",
+        title: `Quote ${updated.quoteNumber} accepted`,
+        message: `Quote ${updated.quoteNumber} was accepted`,
+        entityType: "opportunity",
+        entityId: updated.opportunityId,
+        actionLink: `/quotes/${updated.id}`,
+      });
+    }
     return NextResponse.json(quoteToUI(updated));
   } catch (err) {
     logServerError(`POST /api/quotes/${id}`, err);

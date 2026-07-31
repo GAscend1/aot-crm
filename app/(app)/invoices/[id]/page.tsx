@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Download,
   FileText,
+  Pencil,
   Printer,
   Trash2,
   User,
@@ -17,8 +18,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToastContext } from "@/app/(app)/AppProviders";
+import { invoiceService } from "@/services/index";
 import type { Invoice } from "@/services/invoice.service";
 import { invoiceStatusColors, invoiceStatusLabels } from "../types";
+import { InvoiceDrawer } from "../components/InvoiceDrawer";
 
 const currencyFmt = (value: number, currency = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
@@ -29,6 +32,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const { success, error: showError } = useToastContext();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +71,66 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleSave = async (data: Invoice) => {
+    if (!invoice) return;
+    try {
+      const updated = await invoiceService.update(invoice.id, data as Partial<Invoice>);
+      setInvoice(updated);
+      setEditOpen(false);
+      success("Invoice updated", `${updated.invoiceNumber} has been updated.`);
+    } catch {
+      showError("Error", "Failed to update invoice.");
+    }
+  };
+
   const handlePrint = () => window.print();
+
+  const handleExportPdf = () => {
+    if (!invoice) return;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoice.invoiceNumber}</title><style>
+      body { font-family: system-ui, sans-serif; color: #0f172a; padding: 40px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .muted { color: #64748b; font-size: 12px; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 24px 0; }
+      .label { text-transform: uppercase; font-size: 10px; color: #94a3b8; letter-spacing: 0.05em; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th { text-align: left; border-bottom: 1px solid #e2e8f0; padding: 8px; font-size: 11px; text-transform: uppercase; color: #94a3b8; }
+      td { border-bottom: 1px solid #e2e8f0; padding: 8px; }
+      .totals { margin-left: auto; width: 280px; margin-top: 16px; font-size: 13px; }
+      .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
+      .totals .total { border-top: 1px solid #e2e8f0; font-weight: 700; font-size: 15px; }
+    </style></head><body>
+      <h1>Invoice</h1><p class="muted">${invoice.invoiceNumber} · ${invoice.status}</p>
+      <div class="grid">
+        <div><div class="label">Customer</div><div>${invoice.customer || "-"}</div></div>
+        <div><div class="label">Company</div><div>${invoice.company || "-"}</div></div>
+        <div><div class="label">Due Date</div><div>${invoice.dueDate || "-"}</div></div>
+      </div>
+      <table><thead><tr><th>Item</th><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+        ${invoice.items
+          .map(
+            (i) =>
+              `<tr><td>${i.name || i.description}</td><td>${i.description}</td><td style="text-align:right">${i.quantity}</td><td style="text-align:right">${currencyFmt(i.unitPrice, invoice.currency)}</td><td style="text-align:right">${currencyFmt(i.amount, invoice.currency)}</td></tr>`
+          )
+          .join("")}
+      </tbody></table>
+      <div class="totals">
+        <div><span>Subtotal</span><span>${currencyFmt(invoice.subtotal, invoice.currency)}</span></div>
+        <div><span>Tax</span><span>${currencyFmt(invoice.tax, invoice.currency)}</span></div>
+        <div><span>Discount</span><span>-${currencyFmt(invoice.discount, invoice.currency)}</span></div>
+        <div class="total"><span>Total</span><span>${currencyFmt(invoice.total, invoice.currency)}</span></div>
+      </div>
+    </body></html>`;
+    const win = window.open("", "_blank");
+    if (!win) {
+      showError("Error", "Pop-up blocked. Allow pop-ups to export as PDF.");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
 
   const handleDelete = async () => {
     if (!invoice) return;
@@ -158,9 +221,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               Void
             </Button>
           )}
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
-            Export
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={() => void handleExportPdf()}>
+            <Printer className="mr-2 h-4 w-4" />
+            Export PDF
           </Button>
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
@@ -273,6 +344,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+
+      <InvoiceDrawer
+        open={editOpen}
+        onOpenChange={(open) => setEditOpen(open)}
+        invoice={invoice}
+        onSave={handleSave}
+      />
     </>
   );
 }

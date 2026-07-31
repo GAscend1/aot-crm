@@ -15,6 +15,8 @@ export type UIOpportunity = {
   company: string;
   companyId: string;
   contact: string;
+  leadId: string;
+  leadName: string;
   leadSource: string;
   value: number;
   priority: string;
@@ -35,7 +37,7 @@ export type OpportunityWithRelations = Prisma.OpportunityGetPayload<{
     customer: { include: { company: true } };
     stage: true;
     owner: true;
-    lead: { select: { source: true } };
+    lead: { select: { id: true; source: true; firstName: true; lastName: true; companyName: true } };
   };
 }>;
 
@@ -43,7 +45,7 @@ export const opportunityInclude = {
   customer: { include: { company: true } },
   stage: true,
   owner: true,
-  lead: { select: { source: true } },
+  lead: { select: { id: true, source: true, firstName: true, lastName: true, companyName: true } },
 } as const;
 
 export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
@@ -55,6 +57,8 @@ export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
     company: c.customer?.company?.companyName ?? "",
     companyId: c.customer?.companyId ?? "",
     contact: c.customer?.name ?? "",
+    leadId: c.lead?.id ?? "",
+    leadName: c.lead ? `${c.lead.firstName} ${c.lead.lastName}`.trim() || c.lead.companyName || "" : "",
     leadSource: c.lead?.source ?? "",
     value: c.value,
     priority: c.priority ?? "Medium",

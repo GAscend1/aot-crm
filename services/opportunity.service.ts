@@ -9,6 +9,8 @@ export interface Opportunity {
   company?: string;
   companyId?: string;
   contact?: string;
+  leadId?: string;
+  leadName?: string;
   leadSource?: string;
   value: number;
   priority?: "Low" | "Medium" | "High" | "Urgent";

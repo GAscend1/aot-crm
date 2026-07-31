@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest } from "@/lib/server/api";
-import { logAudit, createActivity } from "@/lib/server/records";
+import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { invoiceCreateSchema, invoiceStatusSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, invoiceToUI } from "@/lib/server/billing";
 import type { InvoiceStatus, Prisma } from "@/generated/prisma/client";
@@ -68,6 +68,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         opportunityId: updated.opportunityId,
         customerId: updated.customerId,
       });
+      if (updated.status === "PAID" && updated.opportunityId) {
+        await createNotification({
+          userId: user.id,
+          type: "Success",
+          title: `Invoice ${updated.invoiceNumber} paid`,
+          message: `Invoice ${updated.invoiceNumber} has been marked as paid`,
+          entityType: "opportunity",
+          entityId: updated.opportunityId,
+          actionLink: `/invoices/${updated.id}`,
+        });
+      }
       return NextResponse.json(invoiceToUI(updated));
     }
 
@@ -190,6 +201,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       opportunityId: updated.opportunityId,
       customerId: updated.customerId,
     });
+    if (updated.status === "PAID" && updated.opportunityId) {
+      await createNotification({
+        userId: user.id,
+        type: "Success",
+        title: `Invoice ${updated.invoiceNumber} paid`,
+        message: `Invoice ${updated.invoiceNumber} has been marked as paid`,
+        entityType: "opportunity",
+        entityId: updated.opportunityId,
+        actionLink: `/invoices/${updated.id}`,
+      });
+    }
     return NextResponse.json(invoiceToUI(updated));
   } catch (err) {
     logServerError(`POST /api/invoices/${id}`, err);

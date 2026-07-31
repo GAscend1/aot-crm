@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest } from "@/lib/server/api";
-import { logAudit, createActivity } from "@/lib/server/records";
+import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { nextInvoiceNumber, invoiceToUI } from "@/lib/server/billing";
 export const dynamic = "force-dynamic";
 
@@ -86,6 +86,17 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       opportunityId: created.opportunityId,
       customerId: created.customerId,
     });
+    if (created.opportunityId) {
+      await createNotification({
+        userId: user.id,
+        type: "Success",
+        title: `Invoice ${created.invoiceNumber} created`,
+        message: `Invoice created from accepted quote ${existing.quoteNumber}`,
+        entityType: "opportunity",
+        entityId: created.opportunityId,
+        actionLink: `/invoices/${created.id}`,
+      });
+    }
 
     return NextResponse.json(invoiceToUI(created), { status: 201 });
   } catch (err) {

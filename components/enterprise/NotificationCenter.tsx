@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
@@ -31,6 +32,9 @@ interface Notification {
   timestamp: string;
   read: boolean;
   category?: string;
+  entityType?: string;
+  entityId?: string;
+  actionLink?: string;
 }
 
 interface NotificationCenterProps {
@@ -49,6 +53,17 @@ const typeIcons = {
   error: XCircle,
 };
 
+const entityPathMap: Record<string, string> = {
+  opportunity: "opportunities",
+  lead: "leads",
+  customer: "customers",
+  company: "companies",
+  contact: "contacts",
+  quote: "quotes",
+  invoice: "invoices",
+  ticket: "tickets",
+};
+
 const typeColors = {
   info: "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300",
   warning: "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300",
@@ -64,6 +79,7 @@ export function NotificationCenter({
   onClear,
   onRemove,
 }: NotificationCenterProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -200,7 +216,15 @@ export function NotificationCenter({
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.15 }}
-                    onClick={() => onMarkAsRead(notification.id)}
+                    onClick={() => {
+                      onMarkAsRead(notification.id);
+                      if (notification.actionLink) {
+                        router.push(notification.actionLink);
+                      } else if (notification.entityId && notification.entityType) {
+                        const base = entityPathMap[notification.entityType];
+                        if (base) router.push(`/${base}/${notification.entityId}`);
+                      }
+                    }}
                     className={`flex gap-3 border-b px-4 py-3 last:border-0 cursor-pointer transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50 ${
                       !notification.read ? "bg-blue-50/30 dark:bg-blue-950/20" : ""
                     }`}

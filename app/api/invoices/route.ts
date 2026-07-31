@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
-import { logAudit, createActivity } from "@/lib/server/records";
+import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { invoiceCreateSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, nextInvoiceNumber, invoiceToUI } from "@/lib/server/billing";
 import type { Prisma, InvoiceStatus } from "@/generated/prisma/client";
@@ -139,6 +139,17 @@ export async function POST(request: NextRequest) {
       opportunityId: created.opportunityId,
       customerId: created.customerId,
     });
+    if (created.opportunityId) {
+      await createNotification({
+        userId: user.id,
+        type: "Success",
+        title: `Invoice ${created.invoiceNumber} created`,
+        message: `Invoice created for ${created.customer?.name ?? "customer"} totalling $${created.total.toLocaleString()}`,
+        entityType: "opportunity",
+        entityId: created.opportunityId,
+        actionLink: `/invoices/${created.id}`,
+      });
+    }
 
     return NextResponse.json(invoiceToUI(created), { status: 201 });
   } catch (err) {

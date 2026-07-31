@@ -20,7 +20,7 @@ interface EventModalProps {
   onSaved?: () => void;
 }
 
-export function EventModal({ open, onClose, event, entityType, onSaved }: EventModalProps) {
+export function EventModal({ open, onClose, event, entityType, entityId, onSaved }: EventModalProps) {
   const { success, error: showError } = useToastContext();
   const isExisting = !!event;
   const [view, setView] = useState<"details" | "edit">(event ? "details" : "edit");
@@ -74,6 +74,21 @@ export function EventModal({ open, onClose, event, entityType, onSaved }: EventM
       } else {
         await calendarService.create(data);
         success("Event created");
+        if (entityType === "opportunity" && entityId) {
+          // In-app notification only — email is gated behind Microsoft Graph consent.
+          void fetch("/api/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "Info",
+              title: "Meeting scheduled",
+              message: `"${subject}" was scheduled for ${date}`,
+              entityType: "opportunity",
+              entityId,
+              actionLink: `/opportunities/${entityId}`,
+            }),
+          }).catch(() => {});
+        }
       }
       onSaved?.();
       onClose();

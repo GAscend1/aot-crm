@@ -30,12 +30,19 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingQuote, setDeletingQuote] = useState<Quote | undefined>();
 
+  // When opened from "View Quotes" on an opportunity, filter to that opportunity's quotes.
   useEffect(() => {
-    quoteService.findAll().then((result) => {
-      setQuotes(result.data);
-      setLoading(false);
-    });
-  }, []);
+    quoteService
+      .findAll(
+        prefillOpportunityId
+          ? { filters: { opportunityId: prefillOpportunityId } }
+          : undefined
+      )
+      .then((result) => {
+        setQuotes(result.data);
+        setLoading(false);
+      });
+  }, [prefillOpportunityId]);
 
   // Prefill from opportunity/lead context (e.g. "Create Quote" from opportunity detail)
   useEffect(() => {
@@ -52,8 +59,6 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
             opportunity: o.title,
             opportunityId: prefillOpportunityId,
           });
-          setEditingQuote(undefined);
-          setDrawerOpen(true);
         });
     } else if (prefillLeadId) {
       fetch(`/api/leads/${prefillLeadId}`)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
-import { logAudit, createActivity } from "@/lib/server/records";
+import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { quoteSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, nextQuoteNumber, quoteToUI } from "@/lib/server/billing";
 import type { Prisma, QuoteStatus } from "@/generated/prisma/client";
@@ -140,6 +140,17 @@ export async function POST(request: NextRequest) {
       opportunityId: created.opportunityId,
       customerId: created.customerId,
     });
+    if (created.opportunityId) {
+      await createNotification({
+        userId: user.id,
+        type: "Success",
+        title: `Quote ${created.quoteNumber} created`,
+        message: `Quote created for ${created.customer?.name ?? "customer"} totalling $${created.total.toLocaleString()}`,
+        entityType: "opportunity",
+        entityId: created.opportunityId,
+        actionLink: `/quotes/${created.id}`,
+      });
+    }
 
     return NextResponse.json(quoteToUI(created), { status: 201 });
   } catch (err) {

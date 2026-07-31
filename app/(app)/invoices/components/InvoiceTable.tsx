@@ -38,12 +38,19 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingInvoice, setDeletingInvoice] = useState<Invoice | undefined>();
 
+  // When opened from an opportunity detail page, filter to that opportunity's invoices.
   useEffect(() => {
-    invoiceService.findAll().then((result) => {
-      setInvoices(result.data);
-      setLoading(false);
-    });
-  }, []);
+    invoiceService
+      .findAll(
+        prefillOpportunityId
+          ? { filters: { opportunityId: prefillOpportunityId } }
+          : undefined
+      )
+      .then((result) => {
+        setInvoices(result.data);
+        setLoading(false);
+      });
+  }, [prefillOpportunityId]);
 
   // Prefill from opportunity context (e.g. "Create Invoice" from opportunity detail)
   useEffect(() => {
