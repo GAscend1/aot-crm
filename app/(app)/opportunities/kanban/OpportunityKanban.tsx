@@ -1,30 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { KanbanBoard } from "@/components/enterprise/KanbanBoard";
 import { opportunityService } from "@/services/index";
 import type { Opportunity } from "@/services/opportunity.service";
 import { useToastContext } from "@/app/(app)/AppProviders";
-
-const stages = [
-  "Discovery",
-  "Qualification",
-  "Proposal",
-  "Negotiation",
-  "Closed Won",
-  "Closed Lost",
-] as const;
-
-const stageColors: Record<string, string> = {
-  Qualification: "#94a3b8",
-  Discovery: "#3b82f6",
-  Proposal: "#f59e0b",
-  Negotiation: "#8b5cf6",
-  "Closed Won": "#22c55e",
-  "Closed Lost": "#ef4444",
-};
+import { OpportunityWorkspace } from "../components/OpportunityWorkspace";
+import { OPPORTUNITY_STAGES, stageDotVar } from "../stageConfig";
 
 export function OpportunityKanban() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const { success, error: showError } = useToastContext();
@@ -36,10 +23,10 @@ export function OpportunityKanban() {
     });
   }, []);
 
-  const columns = stages.map((stage) => ({
+  const columns = OPPORTUNITY_STAGES.map((stage) => ({
     id: stage,
     title: stage,
-    color: stageColors[stage],
+    color: stageDotVar[stage],
     cards: opportunities
       .filter((opp) => opp.stage === stage)
       .map((opp) => ({
@@ -93,7 +80,18 @@ export function OpportunityKanban() {
         columns={columns}
         onCardMove={handleCardMove}
         onCardClick={(id) => {
-          window.location.href = `/opportunities/${id}`;
+          router.push(`/opportunities/kanban?record=${encodeURIComponent(id)}`, {
+            scroll: false,
+          });
+        }}
+      />
+      <OpportunityWorkspace
+        key={searchParams?.get("record") ? `record:${searchParams.get("record")}` : "closed"}
+        siblings={opportunities.map((o) => ({ id: o.id, title: o.title }))}
+        onChanged={() => {
+          opportunityService.findAll().then((result) => {
+            setOpportunities(result.data);
+          });
         }}
       />
     </div>

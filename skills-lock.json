@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "crm-automation": {
+      "source": "claude-office-skills/skills",
+      "sourceType": "github",
+      "skillPath": "crm-automation/SKILL.md",
+      "computedHash": "c73ecbe9c1869423ee086685851e897a4a846d0b0887927945626e37d2b21aa3"
+    },
+    "design-taste-frontend": {
+      "source": "leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "899b84384f74f540ea5284d9b2e9234e050998b42eacc805410b518d4226c0b3"
+    },
+    "enterprise": {
+      "source": "bergside/awesome-design-skills",
+      "sourceType": "github",
+      "skillPath": "skills/enterprise/SKILL.md",
+      "computedHash": "e65c906bc06be4a789422acfee2b9cae38c0f78f982a8c13e9b12d9610314b2a"
+    },
+    "frontend-ui-engineering": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-ui-engineering/SKILL.md",
+      "computedHash": "3a5d4a84e52710f2d724ff68813fba0d61db4f2a232a9d0b0050a8fec08b3e82"
+    },
+    "qa-gates": {
+      "source": "gtmagents/gtm-agents",
+      "sourceType": "github",
+      "skillPath": "plugins/email-sequence-orchestration/skills/qa-gates/SKILL.md",
+      "computedHash": "11543546d1018560763d6d4c7471d758cf56a7ccc495f5d37299c3c8e3cec9e9"
+    },
+    "redesign-existing-projects": {
+      "source": "leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/redesign-skill/SKILL.md",
+      "computedHash": "47eced3e960a2c961d3cbee11fa1216264f589344b586a5cbd03967cd6b9c54b"
+    }
+  }
+}

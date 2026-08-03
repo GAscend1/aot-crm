@@ -28,39 +28,39 @@ export function EmailTimeline({ entityEmail, entityName }: EmailTimelineProps) {
     <>
       <div className="space-y-3">
         {entityEmails.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-6 text-sm text-slate-500">
+          <div className="flex flex-col items-center gap-2 py-6 text-sm text-muted-foreground">
             <Mail className="h-8 w-8" />
             <p>No email history with {entityName || "this contact"}</p>
           </div>
         ) : (
           entityEmails.map((email) => (
-            <div key={email.id} className="rounded-lg border bg-slate-50 p-3 dark:bg-slate-800 dark:border-slate-700">
+            <div key={email.id} className="rounded-lg border bg-muted/40 p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                    <span className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                    <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="truncate text-sm font-medium text-foreground">
                       {email.subject}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {email.sender.name} → {email.to.map((t) => t.name).join(", ")}
                   </p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                     {email.bodyPreview}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
                   <button
                     onClick={() => setReplyTo(email)}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    className="rounded p-1 text-muted-foreground hover:bg-muted"
                     title="Reply"
                   >
                     <Reply className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => setForwardFrom(email)}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    className="rounded p-1 text-muted-foreground hover:bg-muted"
                     title="Forward"
                   >
                     <Forward className="h-3.5 w-3.5" />

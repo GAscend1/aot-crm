@@ -116,10 +116,10 @@ export function CreateQuoteModal({ open, onClose, opportunity, onCreated }: Crea
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/20 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <DialogPrimitive.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 transition-all duration-150">
-          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border bg-white shadow-2xl dark:bg-slate-950 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b px-5 py-4 dark:border-slate-800">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-                <FileText className="h-4 w-4 text-blue-500" />
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border bg-surface-raised shadow-2xl">
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <FileText className="h-4 w-4 text-[color:var(--chart-3)]" />
                 Create Quote
               </h2>
               <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
@@ -129,30 +129,30 @@ export function CreateQuoteModal({ open, onClose, opportunity, onCreated }: Crea
 
             <div className="flex-1 overflow-y-auto space-y-4 p-5">
               {/* Prefilled context */}
-              <div className="grid grid-cols-2 gap-3 rounded-lg border bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Opportunity</p>
-                  <p className="font-medium text-slate-900 dark:text-white">{opportunity.title}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Opportunity</p>
+                  <p className="font-medium text-foreground">{opportunity.title}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Customer</p>
-                  <p className="font-medium text-slate-900 dark:text-white">{opportunity.customer || "—"}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Customer</p>
+                  <p className="font-medium text-foreground">{opportunity.customer || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Company</p>
-                  <p className="font-medium text-slate-900 dark:text-white">{opportunity.company || "—"}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Company</p>
+                  <p className="font-medium text-foreground">{opportunity.company || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Contact</p>
-                  <p className="font-medium text-slate-900 dark:text-white">{opportunity.contact || "—"}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Contact</p>
+                  <p className="font-medium text-foreground">{opportunity.contact || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Lead</p>
-                  <p className="font-medium text-slate-900 dark:text-white">{opportunity.leadName || "—"}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead</p>
+                  <p className="font-medium text-foreground">{opportunity.leadName || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Owner</p>
-                  <p className="font-medium text-slate-900 dark:text-white">{opportunity.owner || "Unassigned"}</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner</p>
+                  <p className="font-medium text-foreground">{opportunity.owner || "Unassigned"}</p>
                 </div>
               </div>
 
@@ -180,7 +180,7 @@ export function CreateQuoteModal({ open, onClose, opportunity, onCreated }: Crea
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  <div className="grid grid-cols-[1.3fr_1.5fr_0.6fr_0.8fr_0.8fr_auto] gap-2 px-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  <div className="grid grid-cols-[1.3fr_1.5fr_0.6fr_0.8fr_0.8fr_auto] gap-2 px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     <span>Product</span>
                     <span>Description</span>
                     <span>Qty</span>
@@ -194,7 +194,7 @@ export function CreateQuoteModal({ open, onClose, opportunity, onCreated }: Crea
                       <Input value={item.description} onChange={(e) => updateItem(item.key, { description: e.target.value })} />
                       <Input type="number" min={0} value={item.quantity} onChange={(e) => updateItem(item.key, { quantity: e.target.value })} />
                       <Input type="number" min={0} value={item.unitPrice} onChange={(e) => updateItem(item.key, { unitPrice: e.target.value })} />
-                      <div className="text-right text-sm font-medium text-slate-700 dark:text-slate-300">
+                      <div className="text-right text-sm font-medium text-foreground">
                         {currencyFmt((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}
                       </div>
                       <Button variant="ghost" size="icon-sm" onClick={() => removeItem(item.key)} aria-label="Remove item">
@@ -216,20 +216,20 @@ export function CreateQuoteModal({ open, onClose, opportunity, onCreated }: Crea
                 </div>
               </div>
 
-              <div className="rounded-lg border bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex justify-between text-slate-500">
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+                <div className="flex justify-between text-muted-foreground">
                   <span>Subtotal</span>
                   <span>{currencyFmt(subtotal)}</span>
                 </div>
-                <div className="mt-1 flex justify-between text-slate-500">
+                <div className="mt-1 flex justify-between text-muted-foreground">
                   <span>Discount</span>
                   <span>-{currencyFmt(Number(discount) || 0)}</span>
                 </div>
-                <div className="mt-1 flex justify-between text-slate-500">
+                <div className="mt-1 flex justify-between text-muted-foreground">
                   <span>Tax</span>
                   <span>{currencyFmt(tax)}</span>
                 </div>
-                <div className="mt-2 flex justify-between border-t pt-2 text-base font-semibold text-slate-900 dark:text-white">
+                <div className="mt-2 flex justify-between border-t pt-2 text-base font-semibold text-foreground">
                   <span>Grand Total</span>
                   <span>{currencyFmt(total)}</span>
                 </div>
@@ -244,7 +244,7 @@ export function CreateQuoteModal({ open, onClose, opportunity, onCreated }: Crea
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save Draft
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => void handleSaveAndOpen()} disabled={saving}>
+              <Button onClick={() => void handleSaveAndOpen()} disabled={saving}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save & Open Quote
               </Button>

@@ -40,19 +40,22 @@ export function Breadcrumbs() {
   if (segments.length <= 1) return null;
 
   return (
-    <nav className="flex items-center gap-1.5 text-sm text-slate-500">
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
       {segments.slice(0, -1).map((segment) => (
         <span key={segment.href} className="flex items-center gap-1.5">
           <Link
             href={segment.href}
-            className="hover:text-slate-900 dark:hover:text-white transition-colors"
+            className="rounded-sm transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             {segment.label}
           </Link>
-          <ChevronRight className="h-3.5 w-3.5" />
+          <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
       ))}
-      <span className="font-semibold text-slate-900 dark:text-white">
+      <span
+        aria-current="page"
+        className="max-w-[220px] truncate font-medium text-foreground"
+      >
         {segments[segments.length - 1].label}
       </span>
     </nav>

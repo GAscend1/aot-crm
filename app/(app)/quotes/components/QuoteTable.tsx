@@ -10,6 +10,7 @@ import type { Quote } from "@/services/quote.service";
 import { QuoteDrawer } from "./QuoteDrawer";
 import { QuoteDeleteDialog } from "./QuoteDeleteDialog";
 import { QuoteToolbar } from "./QuoteToolbar";
+import { QuoteWorkspace } from "./QuoteWorkspace";
 import { quoteStatusLabels } from "../types";
 
 interface QuoteTableProps {
@@ -89,7 +90,18 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
   }, [quotes, searchQuery, statusFilter]);
 
   const handleView = useCallback(
-    (quote: Quote) => router.push(`/quotes/${quote.id}`),
+    (quote: Quote) =>
+      router.push(`/quotes?record=${encodeURIComponent(quote.id)}`, {
+        scroll: false,
+      }),
+    [router]
+  );
+
+  const handleRowClick = useCallback(
+    (quote: Quote) =>
+      router.push(`/quotes?record=${encodeURIComponent(quote.id)}`, {
+        scroll: false,
+      }),
     [router]
   );
 
@@ -253,7 +265,7 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
         columns={columns}
         data={filtered}
         enableRowSelection
-        onRowClick={handleView}
+        onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
         bulkActions={[
           { action: "export", label: "Export CSV" },
@@ -292,6 +304,20 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
         onCancel={() => {
           setDeleteDialogOpen(false);
           setDeletingQuote(undefined);
+        }}
+      />
+
+      <QuoteWorkspace
+        onChanged={() => {
+          quoteService
+            .findAll(
+              prefillOpportunityId
+                ? { filters: { opportunityId: prefillOpportunityId } }
+                : undefined
+            )
+            .then((result) => {
+              setQuotes(result.data);
+            });
         }}
       />
     </div>

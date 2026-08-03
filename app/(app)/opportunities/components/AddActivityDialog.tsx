@@ -68,10 +68,10 @@ export function AddActivityDialog({ open, onClose, opportunityId, onAdded }: Add
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/20 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <DialogPrimitive.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 transition-all duration-150">
-          <div className="flex w-full max-w-lg flex-col rounded-xl border bg-white shadow-2xl dark:bg-slate-950 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-800">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-                <ClipboardList className="h-4 w-4 text-blue-500" />
+          <div className="flex w-full max-w-lg flex-col rounded-xl border bg-surface-raised shadow-2xl">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <ClipboardList className="h-4 w-4 text-[color:var(--chart-5)]" />
                 Add Activity
               </h2>
               <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
@@ -82,11 +82,11 @@ export function AddActivityDialog({ open, onClose, opportunityId, onAdded }: Add
             <div className="space-y-4 p-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-500">Type</label>
+                  <label className="text-xs font-medium text-muted-foreground">Type</label>
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value as typeof type)}
-                    className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                    className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                   >
                     {types.map((t) => (
                       <option key={t} value={t}>
@@ -96,11 +96,11 @@ export function AddActivityDialog({ open, onClose, opportunityId, onAdded }: Add
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-500">Status</label>
+                  <label className="text-xs font-medium text-muted-foreground">Status</label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                    className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                   >
                     <option value="Planned">Planned</option>
                     <option value="Completed">Completed</option>
@@ -110,12 +110,12 @@ export function AddActivityDialog({ open, onClose, opportunityId, onAdded }: Add
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-500">Subject</label>
+                <label className="text-xs font-medium text-muted-foreground">Subject</label>
                 <Input placeholder="Activity subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-500">Description</label>
+                <label className="text-xs font-medium text-muted-foreground">Description</label>
                 <textarea
                   className="flex min-h-[70px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   value={description}
@@ -125,12 +125,12 @@ export function AddActivityDialog({ open, onClose, opportunityId, onAdded }: Add
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-500">Due Date</label>
+                <label className="text-xs font-medium text-muted-foreground">Due Date</label>
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t px-4 py-3 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>

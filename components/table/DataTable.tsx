@@ -29,11 +29,12 @@ import {
 } from "@/components/ui/table";
 
 import { DataTablePagination } from "./DataTablePagination";
-import { DataTableViewOptions } from "./DataTableViewOptions";
 import { DataTableBulkActions } from "./DataTableBulkActions";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorState } from "@/components/common/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import type { BulkAction } from "@/types/common";
 
 interface DataTableProps<TData, TValue> {
@@ -42,11 +43,15 @@ interface DataTableProps<TData, TValue> {
   enableRowSelection?: boolean;
   onRowSelectionChange?: (rows: TData[]) => void;
   onRowClick?: (row: TData) => void;
+  rowLabel?: (row: TData) => string;
+  selectedRowId?: string;
   filterKey?: string;
   bulkActions?: BulkAction[];
   onBulkAction?: (action: string, rows: TData[]) => void;
   toolbar?: React.ReactNode;
   loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   emptyTitle?: string;
   emptyDescription?: string;
   onRefresh?: () => void;
@@ -58,10 +63,14 @@ export function DataTable<TData extends { id: string }, TValue>({
   enableRowSelection = true,
   onRowSelectionChange,
   onRowClick,
+  rowLabel,
+  selectedRowId,
   bulkActions,
   onBulkAction,
   toolbar,
   loading,
+  error,
+  onRetry,
   emptyTitle = "No records found",
   emptyDescription = "There are no records to display yet.",
   onRefresh,
@@ -95,6 +104,7 @@ export function DataTable<TData extends { id: string }, TValue>({
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
             aria-label="Select row"
+            onClick={(e) => e.stopPropagation()}
           />
         ),
         enableSorting: false,
@@ -145,32 +155,45 @@ export function DataTable<TData extends { id: string }, TValue>({
   const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {toolbar}
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-3">
         <DataTableBulkActions
           selectedRows={selectedRows}
           bulkActions={bulkActions}
           onBulkAction={(action) => onBulkAction?.(action, selectedRows)}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {onRefresh && (
-            <Button variant="ghost" size="icon" onClick={onRefresh} title="Refresh">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onRefresh}
+              aria-label="Refresh list"
+              title="Refresh"
+            >
               <ListRestart className="h-4 w-4" />
             </Button>
           )}
-          <DataTableViewOptions table={table} />
         </div>
       </div>
 
-      <div className="relative overflow-auto rounded-xl border bg-white shadow-sm dark:bg-slate-900 dark:border-slate-700">
+      <div className="relative overflow-auto rounded-xl border bg-surface-raised">
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-white dark:bg-slate-900">
+          <TableHeader className="sticky top-0 z-10 bg-surface-raised">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="border-b">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}>
+                  <TableHead
+                    key={header.id}
+                    style={{
+                      width:
+                        header.getSize() !== 150
+                          ? header.getSize()
+                          : undefined,
+                    }}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -194,31 +217,74 @@ export function DataTable<TData extends { id: string }, TValue>({
                   ))}
                 </TableRow>
               ))
-            ) : table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  onClick={() => onRowClick?.(row.original)}
-                  className={onRowClick ? "cursor-pointer" : ""}
+            ) : error ? (
+              <TableRow>
+                <TableCell
+                  colSpan={allColumns.length}
+                  className="h-40 px-4"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                  <ErrorState
+                    title="Failed to load"
+                    description={error}
+                    onRetry={onRetry}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => {
+                const isWorkspaceOpen = selectedRowId === row.id;
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    data-selected-workspace={isWorkspaceOpen || undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    aria-label={
+                      onRowClick
+                        ? `${rowLabel?.(row.original) ?? "row"} (open)`
+                        : undefined
+                    }
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("a, button, [data-no-row-click]")) {
+                        return;
+                      }
+                      onRowClick?.(row.original);
+                    }}
+                    onKeyDown={(e) => {
+                      if (!onRowClick) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRowClick(row.original);
+                      }
+                    }}
+                    className={cn(
+                      onRowClick &&
+                        "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                      isWorkspaceOpen && "bg-primary-soft/60 hover:bg-primary-soft"
+                    )}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
                   colSpan={allColumns.length}
-                  className="h-32 text-center"
+                  className="h-40 px-4"
                 >
-                  <EmptyState title={emptyTitle} description={emptyDescription} />
+                  <EmptyState
+                    title={emptyTitle}
+                    description={emptyDescription}
+                    compact
+                  />
                 </TableCell>
               </TableRow>
             )}

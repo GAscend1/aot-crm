@@ -126,7 +126,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 placeholder="Search commands..."
                 className="h-12 w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none dark:text-white"
               />
-              <kbd className="rounded border px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:border-slate-700">ESC</kbd>
+              <kbd className="rounded border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">ESC</kbd>
             </div>
 
             <div className="max-h-[360px] overflow-y-auto p-2">
@@ -163,7 +163,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                                 <span>{cmd.label}</span>
                               </div>
                               {cmd.shortcut && (
-                                <kbd className="rounded border px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:border-slate-700">
+                                <kbd className="rounded border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                   {cmd.shortcut}
                                 </kbd>
                               )}

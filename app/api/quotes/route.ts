@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, isUniqueConstraint } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { quoteSchema } from "@/lib/validation/entities";
-import { calculateTotals, formatLineItems, nextQuoteNumber, quoteToUI } from "@/lib/server/billing";
+import { calculateTotals, formatLineItems, nextQuoteNumber, quoteToUI, type QuoteWithRelations } from "@/lib/server/billing";
 import type { Prisma, QuoteStatus } from "@/generated/prisma/client";
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const quoteInclude = {
+  customer: true,
+  company: true,
+  opportunity: true,
+  lead: true,
+  createdBy: true,
+  items: true,
+} as const;
+
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
@@ -85,41 +95,29 @@ export async function POST(request: NextRequest) {
     const parsed = quoteSchema.parse(body);
     const lineItems = formatLineItems(parsed.items);
     const totals = calculateTotals(parsed.items, parsed.discount, parsed.taxRate);
-    const quoteNumber = await nextQuoteNumber();
 
-    const created = await prisma.quote.create({
-      data: {
-        quoteNumber,
-        status: "DRAFT",
-        currency: parsed.currency ?? "USD",
-        subtotal: totals.subtotal,
-        tax: totals.tax,
-        discount: totals.discount,
-        total: totals.total,
-        validUntil: parsed.validUntil ? new Date(parsed.validUntil) : null,
-        notes: parsed.notes,
-        customer: parsed.customerId ? { connect: { id: parsed.customerId } } : undefined,
-        company: parsed.companyId ? { connect: { id: parsed.companyId } } : undefined,
-        opportunity: parsed.opportunityId ? { connect: { id: parsed.opportunityId } } : undefined,
-        lead: parsed.leadId ? { connect: { id: parsed.leadId } } : undefined,
-        createdBy: { connect: { id: user.id } },
-        items: {
-          create: lineItems.map((i) => ({
-            name: i.name,
-            description: i.description,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            amount: i.amount,
-          })),
-        },
-      },
-      include: {
-        customer: true,
-        company: true,
-        opportunity: true,
-        lead: true,
-        createdBy: true,
-        items: true,
+    const created = await createQuoteWithRetry({
+      currency: parsed.currency ?? "USD",
+      status: "DRAFT",
+      subtotal: totals.subtotal,
+      tax: totals.tax,
+      discount: totals.discount,
+      total: totals.total,
+      validUntil: parsed.validUntil ? new Date(parsed.validUntil) : null,
+      notes: parsed.notes,
+      customer: parsed.customerId ? { connect: { id: parsed.customerId } } : undefined,
+      company: parsed.companyId ? { connect: { id: parsed.companyId } } : undefined,
+      opportunity: parsed.opportunityId ? { connect: { id: parsed.opportunityId } } : undefined,
+      lead: parsed.leadId ? { connect: { id: parsed.leadId } } : undefined,
+      createdBy: { connect: { id: user.id } },
+      items: {
+        create: lineItems.map((i) => ({
+          name: i.name,
+          description: i.description,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          amount: i.amount,
+        })),
       },
     });
 
@@ -154,7 +152,31 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(quoteToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "QUOTE_VALIDATION_FAILED", "At least one valid line item is required.");
+    }
     logServerError("POST /api/quotes", err);
     return serverError("Failed to create quote");
   }
+}
+
+/**
+ * Creates a quote, retrying with a freshly generated number when a
+ * concurrent create races on the unique `quoteNumber` column.
+ */
+async function createQuoteWithRetry(
+  data: Omit<Prisma.QuoteCreateInput, "quoteNumber">
+): Promise<QuoteWithRelations> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const quoteNumber = await nextQuoteNumber();
+    try {
+      return await prisma.quote.create({
+        data: { ...data, quoteNumber },
+        include: quoteInclude,
+      });
+    } catch (err) {
+      if (!isUniqueConstraint(err)) throw err;
+    }
+  }
+  throw new Error("Could not allocate a unique quote number");
 }

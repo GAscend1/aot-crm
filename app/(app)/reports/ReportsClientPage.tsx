@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useReportsData, type ReportFilters } from "@/hooks/use-reports-data";
+import { useChartPalette } from "@/components/charts/use-chart-palette";
 
 import {
   AreaChart,
@@ -49,8 +50,6 @@ import {
   FunnelChart,
   LabelList,
 } from "recharts";
-
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
 const rangeOptions: { value: ReportFilters["range"]; label: string }[] = [
   { value: "today", label: "Today" },
@@ -90,6 +89,7 @@ export default function ReportsClientPage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const { data, loading, refresh } = useReportsData(filters);
+  const { palette, primary } = useChartPalette();
 
   const kpis = data.kpis;
 
@@ -287,7 +287,7 @@ export default function ReportsClientPage() {
                 <Tooltip content={<ChartTooltip />} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} name="Value">
                   {data.pipelineData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    <Cell key={i} fill={palette[i % palette.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -305,7 +305,7 @@ export default function ReportsClientPage() {
                 <Tooltip content={<ChartTooltip />} />
                 <Funnel dataKey="count" data={data.funnelData} isAnimationActive>
                   {data.funnelData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    <Cell key={i} fill={palette[i % palette.length]} />
                   ))}
                   <LabelList position="right" fill="#64748b" stroke="none" dataKey="stage" style={{ fontSize: 12 }} />
                 </Funnel>
@@ -322,7 +322,7 @@ export default function ReportsClientPage() {
                 <XAxis dataKey="stage" tick={{ fontSize: 10 }} stroke="#94a3b8" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" tickFormatter={(v) => `${v}%`} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="conversionRate" fill="#3b82f6" radius={[3, 3, 0, 0]} name="Conversion" />
+                <Bar dataKey="conversionRate" fill={primary} radius={[3, 3, 0, 0]} name="Conversion" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -353,7 +353,7 @@ export default function ReportsClientPage() {
               <RePieChart>
                 <Pie data={data.leadSources} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4}>
                   {data.leadSources.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    <Cell key={i} fill={palette[i % palette.length]} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
@@ -370,7 +370,7 @@ export default function ReportsClientPage() {
                 <Tooltip content={<ChartTooltip />} />
                 <Funnel dataKey="count" data={data.leadFunnel} isAnimationActive>
                   {data.leadFunnel.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    <Cell key={i} fill={palette[i % palette.length]} />
                   ))}
                   <LabelList position="right" fill="#64748b" stroke="none" dataKey="stage" style={{ fontSize: 12 }} />
                 </Funnel>
@@ -418,7 +418,7 @@ export default function ReportsClientPage() {
                 <XAxis type="number" tick={{ fontSize: 11 }} stroke="#94a3b8" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} stroke="#94a3b8" width={100} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="value" fill="#3b82f6" radius={[0, 3, 3, 0]} name="Revenue" />
+                <Bar dataKey="value" fill={primary} radius={[0, 3, 3, 0]} name="Revenue" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -447,7 +447,7 @@ export default function ReportsClientPage() {
               <RePieChart>
                 <Pie data={data.quotesByStatus} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
                   {data.quotesByStatus.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    <Cell key={i} fill={palette[i % palette.length]} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
@@ -483,7 +483,7 @@ export default function ReportsClientPage() {
               <RePieChart>
                 <Pie data={data.invoicesByStatus} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
                   {data.invoicesByStatus.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    <Cell key={i} fill={palette[i % palette.length]} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
@@ -519,7 +519,7 @@ export default function ReportsClientPage() {
                 <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend />
-                <Bar dataKey="calls" fill="#3b82f6" radius={[2, 2, 0, 0]} name="Calls" />
+                <Bar dataKey="calls" fill={primary} radius={[2, 2, 0, 0]} name="Calls" />
                 <Bar dataKey="emails" fill="#10b981" radius={[2, 2, 0, 0]} name="Emails" />
                 <Bar dataKey="meetings" fill="#f59e0b" radius={[2, 2, 0, 0]} name="Meetings" />
                 <Bar dataKey="tasks" fill="#8b5cf6" radius={[2, 2, 0, 0]} name="Tasks" />
@@ -551,7 +551,7 @@ export default function ReportsClientPage() {
               <RePieChart>
                 <Pie data={data.ticketsByStatus} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
                   {data.ticketsByStatus.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    <Cell key={i} fill={palette[i % palette.length]} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />

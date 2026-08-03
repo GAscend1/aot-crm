@@ -12,8 +12,11 @@ export type UIOpportunity = {
   title: string;
   customer: string;
   customerId: string;
+  customerEmail: string;
+  customerPhone: string;
   company: string;
   companyId: string;
+  companyWebsite: string;
   contact: string;
   leadId: string;
   leadName: string;
@@ -54,8 +57,11 @@ export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
     title: c.title,
     customer: c.customer?.name ?? "",
     customerId: c.customerId ?? "",
+    customerEmail: c.customer?.email ?? "",
+    customerPhone: c.customer?.phone ?? "",
     company: c.customer?.company?.companyName ?? "",
     companyId: c.customer?.companyId ?? "",
+    companyWebsite: c.customer?.company?.website ?? "",
     contact: c.customer?.name ?? "",
     leadId: c.lead?.id ?? "",
     leadName: c.lead ? `${c.lead.firstName} ${c.lead.lastName}`.trim() || c.lead.companyName || "" : "",
@@ -100,6 +106,8 @@ export async function GET(request: NextRequest) {
     try {
       const parsed = JSON.parse(filters) as Record<string, unknown>;
       if (parsed.status) where.status = parsed.status as string;
+      if (parsed.customerId) where.customerId = String(parsed.customerId);
+      if (parsed.companyId) where.customer = { companyId: String(parsed.companyId) };
       if (parsed.stage) where.stage = { name: uiStageToDb(String(parsed.stage)) as PipelineStageName };
     } catch {
       /* ignore invalid JSON */

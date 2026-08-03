@@ -8,7 +8,6 @@ import { RecentCompanies } from "@/modules/dashboard/components/RecentCompanies"
 import { RecentOpportunities } from "@/modules/dashboard/components/RecentOpportunities";
 import { UpcomingTasks } from "@/modules/dashboard/components/UpcomingTasks";
 import { QuickActions } from "@/modules/dashboard/components/QuickActions";
-import { Notifications } from "@/modules/dashboard/components/Notifications";
 
 export default function DashboardPage() {
   return (
@@ -18,11 +17,8 @@ export default function DashboardPage() {
     >
       <DashboardKPIs />
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RevenueChart />
-        </div>
-        <Notifications />
+      <div className="grid gap-5">
+        <RevenueChart />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
@@ -38,10 +34,8 @@ export default function DashboardPage() {
         <RecentOpportunities />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <UpcomingTasks />
-        </div>
+      <div className="grid gap-5">
+        <UpcomingTasks />
       </div>
     </PageLayout>
   );

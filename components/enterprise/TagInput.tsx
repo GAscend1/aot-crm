@@ -48,7 +48,7 @@ export function TagInput({
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-white px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring/50 dark:bg-transparent dark:border-slate-700">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-surface-raised px-3 py-1.5 focus-within:ring-2 focus-within:ring-ring/50">
       <AnimatePresence>
         {tags.map((tag) => (
           <motion.span
@@ -56,12 +56,12 @@ export function TagInput({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
           >
             {tag}
             <button
               onClick={() => removeTag(tag)}
-              className="rounded p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700"
+              className="rounded p-0.5 hover:bg-muted-foreground/20"
             >
               <X className="h-3 w-3" />
             </button>
@@ -81,16 +81,16 @@ export function TagInput({
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           placeholder={tags.length === 0 ? placeholder : ""}
-          className="min-w-[80px] flex-1 border-0 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 dark:text-white"
+          className="min-w-[80px] flex-1 border-0 bg-transparent py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
         {showSuggestions && filteredSuggestions.length > 0 && (
-          <div className="absolute left-0 top-full z-10 mt-1 w-48 rounded-lg border bg-white p-1 shadow-lg dark:bg-slate-900 dark:border-slate-700">
+          <div className="absolute left-0 top-full z-10 mt-1 w-48 rounded-lg border bg-popover p-1 shadow-lg">
             {filteredSuggestions.map((suggestion) => (
               <button
                 key={suggestion}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => addTag(suggestion)}
-                className="w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="w-full rounded-md px-2 py-1.5 text-left text-xs text-foreground hover:bg-muted"
               >
                 {suggestion}
               </button>

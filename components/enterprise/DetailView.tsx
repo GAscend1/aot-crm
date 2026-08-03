@@ -37,16 +37,16 @@ export function DetailView({
         <div className="flex items-center gap-4">
           <Link
             href={backHref}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {title}
             </h1>
             {description && (
-              <p className="text-sm text-slate-500">{description}</p>
+              <p className="text-sm text-muted-foreground">{description}</p>
             )}
           </div>
         </div>
@@ -90,13 +90,13 @@ export function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border bg-white shadow-sm dark:bg-slate-900 dark:border-slate-700">
-      <div className="border-b px-6 py-4 dark:border-slate-700">
-        <h2 className="font-semibold text-slate-900 dark:text-white">
+    <div className="rounded-xl border bg-surface-raised shadow-sm">
+      <div className="border-b px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">
           {title}
         </h2>
       </div>
-      <div className="p-6">{children}</div>
+      <div className="p-4">{children}</div>
     </div>
   );
 }
@@ -110,10 +110,10 @@ export function DetailField({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-sm text-slate-900 dark:text-white">
+      <p className="mt-1 text-sm text-foreground">
         {value ?? "-"}
       </p>
     </div>

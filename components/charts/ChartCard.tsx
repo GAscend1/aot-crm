@@ -27,17 +27,17 @@ export function ChartCard({
 
   return (
     <div
-      className={`rounded-xl border bg-white shadow-sm transition-shadow hover:shadow-md dark:bg-slate-900 dark:border-slate-700 ${
+      className={`rounded-xl border bg-surface-raised shadow-sm transition-shadow hover:shadow-md ${
         expanded ? "fixed inset-4 z-50 overflow-auto" : ""
       } ${className}`}
     >
-      <div className="flex items-center justify-between border-b px-5 py-3 dark:border-slate-700">
+      <div className="flex items-center justify-between border-b px-5 py-3">
         <div className="min-w-0 space-y-0.5">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+          <h3 className="text-sm font-semibold text-foreground">
             {title}
           </h3>
           {subtitle && (
-            <p className="text-xs text-slate-500">{subtitle}</p>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-1">

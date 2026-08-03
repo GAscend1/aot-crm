@@ -10,6 +10,7 @@ import type { Invoice } from "@/services/invoice.service";
 import { InvoiceDrawer } from "./InvoiceDrawer";
 import { InvoiceDeleteDialog } from "./InvoiceDeleteDialog";
 import { InvoiceToolbar } from "./InvoiceToolbar";
+import { InvoiceWorkspace } from "./InvoiceWorkspace";
 import { invoiceStatusLabels } from "../types";
 
 interface InvoicePrefill {
@@ -89,7 +90,21 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
     return result;
   }, [invoices, searchQuery, statusFilter]);
 
-  const handleView = useCallback((invoice: Invoice) => router.push(`/invoices/${invoice.id}`), [router]);
+  const handleView = useCallback(
+    (invoice: Invoice) =>
+      router.push(`/invoices?record=${encodeURIComponent(invoice.id)}`, {
+        scroll: false,
+      }),
+    [router]
+  );
+
+  const handleRowClick = useCallback(
+    (invoice: Invoice) =>
+      router.push(`/invoices?record=${encodeURIComponent(invoice.id)}`, {
+        scroll: false,
+      }),
+    [router]
+  );
   const handleEdit = useCallback((invoice: Invoice) => {
     setEditingInvoice(invoice);
     setDrawerOpen(true);
@@ -214,7 +229,7 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
         columns={columns}
         data={filtered}
         enableRowSelection
-        onRowClick={handleView}
+        onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
         bulkActions={[
           { action: "export", label: "Export CSV" },
@@ -253,6 +268,20 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
         onCancel={() => {
           setDeleteDialogOpen(false);
           setDeletingInvoice(undefined);
+        }}
+      />
+
+      <InvoiceWorkspace
+        onChanged={() => {
+          invoiceService
+            .findAll(
+              prefillOpportunityId
+                ? { filters: { opportunityId: prefillOpportunityId } }
+                : undefined
+            )
+            .then((result) => {
+              setInvoices(result.data);
+            });
         }}
       />
     </div>

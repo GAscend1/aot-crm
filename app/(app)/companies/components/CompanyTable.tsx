@@ -12,6 +12,7 @@ import type { Company } from "@/services/company.service";
 import { CompanyDrawer } from "./CompanyDrawer";
 import { CompanyDeleteDialog } from "./CompanyDeleteDialog";
 import { CompanyToolbar } from "./CompanyToolbar";
+import { CompanyWorkspace } from "./CompanyWorkspace";
 
 export function CompanyTable() {
   const router = useRouter();
@@ -69,7 +70,9 @@ export function CompanyTable() {
 
   const handleView = useCallback(
     (company: Company) => {
-      router.push(`/companies/${company.id}`);
+      router.push(`/companies?record=${encodeURIComponent(company.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -81,7 +84,9 @@ export function CompanyTable() {
 
   const handleRowClick = useCallback(
     (company: Company) => {
-      router.push(`/companies/${company.id}`);
+      router.push(`/companies?record=${encodeURIComponent(company.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -224,6 +229,14 @@ export function CompanyTable() {
         onCancel={() => {
           setDeleteDialogOpen(false);
           setDeletingCompany(undefined);
+        }}
+      />
+
+      <CompanyWorkspace
+        onChanged={() => {
+          companyService.findAll().then((result) => {
+            setCompanies(result.data);
+          });
         }}
       />
     </div>

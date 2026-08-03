@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, Company } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { companySchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = companySchema.parse(body);
-    const name = parsed.companyName ?? parsed.name ?? "";
+    const name = (parsed.companyName ?? parsed.name ?? "").trim();
     const data: Prisma.CompanyCreateInput = {
       companyName: name,
       industry: parsed.industry || undefined,
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
       country: parsed.country || undefined,
       city: parsed.city || undefined,
       address: parsed.address || undefined,
-      employeeCount: parsed.employeeCount,
+      employeeCount: parsed.employeeCount ?? undefined,
       size: parsed.size || undefined,
       revenue: parsed.revenue || undefined,
       status: parsed.status ?? "Active",
@@ -113,6 +114,9 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(companyToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "COMPANY_VALIDATION_FAILED", "Company name is required.");
+    }
     logServerError("POST /api/companies", err);
     return serverError("Failed to create company");
   }

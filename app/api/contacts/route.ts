@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
   const sortBy = searchParams.get("sortBy") ?? "createdAt";
   const sortOrder = (searchParams.get("sortOrder") ?? "desc") as "asc" | "desc";
   const search = searchParams.get("search") ?? "";
+  const filters = searchParams.get("filters");
 
   const where: Prisma.ContactWhereInput = {};
   if (search) {
@@ -62,6 +63,12 @@ export async function GET(request: NextRequest) {
       { email: { contains: search, mode: "insensitive" } },
       { company: { companyName: { contains: search, mode: "insensitive" } } },
     ];
+  }
+  if (filters) {
+    try {
+      const parsed = JSON.parse(filters) as Record<string, unknown>;
+      if (parsed.companyId) where.companyId = String(parsed.companyId);
+    } catch { /* ignore invalid JSON */ }
   }
 
   const orderBy: Prisma.ContactOrderByWithRelationInput = {};

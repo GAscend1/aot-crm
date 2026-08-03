@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -11,8 +12,10 @@ import type { Document } from "@/services/document.service";
 import { DocumentDrawer } from "./DocumentDrawer";
 import { DocumentDeleteDialog } from "./DocumentDeleteDialog";
 import { DocumentToolbar } from "./DocumentToolbar";
+import { DocumentWorkspace } from "./DocumentWorkspace";
 
 export function DocumentTable() {
+  const router = useRouter();
   const { success, error: showError } = useToastContext();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,15 +68,28 @@ export function DocumentTable() {
     setDrawerOpen(true);
   }, []);
 
-  const handleView = useCallback((document: Document) => {
-    setEditingDocument(document);
-    setDrawerOpen(true);
-  }, []);
+  const handleView = useCallback(
+    (document: Document) => {
+      router.push(`/documents?record=${encodeURIComponent(document.id)}`, {
+        scroll: false,
+      });
+    },
+    [router],
+  );
 
   const handleDelete = useCallback((document: Document) => {
     setDeletingDocument(document);
     setDeleteDialogOpen(true);
   }, []);
+
+  const handleRowClick = useCallback(
+    (document: Document) => {
+      router.push(`/documents?record=${encodeURIComponent(document.id)}`, {
+        scroll: false,
+      });
+    },
+    [router],
+  );
 
   const columns = useMemo(
     () => createColumns({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete }),
@@ -175,6 +191,7 @@ export function DocumentTable() {
         columns={columns}
         data={filtered}
         enableRowSelection={true}
+        onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
         toolbar={
           <DocumentToolbar
@@ -212,6 +229,14 @@ export function DocumentTable() {
         onCancel={() => {
           setDeleteDialogOpen(false);
           setDeletingDocument(undefined);
+        }}
+      />
+
+      <DocumentWorkspace
+        onChanged={() => {
+          documentService.findAll().then((result) => {
+            setDocuments(result.data);
+          });
         }}
       />
     </div>

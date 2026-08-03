@@ -12,6 +12,7 @@ import type { Customer } from "@/services/customer.service";
 import { CustomerDrawer } from "./CustomerDrawer";
 import { CustomerDeleteDialog } from "./CustomerDeleteDialog";
 import { CustomerToolbar } from "./CustomerToolbar";
+import { CustomerWorkspace } from "./CustomerWorkspace";
 
 export function CustomerTable() {
   const router = useRouter();
@@ -64,7 +65,9 @@ export function CustomerTable() {
 
   const handleRowClick = useCallback(
     (customer: Customer) => {
-      router.push(`/customers/${customer.id}`);
+      router.push(`/customers?record=${encodeURIComponent(customer.id)}`, {
+        scroll: false,
+      });
     },
     [router]
   );
@@ -201,6 +204,14 @@ export function CustomerTable() {
         }}
         customer={deletingCustomer}
         onConfirm={handleConfirmDelete}
+      />
+
+      <CustomerWorkspace
+        onChanged={() => {
+          customerService.findAll().then((result) => {
+            setCustomers(result.data);
+          });
+        }}
       />
     </div>
   );

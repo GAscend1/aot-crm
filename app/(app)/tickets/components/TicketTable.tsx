@@ -12,6 +12,7 @@ import type { Ticket } from "@/services/ticket.service";
 import { TicketDrawer } from "./TicketDrawer";
 import { TicketDeleteDialog } from "./TicketDeleteDialog";
 import { TicketToolbar } from "./TicketToolbar";
+import { TicketWorkspace } from "./TicketWorkspace";
 
 export function TicketTable() {
   const router = useRouter();
@@ -64,7 +65,9 @@ export function TicketTable() {
 
   const handleView = useCallback(
     (ticket: Ticket) => {
-      router.push(`/tickets/${ticket.id}`);
+      router.push(`/tickets?record=${encodeURIComponent(ticket.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -76,7 +79,9 @@ export function TicketTable() {
 
   const handleRowClick = useCallback(
     (ticket: Ticket) => {
-      router.push(`/tickets/${ticket.id}`);
+      router.push(`/tickets?record=${encodeURIComponent(ticket.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -218,6 +223,14 @@ export function TicketTable() {
         onCancel={() => {
           setDeleteDialogOpen(false);
           setDeletingTicket(undefined);
+        }}
+      />
+
+      <TicketWorkspace
+        onChanged={() => {
+          ticketService.findAll().then((result) => {
+            setTickets(result.data);
+          });
         }}
       />
     </div>

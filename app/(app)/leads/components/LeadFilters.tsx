@@ -49,7 +49,7 @@ export function LeadFilters({
         </SelectTrigger>
 
         <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="all">All statuses</SelectItem>
           {statusOptions.map((s) => (
             <SelectItem key={s} value={s}>
               {s}

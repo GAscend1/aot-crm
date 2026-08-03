@@ -74,7 +74,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
       } else {
         await calendarService.create(data);
         success("Event created");
-        if (entityType === "opportunity" && entityId) {
+        if (entityId && (entityType === "opportunity" || entityType === "customer" || entityType === "contact" || entityType === "lead")) {
           // In-app notification only — email is gated behind Microsoft Graph consent.
           void fetch("/api/notifications", {
             method: "POST",
@@ -83,9 +83,9 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
               type: "Info",
               title: "Meeting scheduled",
               message: `"${subject}" was scheduled for ${date}`,
-              entityType: "opportunity",
+              entityType,
               entityId,
-              actionLink: `/opportunities/${entityId}`,
+              actionLink: `/${entityType}s/${entityId}`,
             }),
           }).catch(() => {});
         }
@@ -128,38 +128,38 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/20 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <DialogPrimitive.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 transition-all duration-150">
-          <div className="flex w-full max-w-lg flex-col rounded-xl border bg-white shadow-2xl dark:bg-slate-950 dark:border-slate-800">
+          <div className="flex w-full max-w-lg flex-col rounded-xl border bg-surface-raised shadow-2xl">
 
             {view === "details" && event ? (
               <>
-                <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-800">
-                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Meeting Details</h2>
+                <div className="flex items-center justify-between border-b px-4 py-3">
+                  <h2 className="text-sm font-semibold text-foreground">Meeting Details</h2>
                   <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
                     <X className="h-4 w-4" />
                   </DialogPrimitive.Close>
                 </div>
 
                 <div className="max-h-[60vh] space-y-3 overflow-y-auto p-4">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">{event.subject}</h3>
+                  <h3 className="text-base font-bold text-foreground">{event.subject}</h3>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
                     {event.onlineMeeting?.provider === "teams" ? "Teams Meeting" : "Outlook Event"}
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                    <span className="rounded bg-muted px-1.5 py-0.5">
                       {providerMode === "live" ? "Live" : "Mock"}
                     </span>
                   </div>
 
-                  <div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                  <div className="rounded-lg bg-muted/40 p-3 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
                       <Clock className="h-4 w-4" />
                       <span>{formatDateTime(event.start)} – {formatDateTime(event.end)}</span>
                     </div>
-                    <div className="mt-1 text-xs text-slate-400">UTC</div>
+                    <div className="mt-1 text-xs text-muted-foreground/70">UTC</div>
                   </div>
 
                   {event.organizer?.name && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="h-4 w-4" />
                       <span>{event.organizer.name}{event.organizer.email ? ` <${event.organizer.email}>` : ""}</span>
                     </div>
@@ -167,10 +167,10 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
 
                   {event.attendees.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-slate-500">Attendees</p>
+                      <p className="text-xs font-medium text-muted-foreground">Attendees</p>
                       <div className="mt-1 space-y-1">
                         {event.attendees.map((a, i) => (
-                          <div key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                          <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Users className="h-3.5 w-3.5" />
                             <span>{a.name || a.email} ({a.status})</span>
                           </div>
@@ -180,7 +180,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                   )}
 
                   {event.location && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <MapPin className="h-4 w-4" />
                       <span>{event.location}</span>
                     </div>
@@ -188,31 +188,31 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
 
                   {event.body && (
                     <div>
-                      <p className="text-xs font-medium text-slate-500">Description</p>
-                      <p className="mt-1 text-sm text-slate-600 whitespace-pre-wrap dark:text-slate-400">{event.body}</p>
+                      <p className="text-xs font-medium text-muted-foreground">Description</p>
+                      <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{event.body}</p>
                     </div>
                   )}
 
                   {event.onlineMeeting?.url && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
-                      <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
+                    <div className="rounded-lg border border-primary/20 bg-primary-soft p-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-[color:var(--primary)]">
                         <Video className="h-4 w-4" />
                         Teams meeting created
                       </div>
-                      <p className="mt-1 text-xs text-blue-600 break-all dark:text-blue-400">{event.onlineMeeting.url}</p>
+                      <p className="mt-1 text-xs break-all text-[color:var(--primary)]/80">{event.onlineMeeting.url}</p>
                     </div>
                   )}
 
                   {event.categories.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {event.categories.map((c, i) => (
-                        <span key={i} className="rounded bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800 dark:text-slate-300">{c}</span>
+                        <span key={i} className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">{c}</span>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 border-t px-4 py-3 dark:border-slate-800">
+                <div className="flex flex-wrap items-center gap-2 border-t px-4 py-3">
                   {event.onlineMeeting?.url && (
                     <>
                       <a href={event.onlineMeeting.url} target="_blank" rel="noopener noreferrer">
@@ -250,8 +250,8 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
               </>
             ) : (
               <>
-                <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-800">
-                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                <div className="flex items-center justify-between border-b px-4 py-3">
+                  <h2 className="text-sm font-semibold text-foreground">
                     {isExisting ? "Edit Event" : "New Event"}
                   </h2>
                   <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
@@ -266,7 +266,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       placeholder="Event title"
-                      className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                      className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                     />
                   </div>
 
@@ -277,7 +277,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                        className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                       />
                     </div>
                     <div>
@@ -286,7 +286,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                         type="time"
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
-                        className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                        className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                       />
                     </div>
                     <div>
@@ -295,7 +295,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                         type="time"
                         value={endTime}
                         onChange={(e) => setEndTime(e.target.value)}
-                        className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                        className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                       />
                     </div>
                   </div>
@@ -306,7 +306,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="Room or location"
-                      className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                      className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                     />
                   </div>
 
@@ -318,7 +318,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                       onChange={(e) => setIsTeams(e.target.checked)}
                       className="rounded border-slate-300"
                     />
-                    <label htmlFor="isTeams" className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
+                    <label htmlFor="isTeams" className="flex items-center gap-1.5 text-sm text-foreground">
                       <Video className="h-4 w-4" />
                       Microsoft Teams meeting
                     </label>
@@ -330,12 +330,12 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
                       rows={4}
-                      className="mt-1 w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                      className="mt-1 w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between border-t px-4 py-3 dark:border-slate-800">
+                <div className="flex items-center justify-between border-t px-4 py-3">
                   <div>
                     {isExisting && (
                       <Button variant="destructive" size="sm" onClick={handleDelete}>

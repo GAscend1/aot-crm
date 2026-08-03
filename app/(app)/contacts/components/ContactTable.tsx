@@ -12,6 +12,7 @@ import type { Contact } from "@/services/contact.service";
 import { ContactDrawer } from "./ContactDrawer";
 import { ContactDeleteDialog } from "./ContactDeleteDialog";
 import { ContactToolbar } from "./ContactToolbar";
+import { ContactWorkspace } from "./ContactWorkspace";
 
 export function ContactTable() {
   const router = useRouter();
@@ -65,7 +66,9 @@ export function ContactTable() {
 
   const handleRowClick = useCallback(
     (contact: Contact) => {
-      router.push(`/contacts/${contact.id}`);
+      router.push(`/contacts?record=${encodeURIComponent(contact.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -202,6 +205,14 @@ export function ContactTable() {
         }}
         contact={deletingContact}
         onConfirm={handleConfirmDelete}
+      />
+
+      <ContactWorkspace
+        onChanged={() => {
+          contactService.findAll().then((result) => {
+            setContacts(result.data);
+          });
+        }}
       />
     </div>
   );

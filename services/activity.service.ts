@@ -1,8 +1,8 @@
 import { BaseService } from "./base/BaseService";
 import type { IRepository } from "@/repositories/base/IRepository";
 
-export type ActivityType = "Meeting" | "Call" | "Email" | "Task" | "Reminder";
-export type ActivityStatus = "Planned" | "In Progress" | "Completed" | "Cancelled";
+export type ActivityType = "Meeting" | "Call" | "Email" | "Task" | "Note" | "Comment";
+export type ActivityStatus = "Planned" | "Completed" | "Cancelled";
 export type RelatedType = "lead" | "opportunity" | "customer" | "ticket";
 
 export interface Activity {
