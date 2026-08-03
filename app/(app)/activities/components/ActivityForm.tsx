@@ -26,16 +26,16 @@ interface ActivityFormProps {
 }
 
 const types: ActivityType[] = [
-  "Meeting",
   "Call",
   "Email",
+  "Meeting",
   "Task",
-  "Reminder",
+  "Note",
+  "Comment",
 ];
 
 const statuses: ActivityStatus[] = [
   "Planned",
-  "In Progress",
   "Completed",
   "Cancelled",
 ];

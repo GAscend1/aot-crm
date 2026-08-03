@@ -14,6 +14,7 @@ import {
   Phone,
   Calendar,
   CheckCircle2,
+  Plus,
 } from "lucide-react";
 import { EmptyState } from "@/components/common/EmptyState";
 
@@ -76,7 +77,18 @@ interface RelatedQuote {
   createdAt: string;
 }
 
-export function RelatedQuotesSection({ opportunityId, refreshKey = 0 }: { opportunityId: string; refreshKey?: number }) {
+export function RelatedQuotesSection({
+  opportunityId,
+  refreshKey = 0,
+  onConvert,
+  compact = false,
+}: {
+  opportunityId: string;
+  refreshKey?: number;
+  onConvert?: (quoteId: string, quoteNumber: string) => void;
+  /** Compact list (max 3 rows) used by the opportunity modal inspector. */
+  compact?: boolean;
+}) {
   const [quotes, setQuotes] = useState<RelatedQuote[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -99,6 +111,74 @@ export function RelatedQuotesSection({ opportunityId, refreshKey = 0 }: { opport
       cancelled = true;
     };
   }, [opportunityId, refreshKey]);
+
+  if (compact) {
+    return (
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Quotes ({quotes.length})
+          </p>
+          <Link href={`/quotes?opportunityId=${opportunityId}`} className="text-[11px] font-medium text-[color:var(--info)] hover:underline">
+            View all
+          </Link>
+        </div>
+        {loading ? (
+          <div className="space-y-1.5">
+            <div className="h-7 animate-pulse rounded-md bg-muted" />
+            <div className="h-7 animate-pulse rounded-md bg-muted" />
+          </div>
+        ) : quotes.length === 0 ? (
+          <p className="py-1 text-xs text-muted-foreground">No quotes yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border">
+            {quotes.slice(0, 3).map((q) => (
+              <li key={q.id} className="flex items-center gap-2 px-2.5 py-1.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300">
+                  <FileText className="h-3 w-3" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Link href={`/quotes/${q.id}`} className="truncate text-xs font-medium text-foreground hover:text-[color:var(--info)]">
+                      {q.quoteNumber}
+                    </Link>
+                    <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-medium ${quoteStatusColors[q.status]}`}>
+                      {quoteStatusLabels[q.status]}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">{new Date(q.createdAt).toLocaleDateString()}</p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-foreground">{moneyFmt(q.total)}</span>
+                {onConvert && q.status === "ACCEPTED" && (
+                  <button
+                    onClick={() => onConvert(q.id, q.quoteNumber)}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[color:var(--success)] transition-colors hover:bg-success-soft"
+                    title="Convert to invoice"
+                  >
+                    <Receipt className="h-3 w-3" />
+                  </button>
+                )}
+                <Link
+                  href={`/quotes/${q.id}`}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Open quote"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </li>
+            ))}
+            {quotes.length > 3 && (
+              <li className="px-2.5 py-1.5">
+                <Link href={`/quotes?opportunityId=${opportunityId}`} className="text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                  +{quotes.length - 3} more
+                </Link>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -133,6 +213,16 @@ export function RelatedQuotesSection({ opportunityId, refreshKey = 0 }: { opport
                 <p className="text-xs text-slate-400">{new Date(q.createdAt).toLocaleDateString()}</p>
               </div>
               <span className="text-sm font-semibold text-slate-900 dark:text-white">{moneyFmt(q.total)}</span>
+              {onConvert && q.status === "ACCEPTED" && (
+                <button
+                  onClick={() => onConvert(q.id, q.quoteNumber)}
+                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:border-slate-700 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                  title="Convert to invoice"
+                >
+                  <Receipt className="h-3.5 w-3.5" />
+                  Convert
+                </button>
+              )}
               <Link
                 href={`/quotes/${q.id}`}
                 className="flex h-8 w-8 items-center justify-center rounded-lg border text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
@@ -162,7 +252,16 @@ interface RelatedInvoice {
   createdAt: string;
 }
 
-export function RelatedInvoicesSection({ opportunityId, refreshKey = 0 }: { opportunityId: string; refreshKey?: number }) {
+export function RelatedInvoicesSection({
+  opportunityId,
+  refreshKey = 0,
+  compact = false,
+}: {
+  opportunityId: string;
+  refreshKey?: number;
+  /** Compact list (max 3 rows) used by the opportunity modal inspector. */
+  compact?: boolean;
+}) {
   const [invoices, setInvoices] = useState<RelatedInvoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -185,6 +284,67 @@ export function RelatedInvoicesSection({ opportunityId, refreshKey = 0 }: { oppo
       cancelled = true;
     };
   }, [opportunityId, refreshKey]);
+
+  if (compact) {
+    return (
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Invoices ({invoices.length})
+          </p>
+          <Link href={`/invoices?opportunityId=${opportunityId}`} className="text-[11px] font-medium text-[color:var(--success)] hover:underline">
+            View all
+          </Link>
+        </div>
+        {loading ? (
+          <div className="space-y-1.5">
+            <div className="h-7 animate-pulse rounded-md bg-muted" />
+            <div className="h-7 animate-pulse rounded-md bg-muted" />
+          </div>
+        ) : invoices.length === 0 ? (
+          <p className="py-1 text-xs text-muted-foreground">No invoices yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border">
+            {invoices.slice(0, 3).map((inv) => (
+              <li key={inv.id} className="flex items-center gap-2 px-2.5 py-1.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300">
+                  <Receipt className="h-3 w-3" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Link href={`/invoices/${inv.id}`} className="truncate text-xs font-medium text-foreground hover:text-[color:var(--success)]">
+                      {inv.invoiceNumber}
+                    </Link>
+                    <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-medium ${invoiceStatusColors[inv.status]}`}>
+                      {invoiceStatusLabels[inv.status]}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Due {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-foreground">{moneyFmt(inv.total)}</span>
+                <Link
+                  href={`/invoices/${inv.id}`}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Open invoice"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </li>
+            ))}
+            {invoices.length > 3 && (
+              <li className="px-2.5 py-1.5">
+                <Link href={`/invoices?opportunityId=${opportunityId}`} className="text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                  +{invoices.length - 3} more
+                </Link>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -249,7 +409,19 @@ interface RelatedDocument {
   uploadedByName: string | null;
 }
 
-export function RelatedDocumentsSection({ opportunityId, refreshKey = 0 }: { opportunityId: string; refreshKey?: number }) {
+export function RelatedDocumentsSection({
+  opportunityId,
+  refreshKey = 0,
+  compact = false,
+  onUpload,
+}: {
+  opportunityId: string;
+  refreshKey?: number;
+  /** Compact list (max 3 rows) used by the opportunity modal inspector. */
+  compact?: boolean;
+  /** Opens the upload dialog from the compact list's Upload action. */
+  onUpload?: () => void;
+}) {
   const [documents, setDocuments] = useState<RelatedDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -291,6 +463,77 @@ export function RelatedDocumentsSection({ opportunityId, refreshKey = 0 }: { opp
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  if (compact) {
+    return (
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Documents ({documents.length})
+          </p>
+          <div className="flex items-center gap-2.5">
+            {onUpload && (
+              <button
+                type="button"
+                onClick={onUpload}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-[color:var(--info)] transition-colors hover:underline"
+              >
+                <Plus className="h-3 w-3" />
+                Upload
+              </button>
+            )}
+            <Link href="/documents" className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+              View all
+            </Link>
+          </div>
+        </div>
+        {loading ? (
+          <div className="space-y-1.5">
+            <div className="h-7 animate-pulse rounded-md bg-muted" />
+            <div className="h-7 animate-pulse rounded-md bg-muted" />
+          </div>
+        ) : documents.length === 0 ? (
+          <p className="py-1 text-xs text-muted-foreground">No documents yet.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border">
+            {documents.slice(0, 3).map((doc) => (
+              <li key={doc.id} className="flex items-center gap-2 px-2.5 py-1.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-100 text-sky-600 dark:bg-sky-900/60 dark:text-sky-300">
+                  <FileUp className="h-3 w-3" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-foreground">{doc.name}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {doc.type || "Other"}
+                    {doc.size ? ` · ${formatSize(doc.size)}` : ""}
+                    {doc.uploadedByName ? ` · ${doc.uploadedByName}` : ""} · {new Date(doc.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => void handleOpen(doc)}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Preview / download"
+                >
+                  {downloading === doc.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Eye className="h-3 w-3" />
+                  )}
+                </button>
+              </li>
+            ))}
+            {documents.length > 3 && (
+              <li className="px-2.5 py-1.5">
+                <Link href="/documents" className="text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                  +{documents.length - 3} more
+                </Link>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -11,8 +12,10 @@ import type { Activity } from "@/services/activity.service";
 import { ActivityDrawer } from "./ActivityDrawer";
 import { ActivityDeleteDialog } from "./ActivityDeleteDialog";
 import { ActivityToolbar } from "./ActivityToolbar";
+import { ActivityWorkspace } from "./ActivityWorkspace";
 
 export function ActivityTable() {
+  const router = useRouter();
   const { success, error: showError } = useToastContext();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,15 +63,28 @@ export function ActivityTable() {
     setDrawerOpen(true);
   }, []);
 
-  const handleView = useCallback((activity: Activity) => {
-    setEditingActivity(activity);
-    setDrawerOpen(true);
-  }, []);
+  const handleView = useCallback(
+    (activity: Activity) => {
+      router.push(`/activities?record=${encodeURIComponent(activity.id)}`, {
+        scroll: false,
+      });
+    },
+    [router],
+  );
 
   const handleDelete = useCallback((activity: Activity) => {
     setDeletingActivity(activity);
     setDeleteDialogOpen(true);
   }, []);
+
+  const handleRowClick = useCallback(
+    (activity: Activity) => {
+      router.push(`/activities?record=${encodeURIComponent(activity.id)}`, {
+        scroll: false,
+      });
+    },
+    [router],
+  );
 
   const columns = useMemo(
     () => createColumns({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete }),
@@ -77,15 +93,37 @@ export function ActivityTable() {
 
   const handleSave = useCallback(
     async (data: Activity) => {
+      // Map the UI form shape onto the API schema. The API maps these onto
+      // Prisma fields (dueDate, assignee, relations) — the raw UI shape
+      // (date/time/owner/relatedTo) cannot be persisted directly.
+      const payload = {
+        type: data.type,
+        subject: data.subject,
+        description: data.description || undefined,
+        status: data.status,
+        dueDate: data.date && data.time ? `${data.date}T${data.time}:00` : data.date || null,
+      };
       try {
         if (editingActivity) {
-          const updated = await activityService.update(editingActivity.id, data as Partial<Activity>);
+          const res = await fetch(`/api/activities/${editingActivity.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error("Failed");
+          const updated = (await res.json()) as Activity;
           setActivities((prev) =>
             prev.map((a) => (a.id === editingActivity.id ? updated : a)),
           );
           success("Activity updated", `${updated.subject} has been updated.`);
         } else {
-          const created = await activityService.create(data as Omit<Activity, "id" | "createdAt" | "updatedAt">);
+          const res = await fetch("/api/activities", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error("Failed");
+          const created = (await res.json()) as Activity;
           setActivities((prev) => [created, ...prev]);
           success("Activity created", `${created.subject} has been added.`);
         }
@@ -170,6 +208,7 @@ export function ActivityTable() {
         columns={columns}
         data={filtered}
         enableRowSelection={true}
+        onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
         toolbar={
           <ActivityToolbar
@@ -206,6 +245,14 @@ export function ActivityTable() {
         onCancel={() => {
           setDeleteDialogOpen(false);
           setDeletingActivity(undefined);
+        }}
+      />
+
+      <ActivityWorkspace
+        onChanged={() => {
+          activityService.findAll().then((result) => {
+            setActivities(result.data);
+          });
         }}
       />
     </div>

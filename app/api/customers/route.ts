@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
     try {
       const parsed = JSON.parse(filters) as Record<string, unknown>;
       if (parsed.status) where.status = parsed.status as EntityStatus;
+      if (parsed.companyId) where.companyId = String(parsed.companyId);
     } catch { /* ignore invalid JSON */ }
   }
 

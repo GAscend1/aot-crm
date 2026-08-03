@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, isUniqueConstraint } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { invoiceCreateSchema } from "@/lib/validation/entities";
-import { calculateTotals, formatLineItems, nextInvoiceNumber, invoiceToUI } from "@/lib/server/billing";
+import { calculateTotals, formatLineItems, nextInvoiceNumber, invoiceToUI, type InvoiceWithRelations } from "@/lib/server/billing";
 import type { Prisma, InvoiceStatus } from "@/generated/prisma/client";
 export const dynamic = "force-dynamic";
 
@@ -89,37 +90,32 @@ export async function POST(request: NextRequest) {
     const items = parsed.items ?? [];
     const lineItems = formatLineItems(items);
     const totals = calculateTotals(items, parsed.discount, parsed.taxRate);
-    const invoiceNumber = await nextInvoiceNumber();
 
-    const created = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        status: "DRAFT",
-        currency: parsed.currency ?? "USD",
-        subtotal: totals.subtotal,
-        tax: totals.tax,
-        discount: totals.discount,
-        total: totals.total,
-        issueDate: new Date(),
-        dueDate: parsed.dueDate ? new Date(parsed.dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        notes: parsed.notes,
-        quote: parsed.quoteId ? { connect: { id: parsed.quoteId } } : undefined,
-        customer: parsed.customerId ? { connect: { id: parsed.customerId } } : undefined,
-        company: parsed.companyId ? { connect: { id: parsed.companyId } } : undefined,
-        opportunity: parsed.opportunityId ? { connect: { id: parsed.opportunityId } } : undefined,
-        lead: parsed.leadId ? { connect: { id: parsed.leadId } } : undefined,
-        createdBy: { connect: { id: user.id } },
-        items: {
-          create: lineItems.map((i) => ({
-            name: i.name,
-            description: i.description,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            amount: i.amount,
-          })),
-        },
+    const created = await createInvoiceWithRetry({
+      status: "DRAFT",
+      currency: parsed.currency ?? "USD",
+      subtotal: totals.subtotal,
+      tax: totals.tax,
+      discount: totals.discount,
+      total: totals.total,
+      issueDate: new Date(),
+      dueDate: parsed.dueDate ? new Date(parsed.dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      notes: parsed.notes,
+      quote: parsed.quoteId ? { connect: { id: parsed.quoteId } } : undefined,
+      customer: parsed.customerId ? { connect: { id: parsed.customerId } } : undefined,
+      company: parsed.companyId ? { connect: { id: parsed.companyId } } : undefined,
+      opportunity: parsed.opportunityId ? { connect: { id: parsed.opportunityId } } : undefined,
+      lead: parsed.leadId ? { connect: { id: parsed.leadId } } : undefined,
+      createdBy: { connect: { id: user.id } },
+      items: {
+        create: lineItems.map((i) => ({
+          name: i.name,
+          description: i.description,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          amount: i.amount,
+        })),
       },
-      include,
     });
 
     await logAudit({
@@ -153,7 +149,31 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(invoiceToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "INVOICE_VALIDATION_FAILED", "At least one valid line item is required.");
+    }
     logServerError("POST /api/invoices", err);
     return serverError("Failed to create invoice");
   }
+}
+
+/**
+ * Creates an invoice, retrying with a freshly generated number when a
+ * concurrent create races on the unique `invoiceNumber` column.
+ */
+async function createInvoiceWithRetry(
+  data: Omit<Prisma.InvoiceCreateInput, "invoiceNumber">
+): Promise<InvoiceWithRelations> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const invoiceNumber = await nextInvoiceNumber();
+    try {
+      return await prisma.invoice.create({
+        data: { ...data, invoiceNumber },
+        include,
+      });
+    } catch (err) {
+      if (!isUniqueConstraint(err)) throw err;
+    }
+  }
+  throw new Error("Could not allocate a unique invoice number");
 }

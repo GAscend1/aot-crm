@@ -5,6 +5,7 @@ import {
   Bell,
   Calendar,
   CheckSquare,
+  ClipboardList,
   Eye,
   Mail,
   MoreHorizontal,
@@ -30,12 +31,17 @@ const typeIcon: Record<ActivityType, typeof Calendar> = {
   Call: Phone,
   Email: Mail,
   Task: CheckSquare,
+  Note: ClipboardList,
+  Comment: ClipboardList,
+};
+
+const typeIconFallback: Record<string, typeof Calendar> = {
+  ...typeIcon,
   Reminder: Bell,
 };
 
 const statusStyle: Record<ActivityStatus, string> = {
   Planned: "bg-blue-100 text-blue-700",
-  "In Progress": "bg-amber-100 text-amber-700",
   Completed: "bg-green-100 text-green-700",
   Cancelled: "bg-gray-100 text-gray-700",
 };
@@ -55,7 +61,7 @@ export function createColumns(actions: ColumnActions): ColumnDef<Activity, unkno
       ),
       cell: ({ row }) => {
         const type = row.original.type;
-        const Icon = typeIcon[type];
+        const Icon = typeIconFallback[type] ?? Calendar;
         return (
           <div className="flex items-center gap-2">
             <Icon className="h-4 w-4 text-muted-foreground" />

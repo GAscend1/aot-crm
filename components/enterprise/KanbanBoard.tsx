@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Plus, GripVertical } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface KanbanCard {
   id: string;
@@ -40,15 +41,23 @@ export function KanbanBoard({
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggedCard, setDraggedCard] = useState<string | null>(null);
   const dragNode = useRef<HTMLElement | null>(null);
+  const reduceMotion = useReducedMotion();
 
   const handleDragStart = useCallback(
-    (e: globalThis.DragEvent | globalThis.MouseEvent | globalThis.TouchEvent | globalThis.PointerEvent, cardId: string) => {
+    (e: React.DragEvent, cardId: string) => {
       dragNode.current = e.target as HTMLElement;
       setDraggedCard(cardId);
-      if ("dataTransfer" in e && e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", cardId);
     },
     []
   );
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedCard(null);
+    setDragOverColumn(null);
+    dragNode.current = null;
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent, columnId: string) => {
     e.preventDefault();
@@ -56,164 +65,213 @@ export function KanbanBoard({
     setDragOverColumn(columnId);
   }, []);
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverColumn(null);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setDragOverColumn(null);
+    }
   }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent, toColumnId: string) => {
       e.preventDefault();
       setDragOverColumn(null);
-      if (!draggedCard) return;
+      const cardId = draggedCard || e.dataTransfer.getData("text/plain");
+      if (!cardId) return;
 
       const fromColumn = columns.find((col) =>
-        col.cards.some((c) => c.id === draggedCard)
+        col.cards.some((c) => c.id === cardId)
       );
       if (!fromColumn) return;
       if (fromColumn.id === toColumnId) return;
 
       const toIndex = columns.find((col) => col.id === toColumnId)?.cards.length ?? 0;
-      onCardMove(draggedCard, fromColumn.id, toColumnId, toIndex);
+      onCardMove(cardId, fromColumn.id, toColumnId, toIndex);
       setDraggedCard(null);
     },
     [draggedCard, columns, onCardMove]
   );
 
   return (
-    <div className="flex h-full gap-4 overflow-x-auto pb-4">
-      {columns.map((column) => (
-        <div
-          key={column.id}
-          onDragOver={(e) => handleDragOver(e, column.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, column.id)}
-          className={`flex min-w-[280px] max-w-[320px] flex-1 flex-col rounded-xl border bg-slate-50 transition-colors dark:bg-slate-900/50 dark:border-slate-700 ${
-            dragOverColumn === column.id
-              ? "border-blue-400 bg-blue-50/50 dark:border-blue-600 dark:bg-blue-950/20"
-              : ""
-          }`}
-        >
-          <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-700">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: column.color }}
-              />
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                {column.title}
-              </h3>
-              <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                {column.cards.length}
-              </span>
-            </div>
-            {onAddClick && (
-              <button
-                onClick={() => onAddClick(column.id)}
-                className="rounded-lg p-1 hover:bg-slate-200 dark:hover:bg-slate-700"
-              >
-                <Plus className="h-4 w-4 text-slate-500" />
-              </button>
-            )}
-          </div>
+    <div className="flex h-full gap-3 overflow-x-auto pb-4 scrollbar-thin">
+      {columns.map((column) => {
+        const totalValue = column.cards.reduce(
+          (sum, card) => sum + (typeof card.value === "number" ? card.value : 0),
+          0
+        );
+        const isDropTarget = dragOverColumn === column.id;
 
-          <div className="flex-1 space-y-2 overflow-y-auto p-3">
-            <AnimatePresence>
-              {column.cards.map((card) => (
-                <motion.div
-                  key={card.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, card.id)}
-                  onClick={() => onCardClick?.(card.id)}
-                  className={`cursor-grab rounded-xl border bg-white p-4 shadow-sm active:cursor-grabbing hover:shadow-md transition-shadow dark:bg-slate-800 dark:border-slate-600 ${
-                    draggedCard === card.id ? "opacity-50" : ""
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">
-                        {card.title}
-                      </p>
-                      {card.subtitle && (
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {card.subtitle}
-                        </p>
+        return (
+          <div
+            key={column.id}
+            onDragOver={(e) => handleDragOver(e, column.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, column.id)}
+            aria-label={`${column.title} stage`}
+            className={cn(
+              "flex min-w-[272px] max-w-[320px] flex-1 flex-col rounded-xl border bg-muted/40 transition-colors duration-150",
+              isDropTarget && "border-[color:var(--primary)] bg-primary-soft/40"
+            )}
+          >
+            <div className="flex items-center justify-between border-b px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: column.color }}
+                  aria-hidden="true"
+                />
+                <h3 className="text-sm font-semibold text-foreground">
+                  {column.title}
+                </h3>
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
+                  {column.cards.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="hidden text-[11px] text-muted-foreground tabular-nums md:inline">
+                  ${totalValue.toLocaleString()}
+                </span>
+                {onAddClick && (
+                  <button
+                    type="button"
+                    onClick={() => onAddClick(column.id)}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Add opportunity to ${column.title}`}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-2 overflow-y-auto p-2.5 scrollbar-thin">
+              <AnimatePresence initial={false}>
+                {column.cards.map((card) => {
+                  const isDragging = draggedCard === card.id;
+                  return (
+                    <motion.div
+                      key={card.id}
+                      layout={!reduceMotion}
+                      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? undefined : { opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      onClick={() => onCardClick?.(card.id)}
+                      onKeyDown={(e) => {
+                        if (onCardClick && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          onCardClick(card.id);
+                        }
+                      }}
+                      role={onCardClick ? "button" : undefined}
+                      tabIndex={onCardClick ? 0 : undefined}
+                      aria-label={`${card.title}, ${column.title}`}
+                      className={cn(
+                        "rounded-xl",
+                        onCardClick &&
+                          "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                       )}
-                      {card.company && (
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          {card.company}
-                        </p>
-                      )}
-                      {card.priority && (
-                        <span
-                          className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                            card.priority === "High"
-                              ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                              : card.priority === "Urgent"
-                                ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                                : card.priority === "Low"
-                                  ? "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
-                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-                          }`}
-                        >
-                          {card.priority}
-                        </span>
-                      )}
-                      {card.value && (
-                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                          {typeof card.value === "number"
-                            ? `$${card.value.toLocaleString()}`
-                            : card.value}
-                        </p>
-                      )}
-                      {card.probability !== undefined && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <div className="h-1.5 flex-1 rounded-full bg-slate-200 dark:bg-slate-700">
-                            <div
-                              className="h-1.5 rounded-full bg-blue-600"
-                              style={{ width: `${card.probability}%` }}
-                            />
+                    >
+                      <div
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, card.id)}
+                        onDragEnd={handleDragEnd}
+                        className={cn(
+                          "cursor-grab rounded-xl border bg-surface-raised p-3 transition-all duration-150 active:cursor-grabbing",
+                          isDragging
+                            ? "z-10 cursor-grabbing opacity-80 shadow-lg"
+                            : "shadow-sm hover:shadow-md"
+                        )}
+                      >
+                        <div className="flex items-start gap-2">
+                          <GripVertical
+                            className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/50"
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {card.title}
+                            </p>
+                            {card.subtitle && (
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                {card.subtitle}
+                              </p>
+                            )}
+                            {card.company && (
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground/70">
+                                {card.company}
+                              </p>
+                            )}
+                            {card.priority && (
+                              <span
+                                className={cn(
+                                  "mt-1.5 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
+                                  /high|urgent/i.test(card.priority)
+                                    ? "bg-danger-soft text-[color:var(--danger)] ring-danger/20"
+                                    : /low/i.test(card.priority)
+                                      ? "bg-muted text-muted-foreground ring-border"
+                                      : "bg-warning-soft text-[color:var(--warning)] ring-warning/20"
+                                )}
+                              >
+                                {card.priority}
+                              </span>
+                            )}
+                            {card.value !== undefined && (
+                              <p className="mt-2 text-sm font-semibold text-foreground tabular-nums">
+                                {typeof card.value === "number"
+                                  ? `$${card.value.toLocaleString()}`
+                                  : card.value}
+                              </p>
+                            )}
+                            {card.probability !== undefined && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                  <div
+                                    className="h-full rounded-full bg-[color:var(--primary)]"
+                                    style={{ width: `${card.probability}%` }}
+                                  />
+                                </div>
+                                <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+                                  {card.probability}%
+                                </span>
+                              </div>
+                            )}
+                            {card.tags && card.tags.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {card.tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {(card.expectedClose || card.assignee) && (
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                {card.expectedClose && (
+                                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                                    Close {card.expectedClose}
+                                  </span>
+                                )}
+                                {card.assignee && (
+                                  <span className="truncate text-[11px] text-muted-foreground">
+                                    {card.assignee}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <span className="text-[11px] font-medium text-slate-500">
-                            {card.probability}%
-                          </span>
                         </div>
-                      )}
-                      {card.tags && card.tags.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {card.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {card.expectedClose && (
-                        <p className="mt-2 text-[11px] text-slate-400">
-                          Close: {card.expectedClose}
-                        </p>
-                      )}
-                      {card.assignee && (
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          {card.assignee}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

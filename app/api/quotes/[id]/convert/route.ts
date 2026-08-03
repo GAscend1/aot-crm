@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest, isUniqueConstraint } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
-import { nextInvoiceNumber, invoiceToUI } from "@/lib/server/billing";
+import { nextInvoiceNumber, invoiceToUI, type InvoiceWithRelations } from "@/lib/server/billing";
+import type { Prisma } from "@/generated/prisma/client";
 export const dynamic = "force-dynamic";
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,8 +24,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     }
 
     const invoiceNumber = await nextInvoiceNumber();
-    const created = await prisma.invoice.create({
-      data: {
+    const created = await createInvoiceFromQuote(
+      existing.id,
+      {
         invoiceNumber,
         status: "ISSUED",
         currency: existing.currency,
@@ -50,17 +52,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
             amount: i.amount,
           })),
         },
-      },
-      include: {
-        customer: true,
-        company: true,
-        opportunity: true,
-        quote: true,
-        lead: true,
-        createdBy: true,
-        items: true,
-      },
-    });
+      }
+    );
 
     await logAudit({
       entityType: "invoice",
@@ -103,4 +96,36 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     logServerError(`POST /api/quotes/${id}/convert`, err);
     return serverError("Failed to convert quote to invoice");
   }
+}
+
+const invoiceInclude = {
+  customer: true,
+  company: true,
+  opportunity: true,
+  quote: true,
+  lead: true,
+  createdBy: true,
+  items: true,
+} as const;
+
+/**
+ * Creates the converted invoice, retrying with a freshly generated number
+ * when a concurrent create races on the unique `invoiceNumber` column.
+ */
+async function createInvoiceFromQuote(
+  quoteId: string,
+  data: Prisma.InvoiceUncheckedCreateInput
+): Promise<InvoiceWithRelations> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const invoiceNumber = await nextInvoiceNumber();
+    try {
+      return await prisma.invoice.create({
+        data: { ...data, invoiceNumber },
+        include: invoiceInclude,
+      });
+    } catch (err) {
+      if (!isUniqueConstraint(err)) throw err;
+    }
+  }
+  throw new Error(`Could not allocate a unique invoice number for quote ${quoteId}`);
 }

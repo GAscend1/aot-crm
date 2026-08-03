@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -12,9 +12,11 @@ import type { Opportunity } from "@/services/opportunity.service";
 import { OpportunityDrawer } from "./OpportunityDrawer";
 import { OpportunityDeleteDialog } from "./OpportunityDeleteDialog";
 import { OpportunityToolbar } from "./OpportunityToolbar";
+import { OpportunityWorkspace } from "./OpportunityWorkspace";
 
 export function OpportunityTable() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { success, error: showError } = useToastContext();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -64,7 +66,9 @@ export function OpportunityTable() {
 
   const handleView = useCallback(
     (opportunity: Opportunity) => {
-      router.push(`/opportunities/${opportunity.id}`);
+      router.push(`/opportunities?record=${encodeURIComponent(opportunity.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -76,7 +80,9 @@ export function OpportunityTable() {
 
   const handleRowClick = useCallback(
     (opportunity: Opportunity) => {
-      router.push(`/opportunities/${opportunity.id}`);
+      router.push(`/opportunities?record=${encodeURIComponent(opportunity.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -218,6 +224,16 @@ export function OpportunityTable() {
         onCancel={() => {
           setDeleteDialogOpen(false);
           setDeletingOpportunity(undefined);
+        }}
+      />
+
+      <OpportunityWorkspace
+        key={searchParams?.get("record") ? `record:${searchParams.get("record")}` : "closed"}
+        siblings={filtered.map((o) => ({ id: o.id, title: o.title }))}
+        onChanged={() => {
+          opportunityService.findAll().then((result) => {
+            setOpportunities(result.data);
+          });
         }}
       />
     </div>

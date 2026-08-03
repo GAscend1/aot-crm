@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { PageLayout } from "@/components/common/PageLayout";
 import { Button } from "@/components/ui/button";
 import { EventModal } from "@/components/integrations/EventModal";
+import { IntegrationWarning } from "@/components/common/IntegrationWarning";
 import { calendarService } from "@/services/calendar.service";
 import type { CalendarEvent } from "@/types/common";
 
@@ -22,6 +23,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [pendingConsent, setPendingConsent] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -37,7 +39,18 @@ export default function CalendarPage() {
   }, [year, month]);
 
   const loadEvents = useCallback(() => {
-    calendarService.getEvents(monthStart, monthEnd).then(setEvents);
+    calendarService
+      .getEvents(monthStart, monthEnd)
+      .then((result) => {
+        setEvents(result);
+        setPendingConsent(false);
+      })
+      .catch((err: unknown) => {
+        setEvents([]);
+        if (err instanceof Error && err.message.includes("awaiting administrator approval")) {
+          setPendingConsent(true);
+        }
+      });
   }, [monthStart, monthEnd]);
 
   useEffect(() => {
@@ -85,6 +98,13 @@ export default function CalendarPage() {
         </Button>
       }
     >
+      {pendingConsent && (
+        <IntegrationWarning
+          title="Microsoft Calendar is awaiting approval"
+          message="Your Microsoft 365 connection is waiting for administrator approval. Calendar events can't sync right now, but the rest of the CRM keeps working."
+          onDismiss={() => setPendingConsent(false)}
+        />
+      )}
       <div className="flex items-center justify-between rounded-xl border bg-white p-4 dark:bg-slate-900 dark:border-slate-700">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={prevMonth}>

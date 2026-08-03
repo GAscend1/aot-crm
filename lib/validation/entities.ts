@@ -108,26 +108,31 @@ export const customerSchema = z.object({
   position: z.string().optional(),
   country: z.string().optional(),
   city: z.string().optional(),
-  status: z.enum(["Active", "Inactive", "Prospect"]).optional(),
+  status: z.enum(["Active", "Inactive", "Prospect", "Blocked"]).optional(),
   tags: z.array(z.string()).optional(),
   notes: z.string().optional(),
 });
 
-export const companySchema = z.object({
-  companyName: z.string().min(1, "Company name is required"),
-  name: z.string().optional(),
-  industry: z.string().optional(),
-  website: z.string().optional(),
-  email: emailOrEmpty,
-  phone: z.string().optional(),
-  country: z.string().optional(),
-  city: z.string().optional(),
-  address: z.string().optional(),
-  employeeCount: z.coerce.number().optional(),
-  size: z.string().optional(),
-  revenue: z.string().optional(),
-  status: z.string().optional(),
-});
+export const companySchema = z
+  .object({
+    companyName: z.string().optional(),
+    name: z.string().optional(),
+    industry: z.string().optional(),
+    website: z.string().optional(),
+    email: emailOrEmpty,
+    phone: z.string().optional(),
+    country: z.string().optional(),
+    city: z.string().optional(),
+    address: z.string().optional(),
+    employeeCount: z.coerce.number().optional(),
+    size: z.string().optional(),
+    revenue: z.string().optional(),
+    status: z.string().optional(),
+  })
+  .refine((v) => (v.companyName ?? v.name ?? "").trim().length > 0, {
+    message: "Company name is required",
+    path: ["companyName"],
+  });
 
 export const contactSchema = z.object({
   firstName: z.string().min(1, "First name is required"),

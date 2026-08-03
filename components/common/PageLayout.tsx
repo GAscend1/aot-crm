@@ -17,14 +17,14 @@ export function PageLayout({
   className,
 }: PageLayoutProps) {
   return (
-    <div className={clsx("mx-auto flex w-full max-w-7xl flex-col gap-5 p-5 lg:p-6", className)}>
+    <div className={clsx("mx-auto flex w-full max-w-[1440px] flex-col gap-4 p-4 lg:p-5", className)}>
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <div className="min-w-0 space-y-0.5">
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
             {title}
           </h1>
           {description && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-muted-foreground">
               {description}
             </p>
           )}

@@ -38,7 +38,7 @@ export function formatLineItems(
 /** Generate the next sequential quote number: QT-0001, QT-0002, ... */
 export async function nextQuoteNumber(): Promise<string> {
   const result = await prisma.$queryRawUnsafe<{ next: string }[]>(
-    `SELECT 'QT-' || LPAD(COALESCE(MAX(CAST(SUBSTRING("quoteNumber" FROM 4) AS INTEGER)), 0) + 1::int, 4, '0') AS next FROM "Quote"`
+    `SELECT 'QT-' || LPAD((COALESCE(MAX(SUBSTRING("quoteNumber" FROM 4)::int), 0) + 1)::text, 4, '0') AS next FROM "Quote" WHERE "quoteNumber" ~ '^QT-[0-9]+$'`
   );
   return result?.[0]?.next ?? "QT-0001";
 }
@@ -46,7 +46,7 @@ export async function nextQuoteNumber(): Promise<string> {
 /** Generate the next sequential invoice number: INV-0001, INV-0002, ... */
 export async function nextInvoiceNumber(): Promise<string> {
   const result = await prisma.$queryRawUnsafe<{ next: string }[]>(
-    `SELECT 'INV-' || LPAD(COALESCE(MAX(CAST(SUBSTRING("invoiceNumber" FROM 5) AS INTEGER)), 0) + 1::int, 4, '0') AS next FROM "Invoice"`
+    `SELECT 'INV-' || LPAD((COALESCE(MAX(SUBSTRING("invoiceNumber" FROM 5)::int), 0) + 1)::text, 4, '0') AS next FROM "Invoice" WHERE "invoiceNumber" ~ '^INV-[0-9]+$'`
   );
   return result?.[0]?.next ?? "INV-0001";
 }

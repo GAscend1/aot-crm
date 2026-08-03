@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
       const parsed = JSON.parse(filters) as Record<string, unknown>;
       if (parsed.status) where.status = uiTicketStatusToDb(String(parsed.status));
       if (parsed.priority) where.priority = parsed.priority as TicketPriority;
+      if (parsed.customerId) where.customerId = String(parsed.customerId);
     } catch { /* ignore invalid JSON */ }
   }
 

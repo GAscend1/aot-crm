@@ -95,9 +95,9 @@ export function RecordDetail<T extends { id: string }>({
   if (loading || !record) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -173,7 +173,7 @@ export function RecordDetail<T extends { id: string }>({
                   <button
                     key={action.label}
                     onClick={action.onClick}
-                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                   >
                     <action.icon className="h-4 w-4" />
                     {action.label}

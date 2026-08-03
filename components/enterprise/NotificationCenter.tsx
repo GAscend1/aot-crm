@@ -65,10 +65,10 @@ const entityPathMap: Record<string, string> = {
 };
 
 const typeColors = {
-  info: "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300",
-  warning: "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300",
-  success: "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300",
-  error: "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300",
+  info: "bg-info-soft text-[color:var(--info)]",
+  warning: "bg-warning-soft text-[color:var(--warning)]",
+  success: "bg-success-soft text-[color:var(--success)]",
+  error: "bg-danger-soft text-[color:var(--danger)]",
 };
 
 export function NotificationCenter({
@@ -136,11 +136,11 @@ export function NotificationCenter({
         sideOffset={8}
         className="w-[400px] p-0"
       >
-        <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-700">
+        <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Notifications</h3>
+            <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
             {unreadCount > 0 && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-[color:var(--primary)]">
                 {unreadCount} new
               </span>
             )}
@@ -165,9 +165,9 @@ export function NotificationCenter({
           </div>
         </div>
 
-        <div className="border-b p-2 dark:border-slate-700">
+        <div className="border-b p-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search notifications..."
               className="pl-9"
@@ -180,8 +180,8 @@ export function NotificationCenter({
               onClick={() => setFilter("all")}
               className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                 filter === "all"
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted"
               }`}
             >
               All
@@ -190,8 +190,8 @@ export function NotificationCenter({
               onClick={() => setFilter("unread")}
               className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                 filter === "unread"
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                  : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted"
               }`}
             >
               Unread
@@ -201,7 +201,7 @@ export function NotificationCenter({
 
         <div className="max-h-[360px] overflow-y-auto">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-sm text-slate-500">
+            <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
               <Inbox className="h-8 w-8" />
               <p>No notifications</p>
             </div>
@@ -225,8 +225,8 @@ export function NotificationCenter({
                         if (base) router.push(`/${base}/${notification.entityId}`);
                       }
                     }}
-                    className={`flex gap-3 border-b px-4 py-3 last:border-0 cursor-pointer transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50 ${
-                      !notification.read ? "bg-blue-50/30 dark:bg-blue-950/20" : ""
+                    className={`group flex gap-3 border-b px-4 py-3 last:border-0 cursor-pointer transition-colors hover:bg-muted/50 ${
+                      !notification.read ? "bg-primary-soft/40" : ""
                     }`}
                   >
                     <div
@@ -235,13 +235,13 @@ export function NotificationCenter({
                       <Icon className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      <p className="text-sm font-medium text-foreground">
                         {notification.title}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      <p className="mt-0.5 text-xs text-muted-foreground">
                         {notification.message}
                       </p>
-                      <p className="mt-1 text-[10px] text-slate-400">
+                      <p className="mt-1 text-[10px] text-muted-foreground/70">
                         {timeAgo(notification.timestamp)}
                       </p>
                     </div>
@@ -250,7 +250,7 @@ export function NotificationCenter({
                         e.stopPropagation();
                         onRemove(notification.id);
                       }}
-                      className="shrink-0 rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      className="shrink-0 rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-muted"
                     >
                       <X className="h-3 w-3" />
                     </button>

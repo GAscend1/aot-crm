@@ -8,14 +8,14 @@ export function SectionCard({
   children,
 }: SectionCardProps) {
   return (
-    <div className="rounded-xl border bg-white shadow-sm">
-      <div className="border-b px-6 py-4">
-        <h2 className="font-semibold">
+    <div className="rounded-xl border bg-surface-raised shadow-sm">
+      <div className="border-b px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">
           {title}
         </h2>
       </div>
 
-      <div className="p-6">
+      <div className="p-4">
         {children}
       </div>
     </div>

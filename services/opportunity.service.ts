@@ -6,8 +6,11 @@ export interface Opportunity {
   title: string;
   customer: string;
   customerId?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   company?: string;
   companyId?: string;
+  companyWebsite?: string;
   contact?: string;
   leadId?: string;
   leadName?: string;

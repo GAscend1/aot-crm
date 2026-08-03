@@ -12,6 +12,7 @@ import type { Lead } from "@/services/lead.service";
 import { LeadDrawer } from "./LeadDrawer";
 import { LeadDeleteDialog } from "./LeadDeleteDialog";
 import { LeadToolbar } from "./LeadToolbar";
+import { LeadWorkspace } from "./LeadWorkspace";
 
 export function LeadTable() {
   const router = useRouter();
@@ -70,7 +71,9 @@ export function LeadTable() {
 
   const handleView = useCallback(
     (lead: Lead) => {
-      router.push(`/leads/${lead.id}`);
+      router.push(`/leads?record=${encodeURIComponent(lead.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -82,7 +85,9 @@ export function LeadTable() {
 
   const handleRowClick = useCallback(
     (lead: Lead) => {
-      router.push(`/leads/${lead.id}`);
+      router.push(`/leads?record=${encodeURIComponent(lead.id)}`, {
+        scroll: false,
+      });
     },
     [router],
   );
@@ -140,6 +145,12 @@ export function LeadTable() {
     const result = await leadService.findAll();
     setLeads(result.data);
     setLoading(false);
+  }, []);
+
+  const handleWorkspaceChanged = useCallback(() => {
+    leadService.findAll().then((result) => {
+      setLeads(result.data);
+    });
   }, []);
 
   const handleBulkAction = useCallback(
@@ -227,6 +238,8 @@ export function LeadTable() {
           setDeletingLead(undefined);
         }}
       />
+
+      <LeadWorkspace onChanged={handleWorkspaceChanged} />
     </div>
   );
 }
