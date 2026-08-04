@@ -20,6 +20,8 @@ export interface Lead {
   notes: string;
   isFavorite: boolean;
   tags?: string[];
+  convertedAt?: string;
+  convertedOpportunityId?: string;
   createdAt: string;
   updatedAt: string;
 }

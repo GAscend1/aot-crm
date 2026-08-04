@@ -111,6 +111,13 @@ model User {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
+  // Onboarding preferences
+  onboardingStartedAt      DateTime?
+  onboardingCompletedAt    DateTime?
+  onboardingDismissedAt    DateTime?
+  onboardingNeverShowAgain Boolean  @default(false)
+  onboardingLastStep       Int      @default(1)
+
   assignedLeads          Lead[]
   assignedTickets        Ticket[]
   activities             Activity[]
@@ -136,6 +143,15 @@ model User {
   createdReports         Report[]
 }
 
+enum LifecycleStage {
+  Lead
+  Prospect
+  Qualified
+  Customer
+  FormerCustomer
+  Partner
+}
+
 model Company {
   id            String   @id @default(uuid())
   companyName   String
@@ -150,6 +166,8 @@ model Company {
   size          String?
   revenue       String?
   status        String   @default("Active")
+  lifecycleStage LifecycleStage @default(Prospect)
+  archivedAt    DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -171,6 +189,10 @@ model Customer {
   position  String?
   notes     String?
   tags      Json         @default("[]")
+  lifecycleStage LifecycleStage @default(Customer)
+  // Migration path: link Customer records to Contact records (no Prisma relation to avoid circular deps)
+  contactId String?
+  archivedAt DateTime?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -198,6 +220,10 @@ model Contact {
   notes     String?
   tags      Json     @default("[]")
   status    String   @default("Active")
+  lifecycleStage LifecycleStage @default(Prospect)
+  linkedIn  String?
+  lastContactedAt DateTime?
+  archivedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -2,6 +2,9 @@ import { PageLayout } from "@/components/common/PageLayout";
 
 import { DashboardKPIs } from "@/modules/dashboard/components/DashboardKPIs";
 import { RevenueChart } from "@/modules/dashboard/components/RevenueChart";
+import { PipelineByStage } from "@/modules/dashboard/components/PipelineByStage";
+import { OwnerPerformance } from "@/modules/dashboard/components/OwnerPerformance";
+import { UpcomingMeetings } from "@/modules/dashboard/components/UpcomingMeetings";
 import { RecentActivity } from "@/modules/dashboard/components/RecentActivity";
 import { RecentCustomers } from "@/modules/dashboard/components/RecentCustomers";
 import { RecentCompanies } from "@/modules/dashboard/components/RecentCompanies";
@@ -26,6 +29,12 @@ export default function DashboardPage() {
           <RecentActivity />
         </div>
         <QuickActions />
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <PipelineByStage />
+        <UpcomingMeetings />
+        <OwnerPerformance />
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">

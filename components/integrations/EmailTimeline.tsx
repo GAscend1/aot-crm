@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Mail, Reply, Forward } from "lucide-react";
+import { AlertTriangle, Mail, Reply, Forward } from "lucide-react";
 import { outlookService } from "@/services/outlook.service";
 import { EmailComposer } from "./EmailComposer";
 import type { EmailMessage } from "@/types/common";
@@ -15,9 +15,32 @@ export function EmailTimeline({ entityEmail, entityName }: EmailTimelineProps) {
   const [emails, setEmails] = useState<EmailMessage[]>([]);
   const [replyTo, setReplyTo] = useState<EmailMessage | null>(null);
   const [forwardFrom, setForwardFrom] = useState<EmailMessage | null>(null);
+  const [pendingConsent, setPendingConsent] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    outlookService.getMessages().then(setEmails);
+    let cancelled = false;
+    outlookService
+      .getMessages()
+      .then((result) => {
+        if (!cancelled) {
+          setEmails(result);
+          setPendingConsent(false);
+          setLoadError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : "Failed to load email history";
+        if (message.includes("awaiting administrator approval")) {
+          setPendingConsent(true);
+        } else {
+          setLoadError(message);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const entityEmails = entityEmail
@@ -26,6 +49,26 @@ export function EmailTimeline({ entityEmail, entityName }: EmailTimelineProps) {
 
   return (
     <>
+      {pendingConsent && (
+        <div
+          role="status"
+          className="mb-3 flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning-soft/60 px-3 py-2.5"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--warning)]" aria-hidden="true" />
+          <p className="text-xs text-muted-foreground">
+            Email history is waiting for Microsoft Graph approval. CRM data keeps working normally.
+          </p>
+        </div>
+      )}
+      {loadError && (
+        <div
+          role="status"
+          className="mb-3 flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger-soft/60 px-3 py-2.5"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--danger)]" aria-hidden="true" />
+          <p className="text-xs text-muted-foreground">{loadError}</p>
+        </div>
+      )}
       <div className="space-y-3">
         {entityEmails.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-sm text-muted-foreground">

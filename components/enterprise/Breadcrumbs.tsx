@@ -9,7 +9,7 @@ const labelMap: Record<string, string> = {
   dashboard: "Dashboard",
   customers: "Customers",
   companies: "Companies",
-  contacts: "Contacts",
+  contacts: "People",
   leads: "Leads",
   opportunities: "Opportunities",
   activities: "Activities",
@@ -17,6 +17,14 @@ const labelMap: Record<string, string> = {
   documents: "Documents",
   reports: "Reports",
   administration: "Administration",
+  quotes: "Quotes",
+  invoices: "Invoices",
+  kanban: "Pipeline",
+  calendar: "Calendar",
+  email: "Email",
+  meetings: "Meetings",
+  files: "Files",
+  profile: "Profile",
 };
 
 export function Breadcrumbs() {

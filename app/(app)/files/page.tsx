@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Upload,
   Download,
@@ -135,10 +136,13 @@ export default function FilesPage() {
                 <CardContent className="p-0">
                   {file.type === "image" ? (
                     <div className="relative aspect-video overflow-hidden rounded-t-xl">
-                      <img
+                      <Image
                         src={file.thumbnailUrl || file.url}
                         alt={file.name}
-                        className="h-full w-full object-cover"
+                        fill
+                        unoptimized
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        className="object-cover"
                       />
                       <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
                         <Button size="icon-sm" variant="secondary" onClick={() => setPreviewFile(file)}>

@@ -63,6 +63,9 @@ interface OpportunityWorkspaceHeaderProps {
   onNext: () => void;
   onClose: () => void;
   onEdit: () => void;
+  /** When true, the header pencil becomes a Cancel button for inline editing. */
+  editing?: boolean;
+  onCancelEdit?: () => void;
   onEmail: () => void;
   onTeams: () => void;
   onZoom: () => void;
@@ -114,6 +117,8 @@ export function OpportunityWorkspaceHeader({
   onNext,
   onClose,
   onEdit,
+  editing = false,
+  onCancelEdit,
   onEmail,
   onTeams,
   onZoom,
@@ -160,12 +165,12 @@ export function OpportunityWorkspaceHeader({
 
           <button
             type="button"
-            onClick={onEdit}
+            onClick={editing ? onCancelEdit : onEdit}
             className={iconButtonClass}
-            aria-label="Edit opportunity"
-            title="Edit opportunity"
+            aria-label={editing ? "Cancel editing" : "Edit opportunity"}
+            title={editing ? "Cancel editing" : "Edit opportunity"}
           >
-            <Pencil className="h-3.5 w-3.5" />
+            {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
           </button>
 
           <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />

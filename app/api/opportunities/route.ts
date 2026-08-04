@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError } from "@/lib/server/api";
 import { logAudit, createActivity } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import { uiStageToDb, dbStageToUi } from "@/lib/server/opportunity-stages";
@@ -192,6 +193,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(opportunityToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "OPPORTUNITY_VALIDATION_FAILED", "Invalid opportunity data.");
+    }
     logServerError("POST /api/opportunities", err);
     return serverError("Failed to create opportunity");
   }

@@ -40,13 +40,19 @@ export function UpcomingTasks() {
                 : ""
             }`}
           >
-            <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
+            <Circle className={`mt-0.5 h-4 w-4 shrink-0 ${task.overdue ? "text-red-400" : "text-slate-300"}`} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-slate-900">{task.subject}</p>
+              <p className={`text-sm ${task.overdue ? "text-red-700" : "text-slate-900"}`}>
+                {task.subject}
+              </p>
               <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
                 <span>{task.assignee || "Unassigned"}</span>
                 <span>·</span>
-                <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                {task.overdue ? (
+                  <span className="font-medium text-red-500">Overdue</span>
+                ) : (
+                  <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                )}
               </div>
             </div>
             <AlertCircle className={`mt-0.5 h-4 w-4 shrink-0 ${priorityColors[task.priority] || "text-slate-400"}`} />

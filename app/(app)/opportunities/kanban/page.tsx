@@ -1,13 +1,11 @@
-import { PageLayout } from "@/components/common/PageLayout";
-import { OpportunityKanban } from "./OpportunityKanban";
+import { ViewRedirect } from "@/components/common/ViewRedirect";
 
-export default function OpportunitiesKanbanPage() {
+export default function OpportunitiesKanbanRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   return (
-    <PageLayout
-      title="Opportunity Pipeline"
-      description="Drag and drop opportunities through the sales pipeline stages."
-    >
-      <OpportunityKanban />
-    </PageLayout>
+    <ViewRedirect pathname="/opportunities" view="kanban" searchParams={searchParams} />
   );
 }

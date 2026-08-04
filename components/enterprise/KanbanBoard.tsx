@@ -16,6 +16,8 @@ interface KanbanCard {
   probability?: number;
   assignee?: string;
   tags?: string[];
+  /** Shows a green activity dot on the card. */
+  hasActivity?: boolean;
 }
 
 interface KanbanColumn {
@@ -191,6 +193,12 @@ export function KanbanBoard({
                             <p className="text-sm font-medium text-foreground">
                               {card.title}
                             </p>
+                            {card.hasActivity && (
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-[color:var(--success)]">
+                                <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--success)]" />
+                                Active
+                              </span>
+                            )}
                             {card.subtitle && (
                               <p className="mt-0.5 truncate text-xs text-muted-foreground">
                                 {card.subtitle}

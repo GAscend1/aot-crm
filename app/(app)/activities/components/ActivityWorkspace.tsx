@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import {
+  Ban,
   Bell,
   Calendar,
+  CheckCircle2,
   CheckSquare,
   ListTodo,
   Mail,
@@ -25,10 +27,10 @@ import {
 } from "@/components/enterprise/RecordWorkspace";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { activityService } from "@/services/index";
+import { ActivityModal } from "./ActivityModal";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 import type { Activity } from "../types";
-import { ActivityDrawer } from "./ActivityDrawer";
-import { ActivityDeleteDialog } from "./ActivityDeleteDialog";
 
 const typeIcons: Record<string, LucideIcon> = {
   Meeting: Calendar,
@@ -83,10 +85,23 @@ export function ActivityWorkspace({ onChanged }: ActivityWorkspaceProps) {
     try {
       await activityService.delete(record.id);
       success("Activity deleted");
+      setDeleteOpen(false);
       onChanged?.();
       close();
     } catch {
       showError("Error", "Failed to delete activity.");
+    }
+  };
+
+  const setStatus = async (status: Activity["status"], label: string) => {
+    if (!record) return;
+    try {
+      await activityService.update(record.id, { status } as Partial<Activity>);
+      success("Activity updated", `${record.subject} marked ${label}.`);
+      onChanged?.();
+      reload();
+    } catch {
+      showError("Error", "Could not update activity.");
     }
   };
 
@@ -134,19 +149,16 @@ export function ActivityWorkspace({ onChanged }: ActivityWorkspaceProps) {
               },
               {
                 label: "Mark Completed",
-                icon: CheckSquare,
+                icon: CheckCircle2,
                 disabled: record?.status === "Completed",
-                onClick: () => {
-                  if (!record) return;
-                  activityService
-                    .update(record.id, { status: "Completed" })
-                    .then(() => {
-                      success("Activity completed", `${record.subject} is done.`);
-                      onChanged?.();
-                      reload();
-                    })
-                    .catch(() => showError("Error", "Could not update activity."));
-                },
+                onClick: () => void setStatus("Completed", "Completed"),
+              },
+              {
+                label: "Mark Cancelled",
+                icon: Ban,
+                destructive: true,
+                disabled: record?.status === "Cancelled" || record?.status === "Completed",
+                onClick: () => void setStatus("Cancelled", "Cancelled"),
               },
             ]}
           />
@@ -214,20 +226,29 @@ export function ActivityWorkspace({ onChanged }: ActivityWorkspaceProps) {
 
       {record && (
         <>
-          <ActivityDrawer
+          <ActivityModal
             open={editOpen}
-            onOpenChange={(openState) => {
-              setEditOpen(openState);
-              if (!openState) reload();
+            onClose={() => {
+              setEditOpen(false);
+              reload();
             }}
             activity={record}
             onSave={(data) => void handleSave(data)}
           />
-          <ActivityDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            activity={record}
+            onClose={() => setDeleteOpen(false)}
+            title="Delete Activity"
+            message={
+              <>
+                Are you sure you want to delete{" "}
+                <span className="font-medium text-foreground">{record.subject}</span>?
+                This action cannot be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
             onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
           />
         </>
       )}

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, EntityStatus } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError } from "@/lib/server/api";
 import { logAudit, findOrCreateCompany } from "@/lib/server/records";
 import { customerSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
   const filters = searchParams.get("filters");
 
   const where: Prisma.CustomerWhereInput = {};
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
@@ -136,6 +138,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(customerToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "CUSTOMER_VALIDATION_FAILED", "Invalid customer data.");
+    }
     logServerError("POST /api/customers", err);
     return serverError("Failed to create customer");
   }

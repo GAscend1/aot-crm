@@ -24,7 +24,7 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { quoteService } from "@/services/index";
 import type { Quote } from "@/services/quote.service";
 import { quoteStatusColors, quoteStatusLabels } from "../types";
-import { QuoteDrawer } from "../components/QuoteDrawer";
+import { QuoteModal } from "../components/QuoteModal";
 import { ConvertQuoteDialog } from "../components/ConvertQuoteDialog";
 
 const currencyFmt = (value: number, currency = "USD") =>
@@ -381,7 +381,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <QuoteDrawer
+      <QuoteModal
         open={editOpen}
         onOpenChange={(open) => {
           setEditOpen(open);

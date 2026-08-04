@@ -44,7 +44,17 @@ export interface DashboardData {
     dueDate: string;
     priority: string;
     assignee: string;
+    overdue: boolean;
   }>;
+  upcomingMeetings: Array<{
+    id: string;
+    subject: string;
+    dueDate: string;
+    assignee: string;
+    related: string;
+  }>;
+  pipelineByStage: Array<{ stage: string; count: number; value: number }>;
+  topOwners: Array<{ name: string; wonValue: number; wonCount: number; activeDeals: number }>;
 }
 
 const defaultData: DashboardData = {
@@ -54,6 +64,9 @@ const defaultData: DashboardData = {
   recentOpportunities: [],
   recentTickets: [],
   recentTasks: [],
+  upcomingMeetings: [],
+  pipelineByStage: [],
+  topOwners: [],
 };
 
 export function useDashboardData(refreshInterval = 30000): DashboardData & { refresh: () => void } {

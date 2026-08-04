@@ -24,10 +24,10 @@ import {
 import { ActivityComposer } from "@/components/common/ActivityComposer";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { ticketService } from "@/services/index";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 import type { Ticket } from "../types";
-import { TicketDrawer } from "./TicketDrawer";
-import { TicketDeleteDialog } from "./TicketDeleteDialog";
+import { TicketModal } from "./TicketModal";
 
 interface TicketWorkspaceProps {
   onChanged?: () => void;
@@ -60,6 +60,7 @@ export function TicketWorkspace({ onChanged }: TicketWorkspaceProps) {
     try {
       await ticketService.delete(record.id);
       success("Ticket deleted");
+      setDeleteOpen(false);
       onChanged?.();
       close();
     } catch {
@@ -198,20 +199,28 @@ export function TicketWorkspace({ onChanged }: TicketWorkspaceProps) {
 
       {record && (
         <>
-          <TicketDrawer
+          <TicketModal
             open={editOpen}
-            onOpenChange={(openState) => {
-              setEditOpen(openState);
-              if (!openState) reload();
+            onClose={() => {
+              setEditOpen(false);
+              reload();
             }}
             ticket={record}
             onSave={(data) => void handleSave(data)}
           />
-          <TicketDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            ticket={record}
+            onClose={() => setDeleteOpen(false)}
+            title="Delete Ticket"
+            message={
+              <>
+                Are you sure you want to delete <strong>{record.subject}</strong>?
+                This action cannot be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
             onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
           />
         </>
       )}

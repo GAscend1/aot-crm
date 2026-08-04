@@ -7,7 +7,7 @@ import clsx from "clsx";
 import { X, ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { navigation } from "@/config/navigation";
+import { navigation, findActiveItemHref } from "@/config/navigation";
 import { useSidebar } from "@/components/layout/SidebarProvider";
 import { Button } from "@/components/ui/button";
 
@@ -16,19 +16,25 @@ function NavGroup({
   collapsed,
   isOpen,
   onToggle,
-  pathname,
+  activeHref,
   onNavigate,
 }: {
   group: (typeof navigation)[number];
   collapsed: boolean;
   isOpen: boolean;
   onToggle: () => void;
-  pathname: string;
+  activeHref: string | null;
   onNavigate: () => void;
 }) {
-  const hasActive = group.items.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+  // Hidden items stay in config for deep links/command palette, but only
+  // surface in the sidebar when they are the active route so users always
+  // know where they are.
+  const visibleItems = group.items.filter(
+    (item) => !item.hidden || item.href === activeHref
   );
+  if (visibleItems.length === 0) return null;
+
+  const hasActive = visibleItems.some((item) => item.href === activeHref);
 
   return (
     <div>
@@ -37,8 +43,8 @@ function NavGroup({
         onClick={onToggle}
         aria-expanded={isOpen}
         className={clsx(
-          "flex w-full items-center rounded-md text-[11px] font-semibold tracking-[0.08em] uppercase transition-colors",
-          collapsed ? "justify-center p-2.5" : "gap-2 px-2 py-1",
+          "flex w-full items-center rounded-md text-[10px] font-semibold tracking-[0.1em] uppercase transition-colors duration-150",
+          collapsed ? "justify-center p-2" : "gap-2 px-2 py-1",
           hasActive
             ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"
@@ -48,11 +54,11 @@ function NavGroup({
           group.icon && <group.icon className="h-4 w-4" />
         ) : (
           <>
-            {group.icon && <group.icon className="h-3.5 w-3.5 shrink-0" />}
+            {group.icon && <group.icon className="h-3 w-3 shrink-0" />}
             <span className="flex-1 truncate text-left">{group.group}</span>
             <ChevronDown
               className={clsx(
-                "h-3 w-3 shrink-0 transition-transform duration-150",
+                "h-2.5 w-2.5 shrink-0 transition-transform duration-150",
                 isOpen && "rotate-180"
               )}
             />
@@ -70,11 +76,9 @@ function NavGroup({
             className="overflow-hidden"
           >
             <div className={clsx("space-y-0.5", collapsed ? "mt-1" : "mt-0.5 pl-2")}>
-              {group.items.map((item) => {
+              {visibleItems.map((item) => {
                 const Icon = item.icon;
-                const active =
-                  pathname === item.href ||
-                  pathname.startsWith(item.href + "/");
+                const active = item.href === activeHref;
 
                 return (
                   <Link
@@ -83,8 +87,9 @@ function NavGroup({
                     onClick={onNavigate}
                     title={collapsed ? item.title : undefined}
                     aria-current={active ? "page" : undefined}
+                    data-tour={`nav-${item.href}`}
                     className={clsx(
-                      "relative flex items-center rounded-md text-sm font-medium transition-colors",
+                      "relative flex items-center rounded-md text-sm font-medium transition-colors duration-150",
                       collapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-1.5",
                       active
                         ? "bg-primary-soft text-[color:var(--primary)]"
@@ -102,7 +107,7 @@ function NavGroup({
                       <>
                         <span className="flex-1 truncate">{item.title}</span>
                         {item.badge && (
-                          <span className="rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--primary)]">
+                          <span className="rounded-full bg-primary-soft px-1.5 py-0.5 text-[9px] font-semibold text-[color:var(--primary)]">
                             {item.badge}
                           </span>
                         )}
@@ -121,6 +126,7 @@ function NavGroup({
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const activeHref = findActiveItemHref(pathname);
   const { collapsed, toggle, mobileOpen, closeMobile } = useSidebar();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window !== "undefined") {
@@ -167,7 +173,7 @@ export function AppSidebar() {
             collapsed={collapsed}
             isOpen={expandedGroups[group.group] ?? true}
             onToggle={() => toggleGroup(group.group)}
-            pathname={pathname}
+            activeHref={activeHref}
             onNavigate={closeMobile}
           />
         ))}
@@ -198,8 +204,8 @@ export function AppSidebar() {
     <>
       <aside
         className={clsx(
-          "fixed left-0 top-0 z-30 hidden h-full flex-col border-r bg-sidebar transition-all duration-200 lg:flex",
-          collapsed ? "w-[60px]" : "w-[236px]"
+          "fixed left-0 top-0 z-30 hidden h-full flex-col border-r border-border bg-sidebar transition-all duration-200 lg:flex",
+          collapsed ? "w-[60px]" : "w-[220px]"
         )}
       >
         {sidebarContent}
@@ -208,7 +214,7 @@ export function AppSidebar() {
       <div
         className={clsx(
           "hidden transition-all duration-200 lg:block",
-          collapsed ? "w-[60px]" : "w-[236px]"
+          collapsed ? "w-[60px]" : "w-[220px]"
         )}
       />
 
@@ -251,7 +257,7 @@ export function AppSidebar() {
                     collapsed={false}
                     isOpen={expandedGroups[group.group] ?? true}
                     onToggle={() => toggleGroup(group.group)}
-                    pathname={pathname}
+                    activeHref={activeHref}
                     onNavigate={closeMobile}
                   />
                 ))}

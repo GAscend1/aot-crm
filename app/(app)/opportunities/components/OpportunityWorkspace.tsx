@@ -12,7 +12,6 @@ import {
   Pencil,
   Phone,
   StickyNote,
-  Trash2,
   UserRound,
   Video,
   X,
@@ -42,9 +41,10 @@ import { CreateQuoteModal } from "./CreateQuoteModal";
 import { CreateInvoiceModal } from "./CreateInvoiceModal";
 import { UploadDocumentDialog } from "./UploadDocumentDialog";
 import { AddActivityDialog } from "./AddActivityDialog";
-import { OpportunityDrawer } from "./OpportunityDrawer";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ApiRequestError } from "@/repositories/api/ApiRepository";
+import { OpportunityForm } from "./OpportunityForm";
 import { AssignOpportunityDialog } from "./AssignOpportunityDialog";
-import { OpportunityDeleteDialog } from "./OpportunityDeleteDialog";
 
 interface OpportunityWorkspaceProps {
   onChanged?: () => void;
@@ -339,13 +339,15 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
   const handleSave = async (data: Opportunity) => {
     if (!record) return;
     try {
-      await opportunityService.update(record.id, data as Partial<Opportunity>);
-      success("Opportunity updated", `${data.title} has been updated.`);
+      const updated = await opportunityService.update(record.id, data as Partial<Opportunity>);
+      success("Opportunity updated", `${updated.title} has been updated.`);
       setEditOpen(false);
       onChanged?.();
       reload();
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiRequestError) throw err;
       showError("Error", "Failed to save opportunity.");
+      throw new ApiRequestError(500, "Failed to save opportunity.");
     }
   };
 
@@ -422,12 +424,10 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
 
   const subtitle = record ? [record.customer, record.company, record.contact].filter(Boolean).join(" · ") : undefined;
 
+  // NOTE: Edit intentionally lives only in the header (OpportunityWorkspaceHeader
+  // pencil) to avoid duplicate Edit entry points. Low-frequency and destructive
+  // actions live in the overflow menu.
   const overflowActions = [
-    {
-      label: "Edit Opportunity",
-      icon: Pencil,
-      onClick: () => setEditOpen(true),
-    },
     {
       label: "Assign Owner",
       icon: UserRound,
@@ -451,11 +451,6 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
     {
       label: "Archive",
       icon: Archive,
-      onClick: () => void handleDelete(),
-    },
-    {
-      label: "Delete",
-      icon: Trash2,
       destructive: true,
       onClick: () => setDeleteOpen(true),
     },
@@ -491,6 +486,18 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
         loading={loading}
         title={record?.title ?? "Opportunity"}
         layout="split"
+        editing={editOpen}
+        editor={
+          record ? (
+            <div className="min-h-0 overflow-y-auto p-5">
+              <OpportunityForm
+                initialData={record}
+                onSubmit={handleSave}
+                onCancel={() => setEditOpen(false)}
+              />
+            </div>
+          ) : undefined
+        }
         header={
           record ? (
             <OpportunityWorkspaceHeader
@@ -526,6 +533,8 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
               onOpenFullPage={handleOpenFullPage}
               overflowActions={overflowActions}
               converting={converting}
+              editing={editOpen}
+              onCancelEdit={() => setEditOpen(false)}
             />
           ) : undefined
         }
@@ -775,15 +784,6 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
             opportunityId={record.id}
             onAdded={bumpRefresh}
           />
-          <OpportunityDrawer
-            open={editOpen}
-            onOpenChange={(openState) => {
-              setEditOpen(openState);
-              if (!openState) reload();
-            }}
-            opportunity={record}
-            onSave={(data) => void handleSave(data)}
-          />
           <AssignOpportunityDialog
             open={assignOpen}
             onClose={() => setAssignOpen(false)}
@@ -796,11 +796,19 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
               reload();
             }}
           />
-          <OpportunityDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            opportunity={record}
+            onClose={() => setDeleteOpen(false)}
+            title="Archive Opportunity"
+            message={
+              <>
+                Archive <strong>{record.title}</strong>? This will remove the
+                opportunity from the pipeline while keeping related records intact.
+              </>
+            }
+            confirmLabel="Archive"
+            variant="danger"
             onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
           />
           <EmailComposer
             open={emailOpen}

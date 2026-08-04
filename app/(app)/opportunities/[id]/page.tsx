@@ -296,7 +296,7 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
 
             <SectionCard title="Quick Links">
               <div className="flex flex-col gap-2">
-                <Link href="/opportunities/kanban" className={`${actionButton}`}>
+                <Link href="/opportunities?view=kanban" className={`${actionButton}`}>
                   <Briefcase className="h-4 w-4" />
                   Open Pipeline
                 </Link>

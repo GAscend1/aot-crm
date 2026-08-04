@@ -19,6 +19,8 @@ export interface Lead {
   status: "New" | "Contacted" | "Qualified" | "Proposal" | "Negotiation" | "Closed Won" | "Closed Lost";
   notes: string;
   tags?: string[];
+  convertedAt?: string;
+  convertedOpportunityId?: string;
   createdAt: string;
   updatedAt: string;
 }

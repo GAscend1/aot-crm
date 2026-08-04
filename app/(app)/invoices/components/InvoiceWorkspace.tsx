@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
@@ -22,10 +22,10 @@ import {
 } from "@/components/enterprise/RecordWorkspace";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { invoiceService } from "@/services/index";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 import type { Invoice } from "../types";
-import { InvoiceDrawer } from "./InvoiceDrawer";
-import { InvoiceDeleteDialog } from "./InvoiceDeleteDialog";
+import { InvoiceModal } from "./InvoiceModal";
 
 interface InvoiceWorkspaceProps {
   onChanged?: () => void;
@@ -40,28 +40,32 @@ export function InvoiceWorkspace({ onChanged }: InvoiceWorkspaceProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const setStatus = async (status: Invoice["status"], label: string) => {
-    if (!record) return;
-    try {
-      const res = await fetch(`/api/invoices/${record.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      success("Invoice updated", `${record.invoiceNumber} marked ${label}`);
-      onChanged?.();
-      reload();
-    } catch {
-      showError("Error", "Could not update invoice status.");
-    }
-  };
+  const setStatus = useCallback(
+    async (status: Invoice["status"], label: string) => {
+      if (!record) return;
+      try {
+        const res = await fetch(`/api/invoices/${record.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        success("Invoice updated", `${record.invoiceNumber} marked ${label}`);
+        onChanged?.();
+        reload();
+      } catch {
+        showError("Error", "Could not update invoice status.");
+      }
+    },
+    [record, success, showError, onChanged, reload]
+  );
 
   const handleDelete = async () => {
     if (!record) return;
     try {
       await invoiceService.delete(record.id);
       success("Invoice archived");
+      setDeleteOpen(false);
       onChanged?.();
       close();
     } catch {
@@ -107,7 +111,7 @@ export function InvoiceWorkspace({ onChanged }: InvoiceWorkspaceProps) {
         },
       },
     ],
-    [record, router, close]
+    [record, router, close, setStatus]
   );
 
   const currency = record?.currency ?? "USD";
@@ -285,7 +289,7 @@ export function InvoiceWorkspace({ onChanged }: InvoiceWorkspaceProps) {
 
       {record && (
         <>
-          <InvoiceDrawer
+          <InvoiceModal
             open={editOpen}
             onOpenChange={(openState) => {
               setEditOpen(openState);
@@ -294,11 +298,19 @@ export function InvoiceWorkspace({ onChanged }: InvoiceWorkspaceProps) {
             invoice={record}
             onSave={(data) => void handleSave(data)}
           />
-          <InvoiceDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            invoice={record}
+            onClose={() => setDeleteOpen(false)}
+            title="Archive Invoice"
+            message={
+              <>
+                Are you sure you want to archive{" "}
+                <strong>{record.invoiceNumber}</strong>? This action cannot be undone.
+              </>
+            }
+            confirmLabel="Archive"
+            variant="danger"
             onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
           />
         </>
       )}

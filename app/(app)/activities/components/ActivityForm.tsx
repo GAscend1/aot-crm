@@ -21,7 +21,7 @@ import {
 
 interface ActivityFormProps {
   initialData?: Activity;
-  onSubmit: (data: Activity) => void;
+  onSubmit: (data: Activity) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -70,24 +70,31 @@ export function ActivityForm({
     initialData?.relatedType ?? "lead"
   );
   const [reminder, setReminder] = useState(initialData?.reminder ?? "");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit() {
-    onSubmit({
-      id: initialData?.id ?? crypto.randomUUID(),
-      type,
-      subject,
-      description,
-      date,
-      time,
-      owner,
-      status,
-      relatedTo,
-      relatedType,
-      reminder,
-      createdAt:
-        initialData?.createdAt ?? new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-    });
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        id: initialData?.id ?? crypto.randomUUID(),
+        type,
+        subject,
+        description,
+        date,
+        time,
+        owner,
+        status,
+        relatedTo,
+        relatedType,
+        reminder,
+        createdAt:
+          initialData?.createdAt ?? new Date().toISOString().split("T")[0],
+        updatedAt: new Date().toISOString().split("T")[0],
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isEditing = !!initialData;
@@ -255,12 +262,12 @@ export function ActivityForm({
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit}>
-          {isEditing ? "Save Changes" : "Create Activity"}
+        <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          {submitting ? "Saving..." : isEditing ? "Save Changes" : "Create Activity"}
         </Button>
       </div>
     </div>

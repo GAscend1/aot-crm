@@ -9,8 +9,8 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { companyService } from "@/services/index";
 import type { Company } from "@/services/company.service";
-import { CompanyDrawer } from "./CompanyDrawer";
-import { CompanyDeleteDialog } from "./CompanyDeleteDialog";
+import { CompanyModal } from "./CompanyModal";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { CompanyToolbar } from "./CompanyToolbar";
 import { CompanyWorkspace } from "./CompanyWorkspace";
 
@@ -22,16 +22,23 @@ export function CompanyTable() {
   const [statusFilter, setStatusFilter] = useState("");
   const [industryFilter, setIndustryFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCompany, setDeletingCompany] = useState<Company | undefined>();
 
   useEffect(() => {
-    companyService.findAll().then((result) => {
-      setCompanies(result.data);
-      setLoading(false);
-    });
+    companyService
+      .findAll()
+      .then((result) => {
+        setCompanies(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load companies.");
+        setLoading(false);
+      });
   }, []);
 
   const industries = useMemo(
@@ -65,7 +72,7 @@ export function CompanyTable() {
 
   const handleEdit = useCallback((company: Company) => {
     setEditingCompany(company);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleView = useCallback(
@@ -110,40 +117,49 @@ export function CompanyTable() {
           setCompanies((prev) => [created, ...prev]);
           success("Company created", `${created.name} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingCompany(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save company.");
+        throw err;
       }
     },
     [editingCompany, success, showError],
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingCompany) {
-      try {
-        await companyService.delete(deletingCompany.id);
-        setCompanies((prev) =>
-          prev.filter((c) => c.id !== deletingCompany.id),
-        );
-        success("Company deleted", `${deletingCompany.name} has been removed.`);
-        setDeletingCompany(undefined);
-      } catch {
-        showError("Error", "Failed to delete company.");
-      }
+    if (!deletingCompany) return;
+    const target = deletingCompany;
+    const previous = companies;
+    // Optimistic removal; restored if the API call fails.
+    setCompanies((prev) => prev.filter((c) => c.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingCompany(undefined);
+    try {
+      await companyService.delete(target.id);
+      success("Company archived", `${target.name} has been archived.`);
+    } catch {
+      setCompanies(previous);
+      showError("Error", "Failed to archive company.");
     }
-  }, [deletingCompany, success, showError]);
+  }, [companies, deletingCompany, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingCompany(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await companyService.findAll();
-    setCompanies(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await companyService.findAll();
+      setCompanies(result.data);
+    } catch {
+      setError("Failed to load companies.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -155,7 +171,7 @@ export function CompanyTable() {
         setCompanies((prev) =>
           prev.filter((c) => !rows.find((r) => r.id === c.id)),
         );
-        success("Deleted", `${rows.length} company(ies) deleted.`);
+        success("Archived", `${rows.length} company(ies) archived.`);
       } else if (action === "export") {
         const csv = [
           "Name,Industry,City,Status,Revenue,Created",
@@ -176,20 +192,14 @@ export function CompanyTable() {
     [success],
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection={true}
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -212,24 +222,32 @@ export function CompanyTable() {
         }
       />
 
-      <CompanyDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditingCompany(undefined);
+      <CompanyModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingCompany(undefined);
         }}
-        company={editingCompany ?? null}
+        company={editingCompany}
         onSave={handleSave}
       />
 
-      <CompanyDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        company={deletingCompany ?? null}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => {
+        onClose={() => {
           setDeleteDialogOpen(false);
           setDeletingCompany(undefined);
         }}
+        title="Archive Company"
+        message={
+          <>
+            Archive <strong>{deletingCompany?.name}</strong>? This will remove
+            the company from active lists while keeping linked records intact.
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
       />
 
       <CompanyWorkspace

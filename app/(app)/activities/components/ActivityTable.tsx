@@ -9,29 +9,41 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { activityService } from "@/services/index";
 import type { Activity } from "@/services/activity.service";
-import { ActivityDrawer } from "./ActivityDrawer";
-import { ActivityDeleteDialog } from "./ActivityDeleteDialog";
+import { ActivityModal } from "./ActivityModal";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ActivityToolbar } from "./ActivityToolbar";
 import { ActivityWorkspace } from "./ActivityWorkspace";
 
-export function ActivityTable() {
+export function ActivityTable({
+  defaultTypeFilter,
+}: {
+  /** Pre-set the type filter (used by the Tasks view). */
+  defaultTypeFilter?: string;
+}) {
   const router = useRouter();
   const { success, error: showError } = useToastContext();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState(defaultTypeFilter ?? "");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingActivity, setDeletingActivity] = useState<Activity | undefined>();
 
   useEffect(() => {
-    activityService.findAll().then((result) => {
-      setActivities(result.data);
-      setLoading(false);
-    });
+    activityService
+      .findAll()
+      .then((result) => {
+        setActivities(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load activities.");
+        setLoading(false);
+      });
   }, []);
 
   const filtered = useMemo(() => {
@@ -60,7 +72,7 @@ export function ActivityTable() {
 
   const handleEdit = useCallback((activity: Activity) => {
     setEditingActivity(activity);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleView = useCallback(
@@ -127,40 +139,49 @@ export function ActivityTable() {
           setActivities((prev) => [created, ...prev]);
           success("Activity created", `${created.subject} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingActivity(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save activity.");
+        throw err;
       }
     },
     [editingActivity, success, showError],
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingActivity) {
-      try {
-        await activityService.delete(deletingActivity.id);
-        setActivities((prev) =>
-          prev.filter((a) => a.id !== deletingActivity.id),
-        );
-        success("Activity deleted", `${deletingActivity.subject} has been removed.`);
-        setDeletingActivity(undefined);
-      } catch {
-        showError("Error", "Failed to delete activity.");
-      }
+    if (!deletingActivity) return;
+    const target = deletingActivity;
+    const previous = activities;
+    // Optimistic removal; restored if the API call fails.
+    setActivities((prev) => prev.filter((a) => a.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingActivity(undefined);
+    try {
+      await activityService.delete(target.id);
+      success("Activity deleted", `${target.subject} has been removed.`);
+    } catch {
+      setActivities(previous);
+      showError("Error", "Failed to delete activity.");
     }
-  }, [deletingActivity, success, showError]);
+  }, [activities, deletingActivity, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingActivity(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await activityService.findAll();
-    setActivities(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await activityService.findAll();
+      setActivities(result.data);
+    } catch {
+      setError("Failed to load activities.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -193,20 +214,14 @@ export function ActivityTable() {
     [success],
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection={true}
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -228,24 +243,32 @@ export function ActivityTable() {
         }
       />
 
-      <ActivityDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditingActivity(undefined);
+      <ActivityModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingActivity(undefined);
         }}
         activity={editingActivity ?? null}
         onSave={handleSave}
       />
 
-      <ActivityDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        activity={deletingActivity ?? null}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => {
+        onClose={() => {
           setDeleteDialogOpen(false);
           setDeletingActivity(undefined);
         }}
+        title="Delete Activity"
+        message={
+          <>
+            Are you sure you want to delete <strong>{deletingActivity?.subject}</strong>?
+            This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
       />
 
       <ActivityWorkspace

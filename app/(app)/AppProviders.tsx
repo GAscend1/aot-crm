@@ -9,6 +9,8 @@ import { AppEventBridge } from "@/components/enterprise/AppEventBridge";
 import { useSyncedNotifications } from "@/hooks/use-synced-notifications";
 import { useToast } from "@/hooks/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useOnboarding } from "@/hooks/use-onboarding";
+import { ProductTour } from "@/components/onboarding/ProductTour";
 import type { Notification } from "@/types/common";
 
 interface AppContextType {
@@ -21,6 +23,7 @@ interface AppContextType {
   warning: (title: string, message?: string) => void;
   openCommandPalette: () => void;
   openQuickCreate: () => void;
+  restartOnboarding: () => void;
   notifications: Notification[];
   unreadCount: number;
   markAsRead: (id: string) => void;
@@ -69,6 +72,12 @@ export function useToastContext() {
   };
 }
 
+export function useRestartOnboarding() {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useRestartOnboarding must be inside AppProviders");
+  return ctx.restartOnboarding;
+}
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
@@ -81,6 +90,17 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     removeNotification,
   } = useSyncedNotifications();
   const { toasts, removeToast, success, error, info, warning } = useToast();
+  const {
+    loaded: onboardingLoaded,
+    mode: onboardingMode,
+    stepIndex: onboardingStepIndex,
+    startTour,
+    skip: skipOnboarding,
+    neverShowAgain,
+    complete: completeOnboarding,
+    handleStepChange,
+    restart,
+  } = useOnboarding();
 
   const openCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
@@ -146,6 +166,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           warning,
         openCommandPalette,
         openQuickCreate,
+        restartOnboarding: restart,
         notifications,
         unreadCount,
         markAsRead,
@@ -167,6 +188,19 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       />
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
+
+      {onboardingLoaded && (
+        <ProductTour
+          open={onboardingMode !== null}
+          mode={onboardingMode ?? "tour"}
+          stepIndex={onboardingStepIndex}
+          onStart={() => void startTour()}
+          onSkip={() => void skipOnboarding()}
+          onNeverShowAgain={() => void neverShowAgain()}
+          onStepChange={(index) => void handleStepChange(index)}
+          onComplete={() => void completeOnboarding()}
+        />
+      )}
     </AppContext.Provider>
     </>
   );

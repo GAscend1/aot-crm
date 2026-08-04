@@ -16,7 +16,7 @@ import { Ticket, TicketPriority, TicketStatus, TicketSla } from "../types";
 
 interface TicketFormProps {
   initialData?: Ticket;
-  onSubmit: (data: Ticket) => void;
+  onSubmit: (data: Ticket) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -37,24 +37,31 @@ export function TicketForm({
   const [assignee, setAssignee] = useState(initialData?.assignee ?? "");
   const [requester, setRequester] = useState(initialData?.requester ?? "");
   const [department, setDepartment] = useState(initialData?.department ?? "");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit() {
-    onSubmit({
-      id: initialData?.id ?? crypto.randomUUID(),
-      subject,
-      description,
-      priority,
-      status,
-      sla,
-      assignee,
-      requester,
-      department,
-      comments: initialData?.comments ?? 0,
-      attachments: initialData?.attachments ?? 0,
-      createdAt:
-        initialData?.createdAt ?? new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-    });
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        id: initialData?.id ?? crypto.randomUUID(),
+        subject,
+        description,
+        priority,
+        status,
+        sla,
+        assignee,
+        requester,
+        department,
+        comments: initialData?.comments ?? 0,
+        attachments: initialData?.attachments ?? 0,
+        createdAt:
+          initialData?.createdAt ?? new Date().toISOString().split("T")[0],
+        updatedAt: new Date().toISOString().split("T")[0],
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isEditing = !!initialData;
@@ -207,12 +214,12 @@ export function TicketForm({
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit}>
-          {isEditing ? "Save Changes" : "Create Ticket"}
+        <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          {submitting ? "Saving..." : isEditing ? "Save Changes" : "Create Ticket"}
         </Button>
       </div>
     </div>

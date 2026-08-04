@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import {
   X,
@@ -86,10 +87,13 @@ export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps)
 
             <div className="flex-1 overflow-auto p-4">
               {file.type === "image" && (
-                <img
+                <Image
                   src={file.url}
                   alt={file.name}
-                  className="mx-auto max-h-[70vh] rounded-lg object-contain"
+                  width={800}
+                  height={600}
+                  unoptimized
+                  className="mx-auto max-h-[70vh] w-auto rounded-lg object-contain"
                 />
               )}
               {file.type === "pdf" && (

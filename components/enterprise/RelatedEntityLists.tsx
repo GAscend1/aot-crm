@@ -18,6 +18,29 @@ interface RelatedItem {
   href?: string;
 }
 
+/** Minimal API row shape shared by the related-list fetches. */
+interface RelatedApiRow {
+  id: string;
+  title?: string;
+  customer?: string;
+  company?: string;
+  value?: number | null;
+  stage?: string;
+  status?: string | null;
+  total?: number | null;
+  quoteNumber?: string;
+  invoiceNumber?: string;
+  createdAt?: string;
+  dueDate?: string;
+  subject?: string;
+  type?: string;
+  name?: string;
+  position?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 function RelatedList({
   items,
   emptyMessage,
@@ -199,15 +222,15 @@ export function RelatedOpportunitiesList({
       cache: "no-store",
     })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((o) => ({
             id: o.id,
-            title: o.title,
+            title: o.title ?? "",
             subtitle: o.customer,
             meta: o.value != null ? moneyFmt(o.value) : undefined,
-            badge: stagePill(o.stage),
+            badge: stagePill(o.stage ?? ""),
             href: `/opportunities?record=${encodeURIComponent(o.id)}`,
           }))
         );
@@ -258,12 +281,12 @@ export function RelatedQuotesList({
       : "";
     fetch(`/api/quotes?${qs}&pageSize=${limit}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((q) => ({
             id: q.id,
-            title: q.quoteNumber,
+            title: q.quoteNumber ?? "",
             subtitle: q.createdAt
               ? new Date(q.createdAt).toLocaleDateString()
               : undefined,
@@ -319,12 +342,12 @@ export function RelatedInvoicesList({
       : "";
     fetch(`/api/invoices?${qs}&pageSize=${limit}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((inv) => ({
             id: inv.id,
-            title: inv.invoiceNumber,
+            title: inv.invoiceNumber ?? "",
             subtitle: inv.dueDate
               ? `Due ${new Date(inv.dueDate).toLocaleDateString()}`
               : undefined,
@@ -380,12 +403,12 @@ export function RelatedActivitiesList({
     if (companyId) params.set("companyId", companyId);
     fetch(`/api/activities?${params.toString()}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((a) => ({
             id: a.id,
-            title: a.subject,
+            title: a.subject ?? "",
             subtitle: a.type,
             meta: a.createdAt
               ? new Date(a.createdAt).toLocaleDateString()
@@ -434,25 +457,22 @@ export function RelatedCustomersList({
   limit?: number;
 }) {
   const [items, setItems] = useState<RelatedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!companyId);
 
   useEffect(() => {
-    if (!companyId) {
-      setLoading(false);
-      return;
-    }
+    if (!companyId) return;
     let cancelled = false;
     fetch(
       `/api/customers?filters=${encodeURIComponent(JSON.stringify({ companyId }))}&pageSize=${limit}`,
       { cache: "no-store" }
     )
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((c) => ({
             id: c.id,
-            title: c.name,
+            title: c.name ?? "",
             subtitle: c.position,
             meta: c.email || undefined,
             badge: pill(
@@ -497,20 +517,17 @@ export function RelatedContactsList({
   limit?: number;
 }) {
   const [items, setItems] = useState<RelatedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!companyId);
 
   useEffect(() => {
-    if (!companyId) {
-      setLoading(false);
-      return;
-    }
+    if (!companyId) return;
     let cancelled = false;
     fetch(
       `/api/contacts?filters=${encodeURIComponent(JSON.stringify({ companyId }))}&pageSize=${limit}`,
       { cache: "no-store" }
     )
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((c) => ({

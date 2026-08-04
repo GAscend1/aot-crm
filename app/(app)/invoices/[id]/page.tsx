@@ -21,7 +21,7 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { invoiceService } from "@/services/index";
 import type { Invoice } from "@/services/invoice.service";
 import { invoiceStatusColors, invoiceStatusLabels } from "../types";
-import { InvoiceDrawer } from "../components/InvoiceDrawer";
+import { InvoiceModal } from "../components/InvoiceModal";
 
 const currencyFmt = (value: number, currency = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
@@ -345,7 +345,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <InvoiceDrawer
+      <InvoiceModal
         open={editOpen}
         onOpenChange={(open) => setEditOpen(open)}
         invoice={invoice}

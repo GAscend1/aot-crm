@@ -16,6 +16,7 @@ import {
   Bell,
   Command,
   Keyboard,
+  Compass,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,13 +34,14 @@ import { useSidebar } from "@/components/layout/SidebarProvider";
 import { Breadcrumbs } from "@/components/enterprise/Breadcrumbs";
 import { NotificationCenter } from "@/components/enterprise/NotificationCenter";
 import { useTheme } from "@/components/enterprise/ThemeProvider";
-import { useAppNotifications } from "@/app/(app)/AppProviders";
+import { useAppNotifications, useRestartOnboarding } from "@/app/(app)/AppProviders";
 
 export function AppNavbar() {
   const router = useRouter();
   const { toggle, toggleMobile } = useSidebar();
   const { toggle: toggleTheme, resolved: theme } = useTheme();
   const { data: session } = useSession();
+  const restartOnboarding = useRestartOnboarding();
   const {
     notifications,
     unreadCount,
@@ -94,14 +96,15 @@ export function AppNavbar() {
         <Breadcrumbs />
       </div>
 
-      <div className="hidden max-w-md flex-1 px-6 md:block">
+      <div className="hidden max-w-sm flex-1 px-4 md:block">
         <button
           onClick={openCommandPalette}
-          className="flex w-full items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          data-tour="global-search"
+          className="flex w-full items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-sm text-muted-foreground transition-all duration-150 hover:border-ring/40 hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Search className="h-4 w-4" />
-          <span className="flex-1 text-left">Search anything...</span>
-          <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-[10px] font-medium sm:inline-block">
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1 text-left text-xs">Search anything...</span>
+          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium sm:inline-block">
             Ctrl+K
           </kbd>
         </button>
@@ -206,6 +209,10 @@ export function AppNavbar() {
               <DropdownMenuItem>
                 <HelpCircle className="mr-2 h-4 w-4" />
                 Help & Support
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={restartOnboarding}>
+                <Compass className="mr-2 h-4 w-4" />
+                Restart Product Tour
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Info className="mr-2 h-4 w-4" />

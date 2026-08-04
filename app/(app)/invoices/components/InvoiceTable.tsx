@@ -7,8 +7,8 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { invoiceService } from "@/services/index";
 import type { Invoice } from "@/services/invoice.service";
-import { InvoiceDrawer } from "./InvoiceDrawer";
-import { InvoiceDeleteDialog } from "./InvoiceDeleteDialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { InvoiceModal } from "./InvoiceModal";
 import { InvoiceToolbar } from "./InvoiceToolbar";
 import { InvoiceWorkspace } from "./InvoiceWorkspace";
 import { invoiceStatusLabels } from "../types";
@@ -33,7 +33,8 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>();
   const [prefill, setPrefill] = useState<InvoicePrefill | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -49,6 +50,10 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
       )
       .then((result) => {
         setInvoices(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load invoices.");
         setLoading(false);
       });
   }, [prefillOpportunityId]);
@@ -69,7 +74,7 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
             opportunityId: prefillOpportunityId,
           });
           setEditingInvoice(undefined);
-          setDrawerOpen(true);
+          setModalOpen(true);
         });
     }
   }, [prefillOpportunityId]);
@@ -107,7 +112,7 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
   );
   const handleEdit = useCallback((invoice: Invoice) => {
     setEditingInvoice(invoice);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
   const handleDelete = useCallback((invoice: Invoice) => {
     setDeletingInvoice(invoice);
@@ -157,38 +162,49 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
           setInvoices((prev) => [created, ...prev]);
           success("Invoice created", `${created.invoiceNumber} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingInvoice(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save invoice.");
+        throw err;
       }
     },
     [editingInvoice, success, showError]
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingInvoice) {
-      try {
-        await invoiceService.delete(deletingInvoice.id);
-        setInvoices((prev) => prev.filter((i) => i.id !== deletingInvoice.id));
-        success("Invoice archived", `${deletingInvoice.invoiceNumber} has been archived.`);
-        setDeletingInvoice(undefined);
-      } catch {
-        showError("Error", "Failed to archive invoice.");
-      }
+    if (!deletingInvoice) return;
+    const target = deletingInvoice;
+    const previous = invoices;
+    // Optimistic removal; restored if the API call fails.
+    setInvoices((prev) => prev.filter((i) => i.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingInvoice(undefined);
+    try {
+      await invoiceService.delete(target.id);
+      success("Invoice archived", `${target.invoiceNumber} has been archived.`);
+    } catch {
+      setInvoices(previous);
+      showError("Error", "Failed to archive invoice.");
     }
-  }, [deletingInvoice, success, showError]);
+  }, [invoices, deletingInvoice, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingInvoice(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await invoiceService.findAll();
-    setInvoices(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await invoiceService.findAll();
+      setInvoices(result.data);
+    } catch {
+      setError("Failed to load invoices.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -214,20 +230,14 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
     [success]
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -247,10 +257,10 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
         }
       />
 
-      <InvoiceDrawer
-        open={drawerOpen}
+      <InvoiceModal
+        open={modalOpen}
         onOpenChange={(open) => {
-          setDrawerOpen(open);
+          setModalOpen(open);
           if (!open) {
             setEditingInvoice(undefined);
             setPrefill(undefined);
@@ -261,14 +271,22 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
         onSave={handleSave}
       />
 
-      <InvoiceDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        invoice={deletingInvoice ?? null}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => {
+        onClose={() => {
           setDeleteDialogOpen(false);
           setDeletingInvoice(undefined);
         }}
+        title="Archive Invoice"
+        message={
+          <>
+            Are you sure you want to archive{" "}
+            <strong>{deletingInvoice?.invoiceNumber}</strong>? This action cannot be undone.
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
       />
 
       <InvoiceWorkspace

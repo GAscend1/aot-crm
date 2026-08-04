@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { leadUpdateSchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
@@ -39,7 +39,12 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const parsed = leadUpdateSchema.parse(body);
+    let parsed;
+    try {
+      parsed = leadUpdateSchema.parse(body);
+    } catch (err) {
+      return zodValidationError(err, "LEAD_UPDATE_FAILED", "The lead could not be updated.");
+    }
     const existing = await prisma.lead.findUnique({ where: { id } });
     if (!existing) return notFound("Lead not found");
 
@@ -164,7 +169,7 @@ export async function PATCH(
     return NextResponse.json(leadToUI(updated));
   } catch (err) {
     logServerError(`PATCH /api/leads/${id}`, err);
-    return serverError("Failed to update lead");
+    return apiError(500, "LEAD_UPDATE_FAILED", "The lead could not be updated.");
   }
 }
 
@@ -178,18 +183,24 @@ export async function DELETE(
   try {
     const existing = await prisma.lead.findUnique({ where: { id } });
     if (!existing) return notFound("Lead not found");
-    await prisma.lead.delete({ where: { id } });
+    // Archive (soft delete): Leads are referenced by activities, documents,
+    // quotes, invoices, reminders, and calendar events. Archiving preserves
+    // conversion history and related data.
+    await prisma.lead.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
     await logAudit({
       entityType: "lead",
       entityId: id,
-      action: "lead.deleted",
-      description: `Lead "${leadDisplayName(existing)}" deleted`,
+      action: "lead.archived",
+      description: `Lead "${leadDisplayName(existing)}" archived`,
       userId: user.id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
     logServerError(`DELETE /api/leads/${id}`, err);
-    return serverError("Failed to delete lead");
+    return apiError(500, "LEAD_DELETE_FAILED", "The lead could not be deleted.");
   }
 }
 

@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
 
   const where: Prisma.CompanyWhereInput = {};
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { companyName: { contains: search, mode: "insensitive" } },

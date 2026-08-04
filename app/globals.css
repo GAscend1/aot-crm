@@ -188,6 +188,18 @@
  * Authenticated application theme scope.
  * Keeps the public marketing site on the neutral brand while giving the
  * operational CRM a coordinated blue action/selection family.
+ *
+ * AOT Design System:
+ *   Primary: AOT Blue (oklch 0.545 0.18 262)
+ *   Accent:  Indigo (oklch 0.482 0.209 275)
+ *   Quote:   Purple
+ *   Invoice: Green
+ *   Documents: Cyan
+ *   Activity:  Indigo
+ *   Proposal:  Amber
+ *   Closed Won:  Green
+ *   Closed Lost: Red
+ *   Draft:    Gray
  */
 .aot-app {
   --color-primary: oklch(0.545 0.18 262);
@@ -197,6 +209,32 @@
   --color-sidebar-primary-foreground: oklch(0.985 0 0);
   --color-info: oklch(0.545 0.18 262);
   --color-info-foreground: oklch(0.985 0 0);
+  /* Semantic entity colors */
+  --color-accent: oklch(0.482 0.209 275);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-quote: oklch(0.627 0.17 288);
+  --color-quote-foreground: oklch(0.985 0 0);
+  --color-quote-soft: oklch(0.945 0.04 288);
+  --color-invoice: oklch(0.627 0.17 149);
+  --color-invoice-foreground: oklch(0.985 0 0);
+  --color-invoice-soft: oklch(0.965 0.03 149);
+  --color-document: oklch(0.685 0.16 205);
+  --color-document-foreground: oklch(0.985 0 0);
+  --color-document-soft: oklch(0.955 0.03 205);
+  --color-activity: oklch(0.482 0.209 275);
+  --color-activity-foreground: oklch(0.985 0 0);
+  --color-activity-soft: oklch(0.945 0.04 275);
+  --color-proposal: oklch(0.769 0.188 70);
+  --color-proposal-foreground: oklch(0.985 0 0);
+  --color-proposal-soft: oklch(0.968 0.04 88);
+}
+
+.dark .aot-app {
+  --color-quote-soft: oklch(0.28 0.07 288);
+  --color-invoice-soft: oklch(0.25 0.06 150);
+  --color-document-soft: oklch(0.25 0.06 205);
+  --color-activity-soft: oklch(0.28 0.07 275);
+  --color-proposal-soft: oklch(0.27 0.06 84);
 }
 
 @layer utilities {

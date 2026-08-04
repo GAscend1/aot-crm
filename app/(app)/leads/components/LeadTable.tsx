@@ -9,8 +9,8 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { leadService } from "@/services/index";
 import type { Lead } from "@/services/lead.service";
-import { LeadDrawer } from "./LeadDrawer";
-import { LeadDeleteDialog } from "./LeadDeleteDialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { LeadModal } from "./LeadModal";
 import { LeadToolbar } from "./LeadToolbar";
 import { LeadWorkspace } from "./LeadWorkspace";
 
@@ -22,16 +22,23 @@ export function LeadTable() {
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingLead, setDeletingLead] = useState<Lead | undefined>();
 
   useEffect(() => {
-    leadService.findAll().then((result) => {
-      setLeads(result.data);
-      setLoading(false);
-    });
+    leadService
+      .findAll()
+      .then((result) => {
+        setLeads(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load leads.");
+        setLoading(false);
+      });
   }, []);
 
   const sourceOptions = useMemo(
@@ -66,7 +73,7 @@ export function LeadTable() {
 
   const handleEdit = useCallback((lead: Lead) => {
     setEditingLead(lead);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleView = useCallback(
@@ -111,40 +118,49 @@ export function LeadTable() {
           setLeads((prev) => [created, ...prev]);
           success("Lead created", `${created.title} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingLead(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save lead.");
+        throw err;
       }
     },
     [editingLead, success, showError],
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingLead) {
-      try {
-        await leadService.delete(deletingLead.id);
-        setLeads((prev) =>
-          prev.filter((l) => l.id !== deletingLead.id),
-        );
-        success("Lead deleted", `${deletingLead.title} has been removed.`);
-        setDeletingLead(undefined);
-      } catch {
-        showError("Error", "Failed to delete lead.");
-      }
+    if (!deletingLead) return;
+    const target = deletingLead;
+    const previous = leads;
+    // Optimistic removal; restored if the API call fails.
+    setLeads((prev) => prev.filter((l) => l.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingLead(undefined);
+    try {
+      await leadService.delete(target.id);
+      success("Lead archived", `${target.title} has been archived.`);
+    } catch {
+      setLeads(previous);
+      showError("Error", "Failed to archive lead.");
     }
-  }, [deletingLead, success, showError]);
+  }, [leads, deletingLead, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingLead(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await leadService.findAll();
-    setLeads(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await leadService.findAll();
+      setLeads(result.data);
+    } catch {
+      setError("Failed to load leads.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleWorkspaceChanged = useCallback(() => {
@@ -162,7 +178,7 @@ export function LeadTable() {
         setLeads((prev) =>
           prev.filter((l) => !rows.find((r) => r.id === l.id)),
         );
-        success("Deleted", `${rows.length} lead(s) deleted.`);
+        success("Archived", `${rows.length} lead(s) archived.`);
       } else if (action === "export") {
         const csv = [
           "Title,Company,Contact,Email,Status,Created",
@@ -183,20 +199,14 @@ export function LeadTable() {
     [success],
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection={true}
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -219,24 +229,32 @@ export function LeadTable() {
         }
       />
 
-      <LeadDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditingLead(undefined);
+      <LeadModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingLead(undefined);
         }}
-        lead={editingLead ?? null}
+        lead={editingLead}
         onSave={handleSave}
       />
 
-      <LeadDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        lead={deletingLead ?? null}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => {
+        onClose={() => {
           setDeleteDialogOpen(false);
           setDeletingLead(undefined);
         }}
+        title="Archive Lead"
+        message={
+          <>
+            Archive <strong>{deletingLead?.title}</strong>? This will remove
+            the lead from active lists while keeping any linked records intact.
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
       />
 
       <LeadWorkspace onChanged={handleWorkspaceChanged} />

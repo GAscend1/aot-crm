@@ -21,9 +21,9 @@ import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { customerService } from "@/services/index";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type { Customer } from "@/services/customer.service";
-import { CustomerDrawer } from "../components/CustomerDrawer";
-import { CustomerDeleteDialog } from "../components/CustomerDeleteDialog";
+import { CustomerModal } from "../components/CustomerModal";
 
 interface CustomerDetailClientProps {
   id: string;
@@ -34,7 +34,7 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
   const { success, error: showError } = useToastContext();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [auditLog, setAuditLog] = useState<TimelineEntry[]>([]);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -70,7 +70,7 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
           ...prev,
         ]);
         success("Customer updated");
-        setDrawerOpen(false);
+        setModalOpen(false);
       } catch {
         showError("Error", "Failed to update customer.");
       }
@@ -114,7 +114,7 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
         title={customer.name}
         description={customer.position}
         backHref="/customers"
-        onEdit={() => setDrawerOpen(true)}
+        onEdit={() => setModalOpen(true)}
         onDelete={() => setDeleteDialogOpen(true)}
       >
         <div className="grid gap-6 lg:grid-cols-3">
@@ -254,18 +254,26 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
         </div>
       </DetailView>
 
-      <CustomerDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => setDrawerOpen(open)}
+      <CustomerModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
         customer={customer}
         onSave={handleSave}
       />
 
-      <CustomerDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => setDeleteDialogOpen(open)}
-        customer={customer}
-        onConfirm={handleDelete}
+        onClose={() => setDeleteDialogOpen(false)}
+        title="Delete Customer"
+        message={
+          <>
+            Are you sure you want to delete <strong>{customer.name}</strong>?
+            This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => void handleDelete()}
       />
 
       <EmailComposer

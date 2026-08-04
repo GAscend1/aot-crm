@@ -11,12 +11,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAsyncSubmit } from "@/components/common/use-async-submit";
+import { FormErrorBanner, FormFieldError } from "@/components/common/FormError";
 
 import { Opportunity, OpportunityStatus, Stage } from "../types";
 
 interface OpportunityFormProps {
   initialData?: Opportunity;
-  onSubmit: (data: Opportunity) => void;
+  /** Async save. Resolve on success; throw (or reject) on failure to stay open with errors. */
+  onSubmit: (data: Opportunity) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -54,8 +57,12 @@ export function OpportunityForm({
   );
   const [notes, setNotes] = useState(initialData?.notes ?? "");
 
-  function handleSubmit() {
-    onSubmit({
+  const { saving, error, fieldErrors, submit } = useAsyncSubmit(
+    onSubmit as (data: never) => Promise<unknown>,
+  );
+
+  async function handleSubmit() {
+    await submit({
       id: initialData?.id ?? crypto.randomUUID(),
       title,
       customer,
@@ -70,32 +77,37 @@ export function OpportunityForm({
         initialData?.createdAt ??
         new Date().toISOString().split("T")[0],
       updatedAt: new Date().toISOString().split("T")[0],
-    });
+    } as never);
   }
 
   const isEditing = !!initialData;
 
   return (
     <div className="flex flex-col gap-4">
+      <FormErrorBanner message={error} />
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-title">
             Title
           </label>
 
           <Input
+            id="opportunity-title"
             placeholder="Opportunity title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            aria-invalid={!!fieldErrors.title}
           />
+          <FormFieldError message={fieldErrors.title} />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-customer">
             Customer
           </label>
 
           <Input
+            id="opportunity-customer"
             placeholder="Customer name"
             value={customer}
             onChange={(e) => setCustomer(e.target.value)}
@@ -105,11 +117,12 @@ export function OpportunityForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-value">
             Value ($)
           </label>
 
           <Input
+            id="opportunity-value"
             type="number"
             placeholder="0"
             value={value}
@@ -118,7 +131,7 @@ export function OpportunityForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-stage">
             Stage
           </label>
 
@@ -126,7 +139,7 @@ export function OpportunityForm({
             value={stage}
             onValueChange={(v) => setStage(v as Stage)}
           >
-            <SelectTrigger>
+            <SelectTrigger id="opportunity-stage">
               <SelectValue />
             </SelectTrigger>
 
@@ -143,11 +156,12 @@ export function OpportunityForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-probability">
             Probability (%)
           </label>
 
           <Input
+            id="opportunity-probability"
             type="number"
             placeholder="0"
             min={0}
@@ -158,11 +172,12 @@ export function OpportunityForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-close">
             Expected Close Date
           </label>
 
           <Input
+            id="opportunity-close"
             type="date"
             value={expectedCloseDate}
             onChange={(e) => setExpectedCloseDate(e.target.value)}
@@ -172,11 +187,12 @@ export function OpportunityForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-owner">
             Owner
           </label>
 
           <Input
+            id="opportunity-owner"
             placeholder="Owner name"
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
@@ -184,7 +200,7 @@ export function OpportunityForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-status">
             Status
           </label>
 
@@ -192,7 +208,7 @@ export function OpportunityForm({
             value={status}
             onValueChange={(v) => setStatus(v as OpportunityStatus)}
           >
-            <SelectTrigger>
+            <SelectTrigger id="opportunity-status">
               <SelectValue />
             </SelectTrigger>
 
@@ -208,11 +224,12 @@ export function OpportunityForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">
+        <label className="text-xs font-medium text-muted-foreground" htmlFor="opportunity-notes">
           Notes
         </label>
 
         <Input
+          id="opportunity-notes"
           placeholder="Additional notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -220,12 +237,12 @@ export function OpportunityForm({
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit}>
-          {isEditing ? "Save Changes" : "Create Opportunity"}
+        <Button onClick={() => void handleSubmit()} disabled={saving}>
+          {saving ? "Saving..." : isEditing ? "Save Changes" : "Create Opportunity"}
         </Button>
       </div>
     </div>

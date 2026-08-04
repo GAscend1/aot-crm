@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { X, Video, ExternalLink, Copy, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,20 @@ export function ZoomMeetingDialog({ open, onClose, entityName }: ZoomMeetingDial
   const [creating, setCreating] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
-  useState(() => { zoomService.getAccount().then(setAccount); });
+  useEffect(() => {
+    let cancelled = false;
+    zoomService
+      .getAccount()
+      .then((acc) => {
+        if (!cancelled) setAccount(acc);
+      })
+      .catch(() => {
+        if (!cancelled) setAccount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleConnect = async () => {
     setConnecting(true);

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError } from "@/lib/server/api";
 import { logAudit, findOrCreateCompany } from "@/lib/server/records";
 import { contactSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
   const filters = searchParams.get("filters");
 
   const where: Prisma.ContactWhereInput = {};
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { firstName: { contains: search, mode: "insensitive" } },
@@ -121,6 +123,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(contactToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "CONTACT_VALIDATION_FAILED", "Invalid contact data.");
+    }
     logServerError("POST /api/contacts", err);
     return serverError("Failed to create contact");
   }

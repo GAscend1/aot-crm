@@ -62,6 +62,8 @@ const entityPathMap: Record<string, string> = {
   quote: "quotes",
   invoice: "invoices",
   ticket: "tickets",
+  activity: "activities",
+  document: "documents",
 };
 
 const typeColors = {
@@ -118,7 +120,7 @@ export function NotificationCenter({
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="relative" />}>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="relative" data-tour="notifications" />}>
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
           <motion.span

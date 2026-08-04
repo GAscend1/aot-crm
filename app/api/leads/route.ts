@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { leadCreateSchema } from "@/lib/validation/entities";
 import type { LeadStatus, Prisma } from "@/generated/prisma/client";
@@ -26,6 +27,8 @@ export type UILead = {
   isFavorite: boolean;
   tags: string[];
   notes: string;
+  convertedAt: string;
+  convertedOpportunityId: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -53,6 +56,8 @@ export function leadToUI(
     isFavorite: c.isFavorite,
     tags: Array.isArray(c.tags) ? (c.tags as string[]) : [],
     notes: c.notes ?? "",
+    convertedAt: c.convertedAt?.toISOString() ?? "",
+    convertedOpportunityId: c.opportunityId ?? "",
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
@@ -192,6 +197,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(leadToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "LEAD_VALIDATION_FAILED", "Invalid lead data.");
+    }
     logServerError("POST /api/leads", err);
     return serverError("Failed to create lead");
   }

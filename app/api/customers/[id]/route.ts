@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, EntityStatus } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError } from "@/lib/server/api";
 import { logAudit, findOrCreateCompany } from "@/lib/server/records";
 import { customerSchema } from "@/lib/validation/entities";
 import { customerToUI } from "../route";
@@ -36,7 +36,12 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const parsed = customerSchema.partial().parse(body);
+    let parsed;
+    try {
+      parsed = customerSchema.partial().parse(body);
+    } catch (err) {
+      return zodValidationError(err, "CUSTOMER_UPDATE_FAILED", "The customer could not be updated.");
+    }
     const existing = await prisma.customer.findUnique({ where: { id } });
     if (!existing) return notFound("Customer not found");
 
@@ -71,7 +76,7 @@ export async function PATCH(
     return NextResponse.json(customerToUI(updated));
   } catch (err) {
     logServerError(`PATCH /api/customers/${id}`, err);
-    return serverError("Failed to update customer");
+    return apiError(500, "CUSTOMER_UPDATE_FAILED", "The customer could not be updated.");
   }
 }
 
@@ -85,17 +90,23 @@ export async function DELETE(
   try {
     const existing = await prisma.customer.findUnique({ where: { id } });
     if (!existing) return notFound("Customer not found");
-    await prisma.customer.delete({ where: { id } });
+    // Archive (soft delete) instead of hard delete: Customers are referenced by
+    // opportunities, activities, documents, quotes, invoices, and leads. A hard
+    // delete would either fail on foreign keys or silently orphan related data.
+    await prisma.customer.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
     await logAudit({
       entityType: "customer",
       entityId: id,
-      action: "customer.deleted",
-      description: `Customer "${existing.name}" deleted`,
+      action: "customer.archived",
+      description: `Customer "${existing.name}" archived`,
       userId: user.id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
     logServerError(`DELETE /api/customers/${id}`, err);
-    return serverError("Failed to delete customer");
+    return apiError(500, "CUSTOMER_DELETE_FAILED", "The customer could not be deleted.");
   }
 }

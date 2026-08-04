@@ -115,6 +115,9 @@ export function DataTable<TData extends { id: string }, TValue>({
     ] as ColumnDef<TData, TValue>[];
   }, [columns, enableRowSelection]);
 
+  // TanStack Table's useReactTable returns non-memoizable function references;
+  // React Compiler skips memoizing this component, which is expected for this API.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns: allColumns,

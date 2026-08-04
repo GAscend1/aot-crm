@@ -4,18 +4,20 @@ import { useMemo, useState } from "react";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useApiList } from "@/hooks/use-api-list";
+import { useToastContext } from "@/app/(app)/AppProviders";
 
 import { Department, User, UserStatus } from "../types";
 import { createColumns } from "../columns";
-import { AdminDrawer } from "./AdminDrawer";
-import { AdminDeleteDialog } from "./AdminDeleteDialog";
+import { AdminModal } from "./AdminModal";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { AdminToolbar } from "./AdminToolbar";
 
 const USERS_PATH = "/api/admin/users?pageSize=1000";
 
 export function AdminTable() {
-  const { data, refresh } = useApiList<User>(USERS_PATH);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data, loading, error, refresh } = useApiList<User>(USERS_PATH);
+  const { success, error: showError } = useToastContext();
+  const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -51,17 +53,17 @@ export function AdminTable() {
 
   function handleAdd() {
     setSelectedUser(null);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }
 
   function handleView(user: User) {
     setSelectedUser(user);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }
 
   function handleEdit(user: User) {
     setSelectedUser(user);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }
 
   function handleDelete(user: User) {
@@ -80,37 +82,49 @@ export function AdminTable() {
     };
     try {
       if (selectedUser) {
-        await fetch(`/api/admin/users/${selectedUser.id}`, {
+        const res = await fetch(`/api/admin/users/${selectedUser.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!res.ok) throw new Error("Request failed");
       } else {
-        await fetch("/api/admin/users", {
+        const res = await fetch("/api/admin/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!res.ok) throw new Error("Request failed");
       }
       refresh();
-    } catch {
-      // Keep current data on failure
+      success(
+        selectedUser ? "User updated" : "User created",
+        `${user.name} has been ${selectedUser ? "updated" : "created"}.`
+      );
+      // Close only after the save succeeds, so errors keep the modal open.
+      setModalOpen(false);
+      setSelectedUser(null);
+    } catch (err) {
+      showError("Error", "Failed to save user.");
+      throw err;
     }
-    setDrawerOpen(false);
-    setSelectedUser(null);
   }
 
   async function handleConfirmDelete() {
     if (userToDelete) {
       try {
-        await fetch(`/api/admin/users/${userToDelete.id}`, { method: "DELETE" });
+        const res = await fetch(`/api/admin/users/${userToDelete.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Request failed");
         refresh();
+        setDeleteDialogOpen(false);
+        setUserToDelete(null);
       } catch {
-        // Keep current data on failure
+        showError("Error", "Failed to delete user.");
       }
+    } else {
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
     }
-    setDeleteDialogOpen(false);
-    setUserToDelete(null);
   }
 
   function handleCancelDelete() {
@@ -137,20 +151,34 @@ export function AdminTable() {
       <DataTable
         columns={columns}
         data={filteredData}
+        loading={loading}
+        error={error}
+        onRetry={refresh}
       />
 
-      <AdminDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+      <AdminModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setSelectedUser(null);
+        }}
         user={selectedUser}
         onSave={handleSave}
       />
 
-      <AdminDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        user={userToDelete}
+        onClose={handleCancelDelete}
+        title="Delete User"
+        message={
+          <>
+            Are you sure you want to delete <strong>{userToDelete?.name}</strong>?
+            This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
         onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
       />
     </>
   );

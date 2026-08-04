@@ -57,7 +57,7 @@ export function ConvertLeadDialog({
         throw new Error(body.error || "Failed to convert lead");
       }
       const body = (await res.json()) as { convertedOpportunityId?: string };
-      success("Lead converted", `${leadTitle} was converted to a customer`);
+      success("Lead converted", `${leadTitle} was converted`);
       onConverted(body.convertedOpportunityId);
       onClose();
     } catch (err) {
@@ -87,7 +87,7 @@ export function ConvertLeadDialog({
               <div>
                 <p className="text-sm font-medium text-slate-900 dark:text-white">{leadTitle}</p>
                 <p className="text-xs text-slate-500">
-                  Converts this lead into a customer{createOpportunity ? " and opportunity" : ""}.
+                  Creates a contact{createOpportunity ? ", company, and an opportunity in the pipeline" : " and company"} from this lead.
                 </p>
               </div>
 

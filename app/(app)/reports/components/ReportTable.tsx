@@ -4,18 +4,20 @@ import { useCallback, useMemo, useState } from "react";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useApiList } from "@/hooks/use-api-list";
+import { useToastContext } from "@/app/(app)/AppProviders";
 
 import { Report, ReportCategory, ReportStatus } from "../types";
 import { createColumns } from "../columns";
-import { ReportDrawer } from "./ReportDrawer";
-import { ReportDeleteDialog } from "./ReportDeleteDialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ReportModal } from "./ReportModal";
 import { ReportToolbar } from "./ReportToolbar";
 
 const REPORTS_PATH = "/api/reports/manage?pageSize=1000";
 
 export function ReportTable() {
-  const { data, refresh } = useApiList<Report>(REPORTS_PATH);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data, loading, error, refresh } = useApiList<Report>(REPORTS_PATH);
+  const { error: showError } = useToastContext();
+  const [modalOpen, setModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
@@ -46,17 +48,17 @@ export function ReportTable() {
 
   const handleAdd = useCallback(() => {
     setSelectedReport(null);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleView = useCallback((report: Report) => {
     setSelectedReport(report);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleEdit = useCallback((report: Report) => {
     setSelectedReport(report);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleDelete = useCallback((report: Report) => {
@@ -66,16 +68,17 @@ export function ReportTable() {
 
   const handleRun = useCallback(async (report: Report) => {
     try {
-      await fetch(`/api/reports/manage/${report.id}`, {
+      const res = await fetch(`/api/reports/manage/${report.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lastRun: new Date().toISOString().split("T")[0] }),
       });
+      if (!res.ok) throw new Error("Request failed");
       refresh();
     } catch {
-      // Keep current data on failure
+      showError("Error", "Could not run report.");
     }
-  }, [refresh]);
+  }, [refresh, showError]);
 
   async function handleSave(report: Report) {
     const payload = {
@@ -88,37 +91,45 @@ export function ReportTable() {
     };
     try {
       if (selectedReport) {
-        await fetch(`/api/reports/manage/${selectedReport.id}`, {
+        const res = await fetch(`/api/reports/manage/${selectedReport.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!res.ok) throw new Error("Request failed");
       } else {
-        await fetch("/api/reports/manage", {
+        const res = await fetch("/api/reports/manage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!res.ok) throw new Error("Request failed");
       }
       refresh();
-    } catch {
-      // Keep current data on failure
+      // Close only after the save succeeds, so errors keep the modal open.
+      setModalOpen(false);
+      setSelectedReport(null);
+    } catch (err) {
+      showError("Error", "Failed to save report.");
+      throw err;
     }
-    setDrawerOpen(false);
-    setSelectedReport(null);
   }
 
   async function handleConfirmDelete() {
     if (reportToDelete) {
       try {
-        await fetch(`/api/reports/manage/${reportToDelete.id}`, { method: "DELETE" });
+        const res = await fetch(`/api/reports/manage/${reportToDelete.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Request failed");
         refresh();
+        setDeleteDialogOpen(false);
+        setReportToDelete(null);
       } catch {
-        // Keep current data on failure
+        showError("Error", "Failed to delete report.");
       }
+    } else {
+      setDeleteDialogOpen(false);
+      setReportToDelete(null);
     }
-    setDeleteDialogOpen(false);
-    setReportToDelete(null);
   }
 
   function handleCancelDelete() {
@@ -151,20 +162,34 @@ export function ReportTable() {
       <DataTable
         columns={columns}
         data={filteredData}
+        loading={loading}
+        error={error}
+        onRetry={refresh}
       />
 
-      <ReportDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+      <ReportModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setSelectedReport(null);
+        }}
         report={selectedReport}
         onSave={handleSave}
       />
 
-      <ReportDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        report={reportToDelete}
+        onClose={handleCancelDelete}
+        title="Delete Report"
+        message={
+          <>
+            Are you sure you want to delete <strong>{reportToDelete?.name}</strong>?
+            This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
         onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
       />
     </>
   );

@@ -1,5 +1,23 @@
 import type { IRepository, PaginatedResult, QueryOptions } from "@/repositories/base/IRepository";
 
+/**
+ * Structured API error carrying the server's code, message, and field-level
+ * errors so forms can render validation errors next to the offending inputs.
+ */
+export class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+  fieldErrors?: Record<string, string>;
+
+  constructor(status: number, message: string, code?: string, fieldErrors?: Record<string, string>) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = code;
+    this.fieldErrors = fieldErrors;
+  }
+}
+
 export class ApiRepository<T extends { id: string }> implements IRepository<T> {
   constructor(private basePath: string) {}
 
@@ -9,8 +27,19 @@ export class ApiRepository<T extends { id: string }> implements IRepository<T> {
       ...options,
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`API ${res.status} ${res.statusText}: ${body.slice(0, 200)}`);
+      const text = await res.text().catch(() => "");
+      let parsed: { error?: string; message?: string; code?: string; fieldErrors?: Record<string, string> } | null = null;
+      try {
+        parsed = text ? (JSON.parse(text) as { error?: string; message?: string; code?: string; fieldErrors?: Record<string, string> }) : null;
+      } catch {
+        parsed = null;
+      }
+      throw new ApiRequestError(
+        res.status,
+        parsed?.message ?? parsed?.error ?? `Request failed with status ${res.status}`,
+        parsed?.code,
+        parsed?.fieldErrors
+      );
     }
     return res.json();
   }

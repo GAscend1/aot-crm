@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -25,10 +25,10 @@ import {
 } from "@/components/enterprise/RecordWorkspace";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { quoteService } from "@/services/index";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 import type { Quote } from "../types";
-import { QuoteDrawer } from "./QuoteDrawer";
-import { QuoteDeleteDialog } from "./QuoteDeleteDialog";
+import { QuoteModal } from "./QuoteModal";
 
 interface QuoteWorkspaceProps {
   onChanged?: () => void;
@@ -43,24 +43,27 @@ export function QuoteWorkspace({ onChanged }: QuoteWorkspaceProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const setStatus = async (status: Quote["status"], label: string) => {
-    if (!record) return;
-    try {
-      const res = await fetch(`/api/quotes/${record.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      success("Quote updated", `${record.quoteNumber} marked ${label}`);
-      onChanged?.();
-      reload();
-    } catch {
-      showError("Error", "Could not update quote status.");
-    }
-  };
+  const setStatus = useCallback(
+    async (status: Quote["status"], label: string) => {
+      if (!record) return;
+      try {
+        const res = await fetch(`/api/quotes/${record.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        success("Quote updated", `${record.quoteNumber} marked ${label}`);
+        onChanged?.();
+        reload();
+      } catch {
+        showError("Error", "Could not update quote status.");
+      }
+    },
+    [record, success, showError, onChanged, reload]
+  );
 
-  const handleConvert = async () => {
+  const handleConvert = useCallback(async () => {
     if (!record) return;
     try {
       const res = await fetch(`/api/quotes/${record.id}/convert`, {
@@ -78,9 +81,9 @@ export function QuoteWorkspace({ onChanged }: QuoteWorkspaceProps) {
     } catch (err) {
       showError("Error", err instanceof Error ? err.message : "Could not convert quote.");
     }
-  };
+  }, [record, success, close, onChanged, router, showError]);
 
-  const handleDuplicate = async () => {
+  const handleDuplicate = useCallback(async () => {
     if (!record) return;
     try {
       const res = await fetch(`/api/quotes/${record.id}/duplicate`, { method: "POST" });
@@ -92,13 +95,14 @@ export function QuoteWorkspace({ onChanged }: QuoteWorkspaceProps) {
     } catch {
       showError("Error", "Could not duplicate quote.");
     }
-  };
+  }, [record, success, showError, onChanged, open]);
 
   const handleDelete = async () => {
     if (!record) return;
     try {
       await quoteService.delete(record.id);
       success("Quote archived");
+      setDeleteOpen(false);
       onChanged?.();
       close();
     } catch {
@@ -161,7 +165,7 @@ export function QuoteWorkspace({ onChanged }: QuoteWorkspaceProps) {
         },
       },
     ],
-    [record, router, close]
+    [record, router, close, setStatus, handleConvert, handleDuplicate]
   );
 
   const currency = record?.currency ?? "USD";
@@ -323,7 +327,7 @@ export function QuoteWorkspace({ onChanged }: QuoteWorkspaceProps) {
 
       {record && (
         <>
-          <QuoteDrawer
+          <QuoteModal
             open={editOpen}
             onOpenChange={(openState) => {
               setEditOpen(openState);
@@ -332,11 +336,19 @@ export function QuoteWorkspace({ onChanged }: QuoteWorkspaceProps) {
             quote={record}
             onSave={(data) => void handleSave(data)}
           />
-          <QuoteDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            quote={record}
+            onClose={() => setDeleteOpen(false)}
+            title="Archive Quote"
+            message={
+              <>
+                Are you sure you want to archive{" "}
+                <strong>{record.quoteNumber}</strong>? This action cannot be undone.
+              </>
+            }
+            confirmLabel="Archive"
+            variant="danger"
             onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
           />
         </>
       )}

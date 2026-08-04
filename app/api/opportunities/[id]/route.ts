@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
@@ -36,7 +36,12 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const parsed = opportunitySchema.partial().parse(body);
+    let parsed;
+    try {
+      parsed = opportunitySchema.partial().parse(body);
+    } catch (err) {
+      return zodValidationError(err, "OPPORTUNITY_UPDATE_FAILED", "The opportunity could not be updated.");
+    }
     const existing = await prisma.opportunity.findUnique({ where: { id } });
     if (!existing) return notFound("Opportunity not found");
 
@@ -140,7 +145,7 @@ export async function PATCH(
     return NextResponse.json(opportunityToUI(updated));
   } catch (err) {
     logServerError(`PATCH /api/opportunities/${id}`, err);
-    return serverError("Failed to update opportunity");
+    return apiError(500, "OPPORTUNITY_UPDATE_FAILED", "The opportunity could not be updated.");
   }
 }
 
@@ -165,7 +170,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (err) {
     logServerError(`DELETE /api/opportunities/${id}`, err);
-    return serverError("Failed to archive opportunity");
+    return apiError(500, "OPPORTUNITY_DELETE_FAILED", "The opportunity could not be archived.");
   }
 }
 
