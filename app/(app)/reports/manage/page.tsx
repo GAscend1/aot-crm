@@ -7,6 +7,7 @@ import { getCrmUser } from "@/lib/server/api";
 
 import { ReportStats } from "../components/ReportStats";
 import { ReportTable } from "../components/ReportTable";
+import { ReportsManageGate } from "../components/ReportsManageGate";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,10 @@ export default async function ReportsManagePage() {
         </Link>
       }
     >
-      <ReportStats />
-      <ReportTable />
+      <ReportsManageGate>
+        <ReportStats />
+        <ReportTable />
+      </ReportsManageGate>
     </PageLayout>
   );
 }

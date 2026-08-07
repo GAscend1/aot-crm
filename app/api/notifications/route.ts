@@ -19,11 +19,11 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "50")));
     const [notifications, unreadCount] = await Promise.all([
       prisma.notification.findMany({
-        where: { userId: user.id },
+        where: { userId: user.id, organizationId: user.organizationId },
         orderBy: { createdAt: "desc" },
         take: limit,
       }),
-      prisma.notification.count({ where: { userId: user.id, read: false } }),
+      prisma.notification.count({ where: { userId: user.id, organizationId: user.organizationId, read: false } }),
     ]);
     const data = notifications.map((n) => ({
       id: n.id,
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     const created = await prisma.notification.create({
       data: {
         userId: user.id,
+        organizationId: user.organizationId,
         type: ["Info", "Warning", "Success", "Error"].includes(type) ? type : "Info",
         title,
         message: body?.message ? String(body.message) : undefined,
@@ -89,7 +90,7 @@ export async function DELETE() {
   const user = await getCrmUser();
   if (!user) return unauthorized();
   try {
-    await prisma.notification.deleteMany({ where: { userId: user.id } });
+    await prisma.notification.deleteMany({ where: { userId: user.id, organizationId: user.organizationId } });
     return NextResponse.json({ success: true });
   } catch (err) {
     logServerError("DELETE /api/notifications", err);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, isUniqueConstraint } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, isUniqueConstraint, subscriptionWriteGate, featureGate } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { quoteSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, nextQuoteNumber, quoteToUI, type QuoteWithRelations } from "@/lib/server/billing";
@@ -11,6 +11,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "quotes");
+  if (gate) return gate;
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "50")));
@@ -19,7 +21,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const filters = searchParams.get("filters");
 
-  const where: Prisma.QuoteWhereInput = { archivedAt: null };
+  const where: Prisma.QuoteWhereInput = { archivedAt: null, organizationId: user.organizationId };
   if (search) {
     where.OR = [
       { quoteNumber: { contains: search, mode: "insensitive" } },
@@ -90,6 +92,10 @@ const quoteInclude = {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "quotes");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = quoteSchema.parse(body);
@@ -97,6 +103,7 @@ export async function POST(request: NextRequest) {
     const totals = calculateTotals(parsed.items, parsed.discount, parsed.taxRate);
 
     const created = await createQuoteWithRetry({
+      organization: { connect: { id: user.organizationId } },
       currency: parsed.currency ?? "USD",
       status: "DRAFT",
       subtotal: totals.subtotal,
@@ -127,6 +134,7 @@ export async function POST(request: NextRequest) {
       action: "quote.created",
       description: `Quote ${created.quoteNumber} created for ${created.customer?.name ?? "customer"} ($${created.total.toLocaleString()})`,
       userId: user.id,
+      organizationId: user.organizationId,
       after: { quoteNumber: created.quoteNumber, total: created.total, status: created.status },
     });
     await createActivity({
@@ -137,10 +145,12 @@ export async function POST(request: NextRequest) {
       leadId: created.leadId,
       opportunityId: created.opportunityId,
       customerId: created.customerId,
+      organizationId: user.organizationId,
     });
     if (created.opportunityId) {
       await createNotification({
         userId: user.id,
+        organizationId: user.organizationId,
         type: "Success",
         title: `Quote ${created.quoteNumber} created`,
         message: `Quote created for ${created.customer?.name ?? "customer"} totalling $${created.total.toLocaleString()}`,

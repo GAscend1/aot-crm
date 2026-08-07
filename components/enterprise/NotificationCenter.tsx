@@ -126,7 +126,7 @@ export function NotificationCenter({
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[color:var(--danger)] px-1 text-[10px] font-bold text-white"
           >
             {unreadCount > 99 ? "99+" : unreadCount}
           </motion.span>

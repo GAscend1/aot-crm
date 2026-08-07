@@ -15,7 +15,7 @@ export default auth((req) => {
   const publicRoutes = [
     "/", "/features", "/solutions", "/integrations", "/pricing",
     "/security", "/resources", "/contact", "/book-demo", "/login",
-    "/auth/admin-approval-required",
+    "/auth/error",
   ];
 
   if (pathname.startsWith("/api")) return;

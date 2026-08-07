@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -28,18 +29,22 @@ export function LeadTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingLead, setDeletingLead] = useState<Lead | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
     leadService
       .findAll()
       .then((result) => {
+        if (!mountedRef.current) return;
         setLeads(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setError("Failed to load leads.");
         setLoading(false);
       });
-  }, []);
+  }, [mountedRef]);
 
   const sourceOptions = useMemo(
     () => [...new Set(leads.map((l) => l.source))],
@@ -78,7 +83,9 @@ export function LeadTable() {
 
   const handleView = useCallback(
     (lead: Lead) => {
-      router.push(`/leads?record=${encodeURIComponent(lead.id)}`, {
+      // Leads is a view inside the Contacts module — navigate directly to the
+      // merged workspace so the row click is a single client-side transition.
+      router.push(`/contacts?view=leads&record=${encodeURIComponent(lead.id)}`, {
         scroll: false,
       });
     },
@@ -92,7 +99,7 @@ export function LeadTable() {
 
   const handleRowClick = useCallback(
     (lead: Lead) => {
-      router.push(`/leads?record=${encodeURIComponent(lead.id)}`, {
+      router.push(`/contacts?view=leads&record=${encodeURIComponent(lead.id)}`, {
         scroll: false,
       });
     },
@@ -165,9 +172,9 @@ export function LeadTable() {
 
   const handleWorkspaceChanged = useCallback(() => {
     leadService.findAll().then((result) => {
-      setLeads(result.data);
+      if (mountedRef.current) setLeads(result.data);
     });
-  }, []);
+  }, [mountedRef]);
 
   const handleBulkAction = useCallback(
     async (action: string, rows: Lead[]) => {

@@ -22,6 +22,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { quoteService } from "@/services/index";
+import { useCanUse } from "@/hooks/use-subscription";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
 import type { Quote } from "@/services/quote.service";
 import { quoteStatusColors, quoteStatusLabels } from "../types";
 import { QuoteModal } from "../components/QuoteModal";
@@ -39,7 +41,13 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
   const [editOpen, setEditOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
 
+  // Deep-link gate: a plan without quotes never fires the record fetch (which
+  // would 403) — the FeatureGate locked state below is shown instead. The API
+  // still returns 403; this is presentation only.
+  const canUseQuotes = useCanUse("quotes");
+
   useEffect(() => {
+    if (!canUseQuotes) return;
     let cancelled = false;
     fetch(`/api/quotes/${id}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -54,7 +62,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
     return () => {
       cancelled = true;
     };
-  }, [id, router]);
+  }, [id, router, canUseQuotes]);
 
   const runAction = async (path: string, method = "POST", body?: Record<string, unknown>) => {
     if (!quote) return;
@@ -192,18 +200,16 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
     URL.revokeObjectURL(url);
   };
 
-  if (loading || !quote) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
-    <>
+    <FeatureGate feature="quotes" featureLabel="Quotes" mode="replace">
+      {loading || !quote ? (
+        <div className="space-y-6">
+          <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+          <div className="h-48 animate-pulse rounded-xl bg-muted" />
+          <div className="h-48 animate-pulse rounded-xl bg-muted" />
+        </div>
+      ) : (
+      <>
       <div className="mb-6 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-4">
           <Link
@@ -395,6 +401,8 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         quoteId={quote.id}
         quoteNumber={quote.quoteNumber}
       />
-    </>
+      </>
+      )}
+    </FeatureGate>
   );
 }

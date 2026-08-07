@@ -7,7 +7,7 @@ export default function ContactsPage() {
   return (
     <PageLayout
       title="Contacts"
-      description="Manage people and customer accounts — switch between People and Customers views."
+      description="Manage people, customer accounts, and leads — switch between People, Customers, and Leads views."
     >
       <Suspense
         fallback={

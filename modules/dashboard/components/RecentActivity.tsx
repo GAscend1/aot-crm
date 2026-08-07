@@ -16,11 +16,11 @@ const typeIcons = {
 } as const;
 
 const typeColors = {
-  customer: "bg-blue-100 text-blue-600",
-  opportunity: "bg-amber-100 text-amber-600",
-  ticket: "bg-purple-100 text-purple-600",
-  lead: "bg-green-100 text-green-600",
-  task: "bg-slate-100 text-slate-600",
+  customer: "bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300",
+  opportunity: "bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300",
+  ticket: "bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-300",
+  lead: "bg-green-100 text-green-600 dark:bg-green-950/50 dark:text-green-300",
+  task: "bg-muted text-muted-foreground",
 } as const;
 
 export function RecentActivity() {
@@ -64,20 +64,20 @@ export function RecentActivity() {
               key={activity.id}
               className={`flex gap-4 px-6 py-4 ${
                 index < activities.length - 1
-                  ? "border-b border-slate-100"
+                  ? "border-b border-border"
                   : ""
               }`}
             >
               <div
                 className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                  typeColors[activity.entityType as keyof typeof typeColors] || "bg-slate-100 text-slate-600"
+                  typeColors[activity.entityType as keyof typeof typeColors] || "bg-muted text-muted-foreground"
                 }`}
               >
                 <Icon className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-slate-700">{activity.summary}</p>
-                <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                <p className="text-sm text-foreground/80">{activity.summary}</p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                   <span>{activity.userName}</span>
                   <span>·</span>
                   <span>{formatRelativeTime(activity.timestamp)}</span>

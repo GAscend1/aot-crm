@@ -2,6 +2,7 @@ import { PageLayout } from "@/components/common/PageLayout";
 
 import { QuoteStats } from "./components/QuoteStats";
 import { QuoteTable } from "./components/QuoteTable";
+import { QuotesModuleGate } from "./components/QuotesModuleGate";
 
 export default async function QuotesPage({
   searchParams,
@@ -14,11 +15,13 @@ export default async function QuotesPage({
       title="Quotes"
       description="Create, send, and manage sales quotes and proposals."
     >
-      <QuoteStats />
-      <QuoteTable
-        prefillOpportunityId={params.opportunityId}
-        prefillLeadId={params.leadId}
-      />
+      <QuotesModuleGate>
+        <QuoteStats />
+        <QuoteTable
+          prefillOpportunityId={params.opportunityId}
+          prefillLeadId={params.leadId}
+        />
+      </QuotesModuleGate>
     </PageLayout>
   );
 }

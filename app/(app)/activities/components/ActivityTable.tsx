@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -33,18 +34,22 @@ export function ActivityTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingActivity, setDeletingActivity] = useState<Activity | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
     activityService
       .findAll()
       .then((result) => {
+        if (!mountedRef.current) return;
         setActivities(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setError("Failed to load activities.");
         setLoading(false);
       });
-  }, []);
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = activities;
@@ -274,7 +279,7 @@ export function ActivityTable({
       <ActivityWorkspace
         onChanged={() => {
           activityService.findAll().then((result) => {
-            setActivities(result.data);
+            if (mountedRef.current) setActivities(result.data);
           });
         }}
       />

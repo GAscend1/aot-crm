@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Shield, Mail, Video, Radio, Database, HardDrive, ArrowRight } from "lucide-react"
+import { Shield, Mail, Video, Database, HardDrive, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,7 +23,6 @@ const integrations: Integration[] = [
   },
   { name: "Outlook", icon: Mail, status: "Admin Approval", color: "amber" },
   { name: "Teams", icon: Video, status: "Admin Approval", color: "amber" },
-  { name: "Zoom", icon: Radio, status: "Ready", color: "emerald" },
   { name: "Azure SQL", icon: Database, status: "Configurable", color: "blue" },
   {
     name: "Azure Blob",

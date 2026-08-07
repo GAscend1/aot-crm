@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { buildQueryString } from "@/lib/client/api";
 
 export interface ReportFilters {
   range: "today" | "7d" | "30d" | "month" | "quarter" | "year" | "custom";
@@ -57,6 +58,66 @@ export interface ReportsData {
   ticketsByStatus: Array<{ name: string; value: number }>;
   activitiesOverTime: Array<{ month: string; calls: number; emails: number; meetings: number; tasks: number }>;
   users: Array<{ id: string; name: string }>;
+  // Phase 6 analytics blocks
+  /** True when the plan grants the advanced_analytics entitlement (blocks present). */
+  advancedAnalytics: boolean;
+  velocity: {
+    avgCycleDays: number;
+    velocityPerDay: number;
+    dealsMovedByStage: Array<{ stage: string; count: number }>;
+  };
+  forecast: {
+    months: Array<{ month: string; committed: number; weighted: number; best: number }>;
+    totals: { committed: number; weighted: number; best: number };
+  };
+  winLoss: {
+    wonByReason: Array<{ name: string; value: number; count: number }>;
+    lostByReason: Array<{ name: string; value: number; count: number }>;
+    winRateTrend: Array<{ month: string; won: number; lost: number; winRate: number }>;
+    wonValue: number;
+    lostValue: number;
+  };
+  teamProductivity: Array<{
+    name: string;
+    wonValue: number;
+    wonCount: number;
+    activeDeals: number;
+    winRate: number;
+    tasksCompleted: number;
+    meetingsHeld: number;
+    callsMade: number;
+    emailsSent: number;
+  }>;
+  customerHealth: {
+    distribution: Array<{ name: string; value: number }>;
+    healthy: number;
+    atRisk: number;
+    needsAttention: number;
+    atRiskCompanies: Array<{
+      id: string;
+      name: string;
+      industry: string | null;
+      score: number;
+      label: string;
+      tone: string;
+      pipelineValue: number;
+      wonRevenue: number;
+      openTickets: number;
+      peopleCount: number;
+    }>;
+    topCompanies: Array<{
+      id: string;
+      name: string;
+      industry: string | null;
+      score: number;
+      label: string;
+      tone: string;
+      pipelineValue: number;
+      wonRevenue: number;
+      openTickets: number;
+      peopleCount: number;
+    }>;
+  };
 }
 
 const emptyData: ReportsData = {
@@ -102,50 +163,48 @@ const emptyData: ReportsData = {
   ticketsByStatus: [],
   activitiesOverTime: [],
   users: [],
+  advancedAnalytics: false,
+  velocity: { avgCycleDays: 0, velocityPerDay: 0, dealsMovedByStage: [] },
+  forecast: { months: [], totals: { committed: 0, weighted: 0, best: 0 } },
+  winLoss: { wonByReason: [], lostByReason: [], winRateTrend: [], wonValue: 0, lostValue: 0 },
+  teamProductivity: [],
+  customerHealth: {
+    distribution: [],
+    healthy: 0,
+    atRisk: 0,
+    needsAttention: 0,
+    atRiskCompanies: [],
+    topCompanies: [],
+  },
 };
 
 export function useReportsData(filters?: ReportFilters): { data: ReportsData; loading: boolean; refresh: () => void } {
-  const [data, setData] = useState<ReportsData>(emptyData);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
-
   const { range, from, to, ownerId, customerId, companyId, source, stage, status } = filters ?? {};
 
-  useEffect(() => {
-    let cancelled = false;
-    const params = new URLSearchParams();
-    if (range) params.set("range", range);
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    if (ownerId) params.set("ownerId", ownerId);
-    if (customerId) params.set("customerId", customerId);
-    if (companyId) params.set("companyId", companyId);
-    if (source) params.set("source", source);
-    if (stage) params.set("stage", stage);
-    if (status) params.set("status", status);
-    const qs = params.toString();
-    fetch(`/api/reports${qs ? `?${qs}` : ""}`)
-      .then((res) => (res.ok ? res.json() : emptyData))
-      .then((json) => {
-        if (!cancelled) {
-          setData({ ...emptyData, ...json });
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [range, from, to, ownerId, customerId, companyId, source, stage, status, refreshKey]);
+  const query = useQuery<ReportsData>({
+    queryKey: ["reports", range, from, to, ownerId, customerId, companyId, source, stage, status],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports${buildQueryString({
+        range,
+        from,
+        to,
+        ownerId,
+        customerId,
+        companyId,
+        source,
+        stage,
+        status,
+      })}`);
+      if (!res.ok) return emptyData;
+      const json = await res.json();
+      return { ...emptyData, ...json };
+    },
+    staleTime: 60_000,
+  });
 
-  const refresh = useCallback(() => {
-    setLoading(true);
-    setRefreshKey((k) => k + 1);
-  }, []);
-
-  return { data, loading, refresh };
+  return {
+    data: query.data ?? emptyData,
+    loading: query.isPending,
+    refresh: () => void query.refetch(),
+  };
 }

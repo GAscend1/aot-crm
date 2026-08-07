@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { Shield, Mail, MessageSquare, Calendar, Database, HardDrive, BarChart3, Radio } from "lucide-react"
+import { Shield, Mail, MessageSquare, Calendar, Database, HardDrive, BarChart3, Building2 } from "lucide-react"
 
 interface IntegrationNode {
   id: string
@@ -19,9 +19,9 @@ const integrations: IntegrationNode[] = [
   { id: "teams", name: "Teams", icon: MessageSquare, status: "admin-required", x: 80, y: 35 },
   { id: "calendar", name: "Calendar", icon: Calendar, status: "ready", x: 15, y: 55 },
   { id: "onedrive", name: "OneDrive", icon: HardDrive, status: "ready", x: 85, y: 55 },
-  { id: "zoom", name: "Zoom", icon: Radio, status: "available", x: 35, y: 75 },
-  { id: "azure-sql", name: "Azure SQL", icon: Database, status: "configurable", x: 65, y: 75 },
-  { id: "powerbi", name: "Power BI", icon: BarChart3, status: "configurable", x: 50, y: 90 },
+  { id: "azure-sql", name: "Azure SQL", icon: Database, status: "configurable", x: 35, y: 75 },
+  { id: "powerbi", name: "Power BI", icon: BarChart3, status: "configurable", x: 65, y: 75 },
+  { id: "dynamics", name: "Dynamics 365", icon: Building2, status: "configurable", x: 50, y: 90 },
 ]
 
 const statusColors: Record<string, string> = {
@@ -94,9 +94,9 @@ export function MicrosoftEcosystem() {
               {active.id === "teams" && "View CRM records, share updates, and launch collaboration without leaving Microsoft Teams."}
               {active.id === "calendar" && "Sync meetings and availability bidirectionally. Schedule from any CRM record."}
               {active.id === "onedrive" && "Store and share documents with Azure Blob Storage. Version control integrated."}
-              {active.id === "zoom" && "Schedule, join, and log Zoom meetings. Auto-attach meeting notes to CRM records."}
               {active.id === "azure-sql" && "Secure, scalable database backend for all CRM data with built-in replication."}
               {active.id === "powerbi" && "Export CRM analytics to Power BI for advanced reporting and visualization."}
+              {active.id === "dynamics" && "Bring Dynamics 365 sales and service data into AOT CRM for a complete view of customer relationships."}
             </p>
           </div>
         )}

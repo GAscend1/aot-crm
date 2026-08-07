@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Archive,
   Copy,
@@ -42,6 +43,7 @@ interface LeadWorkspaceProps {
 }
 
 export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
+  const router = useRouter();
   const { success, error: showError } = useToastContext();
   const { record, loading, recordId, open, close, reload } =
     useRecordWorkspace(leadService);
@@ -255,18 +257,46 @@ export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
                     <p className="text-xs font-semibold text-[color:var(--success)]">
                       Converted
                     </p>
-                    {record?.convertedOpportunityId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          close();
-                          window.location.href = `/opportunities/${record.convertedOpportunityId}`;
-                        }}
-                        className="mt-1 text-xs font-medium text-[color:var(--primary)] hover:underline"
-                      >
-                        View linked opportunity
-                      </button>
-                    )}
+                    <div className="mt-1 flex flex-col items-start gap-1">
+                      {record?.convertedContactId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            close();
+                            router.push(`/contacts/${record.convertedContactId}`);
+                          }}
+                          className="text-xs font-medium text-[color:var(--primary)] hover:underline"
+                        >
+                          View linked contact
+                        </button>
+                      )}
+                      {record?.convertedCustomerId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            close();
+                            router.push(
+                              `/contacts?view=customers&record=${encodeURIComponent(record.convertedCustomerId ?? "")}`
+                            );
+                          }}
+                          className="text-xs font-medium text-[color:var(--primary)] hover:underline"
+                        >
+                          View linked customer
+                        </button>
+                      )}
+                      {record?.convertedOpportunityId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            close();
+                            router.push(`/opportunities/${record.convertedOpportunityId}`);
+                          }}
+                          className="text-xs font-medium text-[color:var(--primary)] hover:underline"
+                        >
+                          View linked opportunity
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
                 {record?.tags && record.tags.length > 0 && (

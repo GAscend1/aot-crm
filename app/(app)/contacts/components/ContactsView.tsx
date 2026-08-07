@@ -2,23 +2,27 @@
 
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Contact, Users } from "lucide-react";
+import { Contact, Target, Users } from "lucide-react";
 
 import { ViewSwitcher } from "@/components/common/ViewSwitcher";
 import { ContactStats } from "./ContactStats";
 import { ContactTable } from "./ContactTable";
 import { CustomerStats } from "../../customers/components/CustomerStats";
 import { CustomerTable } from "../../customers/components/CustomerTable";
+import { LeadStats } from "../../leads/components/LeadStats";
+import { LeadTable } from "../../leads/components/LeadTable";
 
 const VIEWS = [
   { id: "people", label: "People", icon: Users },
   { id: "customers", label: "Customers", icon: Contact },
+  { id: "leads", label: "Leads", icon: Target },
 ];
 
 /**
- * Contacts module shell. Customers is now a filtered view of the same module
- * (legacy /customers redirects here via ?view=customers), matching the
- * simplified navigation while keeping the customer records reachable.
+ * Contacts module shell — the "people hub". Customers and Leads are filtered
+ * views of the same module (legacy /customers and /leads redirect here via
+ * ?view=customers / ?view=leads), matching the simplified navigation while
+ * keeping every record type reachable.
  */
 export function ContactsView() {
   const router = useRouter();
@@ -59,6 +63,13 @@ export function ContactsView() {
         <>
           <CustomerStats />
           <CustomerTable />
+        </>
+      )}
+
+      {active === "leads" && (
+        <>
+          <LeadStats />
+          <LeadTable />
         </>
       )}
     </div>

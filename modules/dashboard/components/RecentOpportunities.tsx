@@ -25,23 +25,23 @@ export function RecentOpportunities() {
           <div
             key={opp.id}
             className={`flex items-center justify-between px-6 py-3 ${
-              index < recentOpportunities.length - 1 ? "border-b border-slate-100" : ""
+              index < recentOpportunities.length - 1 ? "border-b border-border" : ""
             }`}
           >
             <div>
-              <p className="text-sm font-medium text-slate-900">{opp.title}</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-sm font-medium text-foreground">{opp.title}</p>
+              <p className="text-xs text-muted-foreground">
                 {opp.customer} · ${opp.value?.toLocaleString()}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-1.5 w-16 rounded-full bg-slate-200">
+              <div className="h-1.5 w-16 rounded-full bg-muted">
                 <div
-                  className="h-1.5 rounded-full bg-blue-500"
+                  className="h-1.5 rounded-full bg-[color:var(--primary)]"
                   style={{ width: `${opp.probability || 0}%` }}
                 />
               </div>
-              <span className="text-xs text-slate-400">{opp.stage}</span>
+              <span className="text-xs text-muted-foreground">{opp.stage}</span>
             </div>
           </div>
         ))}

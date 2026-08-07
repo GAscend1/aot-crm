@@ -83,14 +83,16 @@ export function useOnboarding() {
     };
   }, []);
 
-  // Show welcome once when the user has never started or dismissed onboarding.
-  // Deferred (async) so it never sets state synchronously inside the effect.
+  // Show the welcome modal for anyone with INCOMPLETE onboarding — a brand-new
+  // user, a user who started the tour but never finished it, or a second user
+  // from an existing tenant whose personal onboarding is not done. Only users
+  // who completed onboarding, explicitly dismissed it, or opted out are left
+  // alone. Deferred (async) so it never sets state synchronously in the effect.
   useEffect(() => {
     if (!loaded || hasShownRef.current) return;
-    const neverStarted = !state.onboardingStartedAt;
     const dismissed = !!state.onboardingDismissedAt;
     const completed = !!state.onboardingCompletedAt;
-    if (!state.onboardingNeverShowAgain && neverStarted && !dismissed && !completed) {
+    if (!state.onboardingNeverShowAgain && !completed && !dismissed) {
       hasShownRef.current = true;
       const timer = window.setTimeout(() => {
         setMode("welcome");

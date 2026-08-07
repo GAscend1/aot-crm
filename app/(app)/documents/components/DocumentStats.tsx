@@ -14,8 +14,17 @@ type DocumentRow = {
 export function DocumentStats() {
   const { data, loading } = useApiList<DocumentRow>("/api/documents?pageSize=1000");
 
+  // Defensive: never assume `size` is a pre-formatted string — tolerate
+  // numbers, null and undefined without crashing the module (regression guard
+  // for the Documents runtime error class).
   const totalSizeKb = data
-    .map((d) => parseFloat(d.size.replace(/[^0-9.]/g, "")) || 0)
+    .map((d) => {
+      const raw =
+        typeof d.size === "string"
+          ? d.size.replace(/[^0-9.]/g, "")
+          : String(d.size ?? "").replace(/[^0-9.]/g, "");
+      return parseFloat(raw) || 0;
+    })
     .reduce((a, b) => a + b, 0);
   const totalSizeMb = (totalSizeKb / 1024).toFixed(1);
 

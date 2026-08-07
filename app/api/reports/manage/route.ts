@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, forbidden, serverError, logServerError, isReportsManager } from "@/lib/server/api";
+import { getCrmUser, unauthorized, forbidden, serverError, logServerError, isReportsManager, featureGate, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { reportSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -35,9 +35,12 @@ export function reportToUI(r: Prisma.ReportGetPayload<{ include: { createdBy: tr
 export async function GET() {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "reports");
+  if (gate) return gate;
   if (!isReportsManager(user)) return forbidden();
   try {
     const reports = await prisma.report.findMany({
+      where: { organizationId: user.organizationId },
       include: { createdBy: true },
       orderBy: { createdAt: "desc" },
     });
@@ -51,12 +54,17 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "reports");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   if (!isReportsManager(user)) return forbidden();
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = reportSchema.parse(body);
 
     const data: Prisma.ReportCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       name: parsed.name,
       category: parsed.category,
       type: parsed.type,
@@ -73,6 +81,7 @@ export async function POST(request: NextRequest) {
       action: "report.created",
       description: `Report "${created.name}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(reportToUI(created), { status: 201 });

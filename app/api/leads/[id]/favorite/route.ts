@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, leadDisplayName } from "@/lib/server/records";
-import { leadToUI } from "../../route";
+import { leadToUI, leadUIInclude } from "../../route";
 export const dynamic = "force-dynamic";
 
 export async function PATCH(
@@ -11,14 +11,16 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const lead = await prisma.lead.findUnique({ where: { id } });
+    const lead = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!lead) return notFound("Lead not found");
     const updated = await prisma.lead.update({
       where: { id },
       data: { isFavorite: !lead.isFavorite },
-      include: { assignedTo: true },
+      include: leadUIInclude,
     });
     await logAudit({
       entityType: "lead",

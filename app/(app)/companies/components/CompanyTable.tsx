@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { DataTable } from "@/components/table/DataTable";
@@ -27,18 +27,34 @@ export function CompanyTable() {
   const [editingCompany, setEditingCompany] = useState<Company | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCompany, setDeletingCompany] = useState<Company | undefined>();
+  // Guards the async refresh callback below against post-unmount updates.
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     companyService
       .findAll()
       .then((result) => {
+        if (cancelled) return;
         setCompanies(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (cancelled) return;
         setError("Failed to load companies.");
         setLoading(false);
       });
+    return () => {
+      // Never touch state after unmount (React "state update on unmounted
+      // component" regression guard — same pattern as InvoiceTable).
+      cancelled = true;
+    };
   }, []);
 
   const industries = useMemo(
@@ -252,8 +268,11 @@ export function CompanyTable() {
 
       <CompanyWorkspace
         onChanged={() => {
-          companyService.findAll().then((result) => {
-            setCompanies(result.data);
+          // Best-effort refresh — guarded against post-unmount updates.
+          void companyService.findAll().then((result) => {
+            if (mountedRef.current) setCompanies(result.data);
+          }).catch(() => {
+            /* keep current rows */
           });
         }}
       />

@@ -2,40 +2,56 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Check } from "lucide-react"
+import { Check, Info } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { MarketingLayout } from "@/components/marketing/MarketingLayout"
 import { ScrollReveal } from "@/components/marketing/ScrollReveal"
 import { FAQSection } from "@/components/marketing/FAQSection"
 
+/**
+ * Public pricing — reflects the final plan matrix (lib/entitlements.ts).
+ *
+ * - TRIAL is NOT sold as a tier: every new workspace starts with a 7-day
+ *   full-feature trial. Only STARTER / PROFESSIONAL / ENTERPRISE are listed.
+ * - Feature lists are accurate: Professional deliberately does NOT advertise
+ *   Calendar Sync, Teams or Zoom; those are Enterprise-only capabilities.
+ * - Microsoft 365 / Teams / Zoom capabilities are only unlocked by Enterprise
+ *   AND require the customer's own provider connection (technical
+ *   configuration is never implied by the plan alone).
+ */
 const tiers = [
   {
-    name: "Trial",
-    price: "Free",
-    period: "14 days",
-    description: "Explore AOT CRM risk-free with full feature access.",
-    features: ["Up to 5 users", "Lead & contact management", "Pipeline tracking", "Email integration", "Standard reports", "Community support"],
-    cta: "Start Free Trial",
-    href: "/login",
-    popular: false,
-  },
-  {
     name: "Starter",
-    price: "Contact us",
+    price: "Contact Sales",
     period: "per user / month",
-    description: "Essential CRM tools for growing teams.",
-    features: ["Up to 25 users", "Everything in Trial", "Custom fields & tags", "Automation rules (5)", "API access", "Email support"],
+    description: "Core CRM for teams getting started.",
+    features: [
+      "Companies & contacts",
+      "Leads",
+      "Opportunities & Kanban",
+      "Tasks & activities",
+      "Documents",
+      "Standard reports",
+    ],
     cta: "Contact Sales",
     href: "/contact",
     popular: false,
   },
   {
     name: "Professional",
-    price: "Contact us",
+    price: "Contact Sales",
     period: "per user / month",
-    description: "Advanced features for scaling businesses.",
-    features: ["Up to 100 users", "Everything in Starter", "Unlimited automation", "Microsoft 365 integration", "Advanced analytics", "Priority support"],
+    description: "Complete CRM tools for growing teams.",
+    features: [
+      "Everything in Starter",
+      "Quotes",
+      "Invoices",
+      "Tickets",
+      "Email",
+      "Advanced reporting",
+      "Automation & API where implemented",
+    ],
     cta: "Contact Sales",
     href: "/contact",
     popular: true,
@@ -43,9 +59,17 @@ const tiers = [
   {
     name: "Enterprise",
     price: "Custom",
-    period: "annual billing",
-    description: "Tailored solutions for large organizations.",
-    features: ["Unlimited users", "Everything in Professional", "Dedicated infrastructure", "Custom integrations", "SLA guarantees", "Dedicated support manager"],
+    period: "tailored to your needs",
+    description: "Everything in Professional, plus the full Microsoft 365 integration suite.",
+    features: [
+      "Everything in Professional",
+      "Outlook & Microsoft 365 integrations",
+      "Outlook Calendar Sync",
+      "Microsoft Teams",
+      "Zoom integration when configured",
+      "Advanced configuration & integrations",
+      "Highest supported limits",
+    ],
     cta: "Talk to Sales",
     href: "/book-demo",
     popular: false,
@@ -66,7 +90,11 @@ export default function PricingPage() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Simple, transparent pricing</h1>
           <p className="mt-4 text-lg text-muted-foreground">
-            Choose the plan that fits your team. No hidden fees, no surprises.
+            Start with a 7-day full-feature trial. No card required.
+          </p>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+            Every new workspace gets the complete CRM to evaluate. Choose the
+            plan that fits your team when you are ready.
           </p>
         </div>
       </section>
@@ -74,20 +102,24 @@ export default function PricingPage() {
       <ScrollReveal>
         <section className="pb-20">
           <div className="mx-auto max-w-7xl px-4">
-            <div className="grid gap-6 lg:grid-cols-4">
+            <div className="grid gap-6 lg:grid-cols-3">
               {tiers.map((tier) => (
-                <Card
+                <div
                   key={tier.name}
-                  className={cn(
-                    "relative flex flex-col transition-all duration-300 hover:-translate-y-1",
-                    tier.popular && "border-primary shadow-lg shadow-primary/10"
-                  )}
+                  className="relative transition-transform duration-300 hover:-translate-y-1"
                 >
+                  {/* Badge sits on the wrapper (not the Card): Card clips overflow. */}
                   {tier.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-xs font-medium text-primary-foreground">
+                    <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-xs font-medium whitespace-nowrap text-primary-foreground">
                       Most popular
                     </div>
                   )}
+                  <Card
+                    className={cn(
+                      "relative flex h-full flex-col transition-shadow duration-300",
+                      tier.popular && "border-primary shadow-lg shadow-primary/10"
+                    )}
+                  >
                   <CardHeader>
                     <CardTitle>{tier.name}</CardTitle>
                     <div className="mt-2">
@@ -113,8 +145,20 @@ export default function PricingPage() {
                       <Link href={tier.href}>{tier.cta}</Link>
                     </Button>
                   </CardContent>
-                </Card>
+                  </Card>
+                </div>
               ))}
+            </div>
+
+            <div className="mx-auto mt-10 flex max-w-3xl items-start gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--primary)]" aria-hidden />
+              <p>
+                Microsoft 365 capabilities (Outlook, Calendar Sync, Teams) and
+                Zoom are available on Enterprise and require your organization
+                to connect the provider — entitlement unlocks the feature, the
+                provider connection enables it. Trial workspaces include every
+                implemented feature for the full 7-day evaluation.
+              </p>
             </div>
           </div>
         </section>

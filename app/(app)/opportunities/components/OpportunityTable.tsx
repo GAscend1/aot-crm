@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -29,18 +30,22 @@ export function OpportunityTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingOpportunity, setDeletingOpportunity] = useState<Opportunity | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
     opportunityService
       .findAll()
       .then((result) => {
+        if (!mountedRef.current) return;
         setOpportunities(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setError("Failed to load opportunities.");
         setLoading(false);
       });
-  }, []);
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = opportunities;
@@ -250,7 +255,7 @@ export function OpportunityTable() {
         siblings={filtered.map((o) => ({ id: o.id, title: o.title }))}
         onChanged={() => {
           opportunityService.findAll().then((result) => {
-            setOpportunities(result.data);
+            if (mountedRef.current) setOpportunities(result.data);
           });
         }}
       />

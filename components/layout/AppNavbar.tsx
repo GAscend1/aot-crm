@@ -1,22 +1,20 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   HelpCircle,
-  Info,
   LogOut,
   Menu,
   Moon,
   PanelLeft,
   Search,
-  Settings,
   Sun,
   User,
-  Bell,
   Command,
-  Keyboard,
   Compass,
+  Crown,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,6 +33,7 @@ import { Breadcrumbs } from "@/components/enterprise/Breadcrumbs";
 import { NotificationCenter } from "@/components/enterprise/NotificationCenter";
 import { useTheme } from "@/components/enterprise/ThemeProvider";
 import { useAppNotifications, useRestartOnboarding } from "@/app/(app)/AppProviders";
+import { SupportModal } from "@/components/support/SupportModal";
 
 export function AppNavbar() {
   const router = useRouter();
@@ -42,6 +41,7 @@ export function AppNavbar() {
   const { toggle: toggleTheme, resolved: theme } = useTheme();
   const { data: session } = useSession();
   const restartOnboarding = useRestartOnboarding();
+  const [supportOpen, setSupportOpen] = useState(false);
   const {
     notifications,
     unreadCount,
@@ -93,7 +93,9 @@ export function AppNavbar() {
           <Menu className="h-4 w-4" />
         </Button>
 
-        <Breadcrumbs />
+        <Suspense fallback={null}>
+          <Breadcrumbs />
+        </Suspense>
       </div>
 
       <div className="hidden max-w-sm flex-1 px-4 md:block">
@@ -155,29 +157,38 @@ export function AppNavbar() {
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end" sideOffset={6} className="w-64">
-            <DropdownMenuLabel>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">{user?.name ?? "User"}</p>
-                <p className="text-xs font-normal text-muted-foreground">
-                  {user?.email ?? ""}
-                </p>
-              </div>
-            </DropdownMenuLabel>
+            {/* Base UI requires GroupLabel to be inside a Group/RadioGroup —
+                otherwise MenuGroupContext is missing and the whole navbar
+                crashes with a runtime error. */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div className="flex items-center gap-2.5">
+                  <Avatar size="sm">
+                    <AvatarImage src={user?.image ?? undefined} />
+                    <AvatarFallback>{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <p className="truncate text-sm font-medium">{user?.name ?? "User"}</p>
+                    <p className="truncate text-xs font-normal text-muted-foreground">
+                      {user?.email ?? ""}
+                    </p>
+                    {user?.isPlatformOwner && (
+                      <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warning)]">
+                        <Crown className="h-3 w-3" aria-hidden />
+                        Platform Owner
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <User className="mr-2 h-4 w-4" />
-                My Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/profile")}>
-                <Settings className="mr-2 h-4 w-4" />
-                Preferences
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/profile")}>
-                <Bell className="mr-2 h-4 w-4" />
-                Notifications
+                View Profile
               </DropdownMenuItem>
               <DropdownMenuItem onClick={toggleTheme}>
                 {theme === "dark" ? (
@@ -197,16 +208,12 @@ export function AppNavbar() {
                 Command Palette
                 <kbd className="ml-auto text-[10px] text-muted-foreground">Ctrl+K</kbd>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Keyboard className="mr-2 h-4 w-4" />
-                Keyboard Shortcuts
-              </DropdownMenuItem>
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSupportOpen(true)}>
                 <HelpCircle className="mr-2 h-4 w-4" />
                 Help & Support
               </DropdownMenuItem>
@@ -214,21 +221,19 @@ export function AppNavbar() {
                 <Compass className="mr-2 h-4 w-4" />
                 Restart Product Tour
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Info className="mr-2 h-4 w-4" />
-                About AOT CRM
-              </DropdownMenuItem>
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem variant="destructive" onClick={() => signOut()}>
+            <DropdownMenuItem variant="destructive" onClick={() => void signOut({ callbackUrl: "/login" })}>
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
     </header>
   );
 }

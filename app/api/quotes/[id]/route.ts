@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest, subscriptionWriteGate, featureGate } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { quoteSchema, quoteStatusSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, quoteToUI } from "@/lib/server/billing";
@@ -19,9 +19,11 @@ const include = {
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "quotes");
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const quote = await prisma.quote.findUnique({ where: { id }, include });
+    const quote = await prisma.quote.findFirst({ where: { id, organizationId: user.organizationId }, include });
     if (!quote) return notFound("Quote not found");
     return NextResponse.json(quoteToUI(quote));
   } catch (err) {
@@ -33,10 +35,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "quotes");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const existing = await prisma.quote.findUnique({ where: { id }, include: { items: true } });
+    const existing = await prisma.quote.findFirst({ where: { id, organizationId: user.organizationId }, include: { items: true } });
     if (!existing) return notFound("Quote not found");
 
     // Accept/Reject/Expire via a pure status payload (edit payloads always include status too)
@@ -142,9 +148,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "quotes");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
-    const existing = await prisma.quote.findUnique({ where: { id } });
+    const existing = await prisma.quote.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Quote not found");
     await prisma.quote.update({ where: { id }, data: { archivedAt: new Date() } });
     await logAudit({
@@ -165,13 +175,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // Explicit status transitions (accept/reject) via POST action
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "quotes");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const status = body?.status as QuoteStatus | undefined;
     if (!status) return badRequest("Status is required");
     if (!["ACCEPTED", "REJECTED", "SENT", "EXPIRED"].includes(status)) return badRequest("Invalid status transition");
-    const existing = await prisma.quote.findUnique({ where: { id } });
+    const existing = await prisma.quote.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Quote not found");
     const updated = await prisma.quote.update({ where: { id }, data: { status }, include });
     await logAudit({

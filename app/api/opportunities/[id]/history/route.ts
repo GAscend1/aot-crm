@@ -9,7 +9,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const opp = await prisma.opportunity.findUnique({ where: { id }, select: { id: true } });
+    const opp = await prisma.opportunity.findFirst({ where: { id, organizationId: user.organizationId }, select: { id: true } });
     if (!opp) return notFound("Opportunity not found");
     const history = await prisma.opportunityStageHistory.findMany({
       where: { opportunityId: id },

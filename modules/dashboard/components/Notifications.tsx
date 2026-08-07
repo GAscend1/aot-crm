@@ -14,10 +14,10 @@ const typeIcons = {
 } as const;
 
 const typeColors = {
-  info: "bg-blue-100 text-blue-600",
-  warning: "bg-amber-100 text-amber-600",
-  success: "bg-green-100 text-green-600",
-  error: "bg-red-100 text-red-600",
+  info: "bg-info-soft text-[color:var(--info)]",
+  warning: "bg-warning-soft text-[color:var(--warning)]",
+  success: "bg-success-soft text-[color:var(--success)]",
+  error: "bg-danger-soft text-[color:var(--danger)]",
 } as const;
 
 export function Notifications() {
@@ -41,7 +41,7 @@ export function Notifications() {
         <div className="flex items-center gap-2">
           <span>Notifications</span>
           {unreadCount > 0 && (
-            <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            <span className="rounded-full bg-[color:var(--danger)] px-1.5 py-0.5 text-[10px] font-medium text-white">
               {unreadCount}
             </span>
           )}
@@ -57,9 +57,9 @@ export function Notifications() {
               key={notification.id}
               className={`flex gap-3 px-6 py-3 ${
                 index < recent.length - 1
-                  ? "border-b border-slate-100"
+                  ? "border-b border-border"
                   : ""
-              } ${!notification.read ? "bg-blue-50/50" : ""}`}
+              } ${!notification.read ? "bg-primary-soft/40" : ""}`}
             >
               <div
                 className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
@@ -69,13 +69,13 @@ export function Notifications() {
                 <Icon className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-slate-900">
+                <p className="text-sm font-medium text-foreground">
                   {notification.title}
                 </p>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {notification.message}
                 </p>
-                <p className="mt-1 text-[10px] text-slate-400">
+                <p className="mt-1 text-[10px] text-muted-foreground/70">
                   {formatRelativeTime(notification.timestamp)}
                 </p>
               </div>

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -27,18 +28,22 @@ export function CustomerTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
     customerService
       .findAll()
       .then((result) => {
+        if (!mountedRef.current) return;
         setCustomers(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setError("Failed to load customers.");
         setLoading(false);
       });
-  }, []);
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = customers;
@@ -72,7 +77,10 @@ export function CustomerTable() {
 
   const handleRowClick = useCallback(
     (customer: Customer) => {
-      router.push(`/customers?record=${encodeURIComponent(customer.id)}`, {
+      // Customers is a view inside the Contacts module — navigate directly to
+      // the merged workspace so the row click is a single client-side
+      // transition.
+      router.push(`/contacts?view=customers&record=${encodeURIComponent(customer.id)}`, {
         scroll: false,
       });
     },
@@ -227,7 +235,7 @@ export function CustomerTable() {
       <CustomerWorkspace
         onChanged={() => {
           customerService.findAll().then((result) => {
-            setCustomers(result.data);
+            if (mountedRef.current) setCustomers(result.data);
           });
         }}
       />

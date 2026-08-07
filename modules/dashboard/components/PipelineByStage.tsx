@@ -30,9 +30,9 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: Tooltip
   if (!active || !payload?.length) return null;
   const entry = payload[0];
   return (
-    <div className="rounded-lg border bg-white p-3 shadow-lg">
-      <p className="text-sm font-medium text-slate-900">{entry.name}</p>
-      <p className="text-sm text-slate-600">
+    <div className="rounded-lg border bg-popover p-3 shadow-lg">
+      <p className="text-sm font-medium text-foreground">{entry.name}</p>
+      <p className="text-sm text-muted-foreground">
         {entry.value} deal{entry.value === 1 ? "" : "s"} · ${(entry.payload?.value ?? 0).toLocaleString()}
       </p>
     </div>
@@ -79,14 +79,14 @@ export function PipelineByStage() {
       <div className="mt-3 space-y-1.5">
         {pipelineByStage.map((s) => (
           <div key={s.stage} className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-2 text-slate-600">
+            <span className="flex items-center gap-2 text-muted-foreground">
               <span
                 className="inline-block h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: STAGE_COLORS[s.stage] || "#94a3b8" }}
               />
               {s.stage}
             </span>
-            <span className="font-medium tabular-nums text-slate-900">
+            <span className="font-medium tabular-nums text-foreground">
               ${(s.value / 1000).toFixed(0)}k · {s.count}
             </span>
           </div>

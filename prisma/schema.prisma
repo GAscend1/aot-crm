@@ -111,6 +111,12 @@ model User {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
+  // SaaS multi-tenancy — every user belongs to exactly one Organization.
+  // Resolution key is the authenticated Microsoft tenant id (tid), never the
+  // email domain. Backfilled to the default organization for legacy rows.
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
   // Onboarding preferences
   onboardingStartedAt      DateTime?
   onboardingCompletedAt    DateTime?
@@ -118,10 +124,21 @@ model User {
   onboardingNeverShowAgain Boolean  @default(false)
   onboardingLastStep       Int      @default(1)
 
+  memberships          OrganizationMember[]
+  subscriptionChanges  SubscriptionChange[] @relation("SubscriptionChangeBy")
+  subscriptionsGranted Subscription[]       @relation("SubscriptionGrantedBy")
+  onboardingState      OnboardingState?
+  salesInquiries       SalesInquiry[]       @relation("SalesInquiryReviewedBy")
+  createdOrganizations Organization[]       @relation("OrganizationCreatedBy")
+
   assignedLeads          Lead[]
   assignedTickets        Ticket[]
   activities             Activity[]
   calendarEvents         CalendarEvent[]
+  calendarSyncJobs       CalendarSyncJob[]
+  calendarDeltaState     CalendarDeltaState[]
+  webhookSubscriptions   WebhookSubscription[]
+  graphToken             GraphToken?
   reminders              Reminder[]
   notifications          Notification[]
   auditLogs              AuditLog[]
@@ -141,6 +158,8 @@ model User {
   salesGoals             SalesGoal[]
   automationsCreated     Automation[]
   createdReports         Report[]
+
+  @@index([organizationId])
 }
 
 enum LifecycleStage {
@@ -154,6 +173,8 @@ enum LifecycleStage {
 
 model Company {
   id            String   @id @default(uuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id])
   companyName   String
   industry      String?
   website       String?
@@ -176,10 +197,15 @@ model Company {
   documents Document[]
   quotes    Quote[]
   invoices  Invoice[]
+  activities Activity[]
+
+  @@index([organizationId])
 }
 
 model Customer {
   id        String       @id @default(uuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id])
   name      String
   email     String?
   phone     String?
@@ -204,10 +230,14 @@ model Customer {
   calendarEvents  CalendarEvent[]
   quotes          Quote[]
   invoices        Invoice[]
+
+  @@index([organizationId])
 }
 
 model Contact {
   id        String   @id @default(uuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id])
   firstName String
   lastName  String
   email     String?
@@ -222,14 +252,20 @@ model Contact {
   status    String   @default("Active")
   lifecycleStage LifecycleStage @default(Prospect)
   linkedIn  String?
+  // Buyer role in the deal cycle (Decision Maker, Champion, Influencer, ...).
+  role      String?
   lastContactedAt DateTime?
   archivedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model Lead {
   id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
   firstName       String
   lastName        String
   title           String?
@@ -269,6 +305,7 @@ model Lead {
 
   @@index([assignedToId])
   @@index([status])
+  @@index([organizationId])
 }
 
 model PipelineStage {
@@ -284,6 +321,8 @@ model PipelineStage {
 
 model Opportunity {
   id                String         @id @default(uuid())
+  organizationId    String
+  organization      Organization   @relation(fields: [organizationId], references: [id])
   title             String
   value             Float          @default(0)
   probability       Int            @default(0)
@@ -296,6 +335,10 @@ model Opportunity {
   expectedCloseDate DateTime?
   notes             String?
   status            String         @default("Open")
+  // Win/loss tracking — set when a deal is closed (Closed Won / Closed Lost).
+  wonReason         String?
+  lostReason        String?
+  closedAt          DateTime?
   ownerId           String?
   owner             User?          @relation(fields: [ownerId], references: [id])
   createdAt         DateTime       @default(now())
@@ -311,6 +354,7 @@ model Opportunity {
 
   @@index([stageId])
   @@index([ownerId])
+  @@index([organizationId])
 }
 
 model OpportunityStageHistory {
@@ -330,6 +374,8 @@ model OpportunityStageHistory {
 
 model Activity {
   id            String         @id @default(uuid())
+  organizationId String
+  organization  Organization   @relation(fields: [organizationId], references: [id])
   type          ActivityType   @default(Note)
   subject       String
   description   String?
@@ -345,25 +391,47 @@ model Activity {
   customer      Customer?      @relation(fields: [customerId], references: [id])
   ticketId      String?
   ticket        Ticket?        @relation(fields: [ticketId], references: [id])
+  companyId     String?
+  company       Company?       @relation(fields: [companyId], references: [id])
   assigneeId    String?
   assignee      User?          @relation(fields: [assigneeId], references: [id])
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([leadId])
+  @@index([companyId])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 model CalendarEvent {
   id               String   @id @default(uuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
   title            String
   description      String?
   startTime        DateTime
   endTime          DateTime
   allDay           Boolean  @default(false)
   location         String?
-  graphSyncStatus  String   @default("PENDING_CONSENT")
+  graphSyncStatus  String   @default("NOT_SYNCED")
   reminderMinutes  Int      @default(0)
+
+  // --- Microsoft Graph synchronization state (Phase 5) ---
+  // Graph event ID (unique — used for duplicate prevention + bidirectional
+  // matching). changeKey detects upstream edits for delta sync.
+  graphEventId     String?  @unique
+  changeKey        String?
+  // Preserved from the Graph event so round-trips keep the user's timezone.
+  timeZone         String   @default("UTC")
+  // Attendees + organizer serialized as JSON so they survive round-trips.
+  attendees        Json?
+  organizer        Json?
+  onlineMeetingUrl String?
+  lastSyncedAt     DateTime?
+  syncError        String?
+  syncAttempts     Int      @default(0)
+
   leadId           String?
   lead             Lead?    @relation(fields: [leadId], references: [id])
   opportunityId    String?
@@ -375,17 +443,94 @@ model CalendarEvent {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  syncJobs CalendarSyncJob[]
+
   @@index([userId])
   @@index([startTime])
+  @@index([graphEventId])
+  @@index([organizationId])
+}
+
+/**
+ * Retry queue for Microsoft Graph calendar operations. Rows are created when a
+ * push/pull fails and re-processed by the background sync runner with backoff.
+ */
+model CalendarSyncJob {
+  id            String   @id @default(uuid())
+  eventId       String
+  event         CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action        String   // "create" | "update" | "delete"
+  status        String   @default("pending") // pending | processing | succeeded | failed
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(5)
+  lastError     String?
+  nextAttemptAt DateTime @default(now())
+  lastRunAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([eventId])
+}
+
+/**
+ * Per-user Microsoft Graph delta-sync cursor. Stores the Graph delta link so
+ * pulls resume where they left off instead of re-scanning the whole calendar.
+ */
+model CalendarDeltaState {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deltaLink  String?
+  lastSyncAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/**
+ * Microsoft Graph change-notification subscription (webhook) persisted per
+ * user + resource so the UI can show/renew/delete the active subscription.
+ */
+model WebhookSubscription {
+  id                  String    @id @default(uuid())
+  graphSubscriptionId String    @unique
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource            String    @default("/me/events")
+  expirationDateTime  DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+/**
+ * Server-side copy of the user's Microsoft refresh token, encrypted at rest.
+ * Written by the Auth.js jwt callback on sign-in and on every token refresh.
+ * Used by background/webhook sync workers that have no browser session.
+ */
+model GraphToken {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Reminder {
-  id         String   @id @default(uuid())
-  title      String
-  dueDate    DateTime
-  completed  Boolean  @default(false)
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  title         String
+  dueDate       DateTime
+  completed     Boolean  @default(false)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
   leadId     String?
   lead       Lead?    @relation(fields: [leadId], references: [id])
   entityType String?
@@ -395,33 +540,39 @@ model Reminder {
 
   @@index([userId, completed])
   @@index([leadId])
+  @@index([organizationId])
 }
 
 model Notification {
-  id         String           @id @default(uuid())
-  type       NotificationType @default(Info)
-  title      String
-  message    String?
-  read       Boolean          @default(false)
-  userId     String
-  user       User             @relation(fields: [userId], references: [id])
-  entityType String?
-  entityId   String?
-  actionLink String?
-  createdAt  DateTime         @default(now())
+  id            String           @id @default(uuid())
+  organizationId String
+  organization  Organization     @relation(fields: [organizationId], references: [id])
+  type          NotificationType @default(Info)
+  title         String
+  message       String?
+  read          Boolean          @default(false)
+  userId        String
+  user          User             @relation(fields: [userId], references: [id])
+  entityType    String?
+  entityId      String?
+  actionLink    String?
+  createdAt     DateTime         @default(now())
 
   @@index([userId, read])
   @@index([userId, createdAt])
+  @@index([organizationId])
 }
 
 model Ticket {
-  id          String         @id @default(uuid())
-  title       String
-  description String?
-  status      TicketStatus   @default(Open)
-  priority    TicketPriority @default(Medium)
-  customerId  String?
-  customer    Customer?      @relation(fields: [customerId], references: [id])
+  id            String         @id @default(uuid())
+  organizationId String
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  title         String
+  description   String?
+  status        TicketStatus   @default(Open)
+  priority      TicketPriority @default(Medium)
+  customerId    String?
+  customer      Customer?      @relation(fields: [customerId], references: [id])
   assigneeId  String?
   assignee    User?          @relation(fields: [assigneeId], references: [id])
   sla         String?
@@ -436,10 +587,13 @@ model Ticket {
 
   @@index([status])
   @@index([assigneeId])
+  @@index([organizationId])
 }
 
 model Document {
   id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
   name            String
   type            String?
   mimeType        String?
@@ -469,33 +623,42 @@ model Document {
 
   @@index([leadId])
   @@index([customerId])
+  @@index([organizationId])
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  entityType String
-  entityId   String
-  action     String
-  description String?
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  data       Json?
-  before     Json?
-  after      Json?
-  createdAt  DateTime @default(now())
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  entityType    String
+  entityId      String
+  action        String
+  description   String?
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  data          Json?
+  before        Json?
+  after         Json?
+  createdAt     DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 model Tag {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  color     String?
-  category  String?
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  name          String
+  color         String?
+  category      String?
+  createdAt     DateTime @default(now())
 
   leadLinks LeadTag[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model LeadTag {
@@ -510,38 +673,46 @@ model LeadTag {
 }
 
 model Note {
-  id         String   @id @default(uuid())
-  entityType String
-  entityId   String
-  content    String
-  authorId   String?
-  author     User?    @relation(fields: [authorId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  entityType    String
+  entityId      String
+  content       String
+  authorId      String?
+  author        User?    @relation(fields: [authorId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([entityType, entityId])
+  @@index([organizationId])
 }
 
 model Assignment {
-  id           String   @id @default(uuid())
-  title        String
-  description  String?
-  entityType   String
-  entityId     String
-  assigneeId   String?
-  assignee     User?    @relation("AssignmentAssignee", fields: [assigneeId], references: [id])
-  assignedById String?
-  assignedBy   User?    @relation("AssignmentAssignedBy", fields: [assignedById], references: [id])
-  dueDate      DateTime?
-  status       String   @default("pending")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  title         String
+  description   String?
+  entityType    String
+  entityId      String
+  assigneeId    String?
+  assignee      User?    @relation("AssignmentAssignee", fields: [assigneeId], references: [id])
+  assignedById  String?
+  assignedBy    User?    @relation("AssignmentAssignedBy", fields: [assignedById], references: [id])
+  dueDate       DateTime?
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([entityType, entityId])
+  @@index([organizationId])
 }
 
 model Quote {
   id            String      @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
   quoteNumber   String      @unique
   status        QuoteStatus @default(DRAFT)
   currency      String      @default("USD")
@@ -570,6 +741,7 @@ model Quote {
 
   @@index([leadId])
   @@index([opportunityId])
+  @@index([organizationId])
 }
 
 model QuoteItem {
@@ -585,6 +757,8 @@ model QuoteItem {
 
 model Invoice {
   id            String        @id @default(uuid())
+  organizationId String
+  organization  Organization  @relation(fields: [organizationId], references: [id])
   invoiceNumber String        @unique
   status        InvoiceStatus @default(DRAFT)
   currency      String        @default("USD")
@@ -616,6 +790,7 @@ model Invoice {
 
   @@index([leadId])
   @@index([opportunityId])
+  @@index([organizationId])
 }
 
 model InvoiceItem {
@@ -630,17 +805,21 @@ model InvoiceItem {
 }
 
 model ProspectingList {
-  id          String     @id @default(uuid())
-  name        String
-  description String?
-  archived    Boolean    @default(false)
-  createdById String?
-  createdBy   User?      @relation(fields: [createdById], references: [id])
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id            String     @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  name          String
+  description   String?
+  archived      Boolean    @default(false)
+  createdById   String?
+  createdBy     User?      @relation(fields: [createdById], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   prospects Prospect[]
   campaigns CallCampaign[]
+
+  @@index([organizationId])
 }
 
 model Prospect {
@@ -668,19 +847,23 @@ model Prospect {
 }
 
 model CallCampaign {
-  id          String   @id @default(uuid())
-  name        String
-  listId      String?
-  list        ProspectingList? @relation(fields: [listId], references: [id])
-  startDate   DateTime?
-  endDate     DateTime?
-  status      String   @default("Draft")
-  createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  name          String
+  listId        String?
+  list          ProspectingList? @relation(fields: [listId], references: [id])
+  startDate     DateTime?
+  endDate       DateTime?
+  status        String   @default("Draft")
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   queue CallQueueEntry[]
+
+  @@index([organizationId])
 }
 
 model CallQueueEntry {
@@ -699,33 +882,41 @@ model CallQueueEntry {
 }
 
 model SalesGoal {
-  id        String   @id @default(uuid())
-  name      String
-  metric    String
-  target    Float
-  period    String   @default("month")
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  startDate DateTime
-  endDate   DateTime
-  status    String   @default("Active")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  name          String
+  metric        String
+  target        Float
+  period        String   @default("month")
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  startDate     DateTime
+  endDate       DateTime
+  status        String   @default("Active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model Automation {
-  id          String   @id @default(uuid())
-  name        String
-  enabled     Boolean  @default(true)
-  triggerType String
-  createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  name          String
+  enabled       Boolean  @default(true)
+  triggerType   String
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   conditions AutomationCondition[]
   actions    AutomationAction[]
   runs       AutomationRun[]
+
+  @@index([organizationId])
 }
 
 model AutomationCondition {
@@ -770,17 +961,221 @@ model AutomationRunLog {
 }
 
 model Report {
-  id          String   @id @default(uuid())
-  name        String
-  category    String
-  type        String
-  description String?
-  createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  lastRun     DateTime?
-  status      String   @default("Draft")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  name          String
+  category      String
+  type          String
+  description   String?
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id])
+  lastRun       DateTime?
+  status        String   @default("Draft")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([createdById])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// SaaS multi-tenancy (Section 3–6 of the SaaS conversion)
+// ============================================================================
+
+/**
+ * A customer organization/workspace. Every tenant-owned record is scoped to
+ * exactly one Organization. Keyed by the authenticated Microsoft Entra tenant
+ * ID (`microsoftTenantId`) when known; legacy/single-tenant data lives in the
+ * seeded default organization.
+ */
+model Organization {
+  id                 String    @id @default(uuid())
+  name               String
+  slug               String?   @unique
+  /** Authenticated Microsoft Entra tenant ID (tid) — never derived from email. */
+  microsoftTenantId  String?   @unique
+  status             String    @default("ACTIVE") // ACTIVE | SUSPENDED | DISABLED
+  createdById        String?
+  createdBy          User?     @relation("OrganizationCreatedBy", fields: [createdById], references: [id])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  members         OrganizationMember[]
+  subscriptions   Subscription[]
+  users           User[]
+  companies       Company[]
+  customers       Customer[]
+  contacts        Contact[]
+  leads           Lead[]
+  opportunities   Opportunity[]
+  activities      Activity[]
+  calendarEvents  CalendarEvent[]
+  tickets         Ticket[]
+  documents       Document[]
+  quotes          Quote[]
+  invoices        Invoice[]
+  reminders       Reminder[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  notes           Note[]
+  assignments     Assignment[]
+  reports         Report[]
+  automations     Automation[]
+  prospectingLists ProspectingList[]
+  callCampaigns   CallCampaign[]
+  salesGoals      SalesGoal[]
+  tags            Tag[]
+  salesInquiries  SalesInquiry[]
+  onboardingStates OnboardingState[]
+
+  @@index([microsoftTenantId])
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("MEMBER") // OWNER | ADMIN | MEMBER
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+/**
+ * Catalog of sellable plans. Seeded: TRIAL, STARTER, PROFESSIONAL, ENTERPRISE.
+ * `features` is a snapshot of granted feature codes for reporting/UI.
+ */
+model Plan {
+  id        String   @id @default(uuid())
+  code      String   @unique // TRIAL | STARTER | PROFESSIONAL | ENTERPRISE
+  name      String
+  limits    Json?
+  features  Json?
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * Central feature-flag source of truth: which features each plan grants.
+ * Enforced server-side by lib/entitlements.ts — UI mirrors it for display.
+ */
+model Entitlement {
+  id        String   @id @default(uuid())
+  planCode  String
+  feature   String // outlook_email | calendar_sync | teams | advanced_analytics | automation | api | ...
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([planCode, feature])
+  @@index([planCode])
+}
+
+/**
+ * One active subscription per organization (rows are never hard-deleted; plan
+ * changes create SubscriptionChange audit rows instead).
+ * Statuses: TRIALING | ACTIVE | EXPIRED | SUSPENDED | CANCELED
+ * Sources:  TRIAL | MANUAL | SALES | DEMO | PARTNER | BILLING | INTERNAL
+ */
+model Subscription {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planCode       String       @default("TRIAL")
+  status         String       @default("TRIALING")
+  source         String       @default("TRIAL")
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  grantedById    String?
+  grantedBy      User?        @relation("SubscriptionGrantedBy", fields: [grantedById], references: [id])
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  changes SubscriptionChange[]
+
+  @@index([planCode])
+  @@index([status])
+}
+
+/**
+ * Immutable audit trail for every subscription/plan change (manual plan
+ * override, trial extension/expiry, suspend/reactivate, source changes).
+ * Captures changed-by, previous/new plan, source/reason and timestamp.
+ */
+model SubscriptionChange {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  previousPlan   String?
+  newPlan        String
+  previousStatus String?
+  newStatus      String?
+  source         String?
+  reason         String?
+  changedById    String?
+  changedBy      User?        @relation("SubscriptionChangeBy", fields: [changedById], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@index([subscriptionId])
+}
+
+/**
+ * Per-user onboarding progress for the SaaS first-login flow.
+ */
+model OnboardingState {
+  id                         String       @id @default(uuid())
+  userId                     String       @unique
+  user                       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId             String?
+  organization               Organization? @relation(fields: [organizationId], references: [id])
+  currentStep                Int          @default(1)
+  completed                  Boolean      @default(false)
+  tourCompleted              Boolean      @default(false)
+  gettingStartedDismissedAt  DateTime?
+  completedAt                DateTime?
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+/**
+ * Self-service Request Demo / Contact Sales inquiries. Persisted immediately;
+ * the Platform Owner reviews and decides (keep pending / convert to Lead /
+ * create Trial workspace / grant demo / resolve). NEVER auto-creates an
+ * Opportunity — that is an explicit owner action.
+ */
+model SalesInquiry {
+  id             String        @id @default(uuid())
+  name           String
+  email          String
+  company        String?
+  phone          String?
+  companySize    String?
+  industry       String?
+  intendedUse    String?
+  preferredPlan  String?
+  message        String?
+  source         String        @default("WEB") // WEB | CONTACT | BOOK_DEMO | GET_STARTED | TRIAL
+  status         String        @default("PENDING") // PENDING | REVIEWING | LEAD | CONVERTED | RESOLVED | REJECTED
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  reviewedById   String?
+  reviewedBy     User?         @relation("SalesInquiryReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  notes          String?
+  submittedAt    DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([email])
+  @@index([status])
 }

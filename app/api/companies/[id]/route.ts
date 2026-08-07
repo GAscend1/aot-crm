@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { companySchema } from "@/lib/validation/entities";
 import { companyToUI } from "../route";
@@ -15,7 +15,7 @@ export async function GET(
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const company = await prisma.company.findUnique({ where: { id } });
+    const company = await prisma.company.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!company) return notFound("Company not found");
     return NextResponse.json(companyToUI(company));
   } catch (err) {
@@ -30,6 +30,8 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
@@ -39,7 +41,7 @@ export async function PATCH(
     } catch (err) {
       return zodValidationError(err, "COMPANY_UPDATE_FAILED", "The company could not be updated.");
     }
-    const existing = await prisma.company.findUnique({ where: { id } });
+    const existing = await prisma.company.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Company not found");
 
     const data: Prisma.CompanyUpdateInput = {};
@@ -78,9 +80,11 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.company.findUnique({ where: { id } });
+    const existing = await prisma.company.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Company not found");
     // Archive (soft delete): Companies are referenced by contacts, customers,
     // opportunities, quotes, invoices, and documents. Archiving keeps those

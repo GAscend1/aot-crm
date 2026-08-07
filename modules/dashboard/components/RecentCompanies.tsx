@@ -25,18 +25,18 @@ export function RecentCompanies() {
           <div
             key={company.id}
             className={`flex items-center justify-between px-6 py-3 ${
-              index < recentCompanies.length - 1 ? "border-b border-slate-100" : ""
+              index < recentCompanies.length - 1 ? "border-b border-border" : ""
             }`}
           >
             <div>
-              <p className="text-sm font-medium text-slate-900">{company.name}</p>
-              <p className="text-xs text-slate-400">{company.industry} · {company.city}</p>
+              <p className="text-sm font-medium text-foreground">{company.name}</p>
+              <p className="text-xs text-muted-foreground">{company.industry} · {company.city}</p>
             </div>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
                 company.status === "Active"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-slate-100 text-slate-500"
+                  ? "bg-success-soft text-[color:var(--success)]"
+                  : "bg-muted text-muted-foreground"
               }`}
             >
               {company.status}

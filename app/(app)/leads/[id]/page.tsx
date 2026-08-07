@@ -201,16 +201,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (opportunityId) {
       router.push(`/opportunities/${opportunityId}`);
     } else {
-      router.push("/customers");
+      // Canonical destination: Customers is a view of the Contacts module.
+      router.push("/contacts?view=customers");
     }
   };
 
   if (loading || !lead) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -341,6 +342,42 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 suggestions={["enterprise", "tech", "saas", "startup", "hot", "follow-up"]}
               />
             </DetailSection>
+
+            {lead.convertedAt && (
+              <DetailSection title="Conversion">
+                <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">
+                  Converted on {new Date(lead.convertedAt).toLocaleDateString()}. The
+                  original lead is retained here for history — navigate to the
+                  records created from it:
+                </p>
+                <div className="flex flex-col items-start gap-1.5">
+                  {lead.convertedContactId && (
+                    <Link
+                      href={`/contacts/${lead.convertedContactId}`}
+                      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      View linked contact
+                    </Link>
+                  )}
+                  {lead.convertedCustomerId && (
+                    <Link
+                      href={`/contacts?view=customers&record=${encodeURIComponent(lead.convertedCustomerId)}`}
+                      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      View linked customer
+                    </Link>
+                  )}
+                  {lead.convertedOpportunityId && (
+                    <Link
+                      href={`/opportunities/${lead.convertedOpportunityId}`}
+                      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      View linked opportunity
+                    </Link>
+                  )}
+                </div>
+              </DetailSection>
+            )}
           </div>
 
           <div className="space-y-6">

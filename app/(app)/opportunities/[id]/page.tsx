@@ -24,6 +24,7 @@ import { EventModal } from "@/components/integrations/EventModal";
 import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog";
 import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 import { useToastContext } from "@/app/(app)/AppProviders";
+import { useCanUse } from "@/hooks/use-subscription";
 import { opportunityService } from "@/services/index";
 import type { Opportunity } from "@/services/opportunity.service";
 import { AssignOpportunityDialog } from "../components/AssignOpportunityDialog";
@@ -91,6 +92,13 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
 
   const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
+  // Plan-gated entry points: quotes/invoices require Starter+ (server enforces too).
+  const canQuote = useCanUse("quotes");
+  const canInvoice = useCanUse("invoices");
+  const canEmail = useCanUse("outlook_email");
+  const canTeams = useCanUse("teams");
+  const canZoom = useCanUse("zoom");
+
   const handleArchive = async () => {
     if (!opportunity) return;
     try {
@@ -109,9 +117,9 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
   if (loading || !opportunity) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -186,13 +194,17 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
               </DetailSection>
             )}
 
-            <DetailSection title="Related Quotes">
-              <RelatedQuotesSection opportunityId={opportunity.id} refreshKey={refreshKey} />
-            </DetailSection>
+            {canQuote && (
+              <DetailSection title="Related Quotes">
+                <RelatedQuotesSection opportunityId={opportunity.id} refreshKey={refreshKey} />
+              </DetailSection>
+            )}
 
-            <DetailSection title="Related Invoices">
-              <RelatedInvoicesSection opportunityId={opportunity.id} refreshKey={refreshKey} />
-            </DetailSection>
+            {canInvoice && (
+              <DetailSection title="Related Invoices">
+                <RelatedInvoicesSection opportunityId={opportunity.id} refreshKey={refreshKey} />
+              </DetailSection>
+            )}
 
             <div ref={documentsRef} className="scroll-mt-24">
               <DetailSection title="Related Documents">
@@ -239,22 +251,30 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
 
             <SectionCard title="Quick Actions">
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setQuoteModalOpen(true)} className={`${actionButton} text-blue-600`}>
-                  <FileText className="h-4 w-4" />
-                  Create Quote
-                </button>
-                <button onClick={() => router.push(`/quotes?opportunityId=${opportunity.id}`)} className={actionButton}>
-                  <FileText className="h-4 w-4 text-slate-500" />
-                  View Quotes
-                </button>
-                <button onClick={() => router.push(`/invoices?opportunityId=${opportunity.id}`)} className={`${actionButton} text-emerald-600`}>
-                  <Receipt className="h-4 w-4" />
-                  Create Invoice
-                </button>
-                <button onClick={() => router.push(`/invoices?opportunityId=${opportunity.id}`)} className={actionButton}>
-                  <Receipt className="h-4 w-4 text-slate-500" />
-                  View Invoices
-                </button>
+                {canQuote && (
+                  <button onClick={() => setQuoteModalOpen(true)} className={`${actionButton} text-blue-600`}>
+                    <FileText className="h-4 w-4" />
+                    Create Quote
+                  </button>
+                )}
+                {canQuote && (
+                  <button onClick={() => router.push(`/quotes?opportunityId=${opportunity.id}`)} className={actionButton}>
+                    <FileText className="h-4 w-4 text-slate-500" />
+                    View Quotes
+                  </button>
+                )}
+                {canInvoice && (
+                  <button onClick={() => router.push(`/invoices?opportunityId=${opportunity.id}`)} className={`${actionButton} text-emerald-600`}>
+                    <Receipt className="h-4 w-4" />
+                    Create Invoice
+                  </button>
+                )}
+                {canInvoice && (
+                  <button onClick={() => router.push(`/invoices?opportunityId=${opportunity.id}`)} className={actionButton}>
+                    <Receipt className="h-4 w-4 text-slate-500" />
+                    View Invoices
+                  </button>
+                )}
                 <button onClick={() => setUploadOpen(true)} className={`${actionButton} text-sky-600`}>
                   <FileUp className="h-4 w-4" />
                   Upload Document
@@ -275,14 +295,24 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
                   <UserRound className="h-4 w-4 text-purple-600" />
                   Assign
                 </button>
-                <button onClick={() => setEmailOpen(true)} className={actionButton}>
-                  <Mail className="h-4 w-4" />
-                  Email Customer
-                </button>
-                <button onClick={() => setTeamsOpen(true)} className={actionButton}>
-                  <Video className="h-4 w-4" />
-                  Teams Meeting
-                </button>
+                {canEmail && (
+                  <button onClick={() => setEmailOpen(true)} className={actionButton}>
+                    <Mail className="h-4 w-4" />
+                    Email Customer
+                  </button>
+                )}
+                {canTeams && (
+                  <button onClick={() => setTeamsOpen(true)} className={actionButton}>
+                    <Video className="h-4 w-4" />
+                    Teams Meeting
+                  </button>
+                )}
+                {canZoom && (
+                  <button onClick={() => setZoomOpen(true)} className={actionButton}>
+                    <Video className="h-4 w-4" />
+                    Zoom Meeting
+                  </button>
+                )}
                 <button onClick={() => setEventOpen(true)} className={actionButton}>
                   <Calendar className="h-4 w-4" />
                   Schedule Meeting

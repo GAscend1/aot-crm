@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { findActiveItemHref, navigation } from "@/config/navigation";
+import { canonicalModulePath, findActiveItemHref, navigation } from "@/config/navigation";
 
 /**
  * Guards the sidebar active-state contract:
@@ -20,8 +20,6 @@ describe("findActiveItemHref", () => {
     expect(findActiveItemHref("/dashboard")).toBe("/dashboard");
     expect(findActiveItemHref("/companies")).toBe("/companies");
     expect(findActiveItemHref("/contacts")).toBe("/contacts");
-    expect(findActiveItemHref("/customers")).toBe("/customers");
-    expect(findActiveItemHref("/leads")).toBe("/leads");
     expect(findActiveItemHref("/opportunities")).toBe("/opportunities");
     expect(findActiveItemHref("/quotes")).toBe("/quotes");
     expect(findActiveItemHref("/invoices")).toBe("/invoices");
@@ -31,15 +29,30 @@ describe("findActiveItemHref", () => {
     expect(findActiveItemHref("/reports")).toBe("/reports");
     expect(findActiveItemHref("/administration")).toBe("/administration");
     expect(findActiveItemHref("/profile")).toBe("/profile");
-    expect(findActiveItemHref("/files")).toBe("/files");
   });
 
   it("highlights a parent module for plain record routes", () => {
     expect(findActiveItemHref("/opportunities/abc-123")).toBe("/opportunities");
     expect(findActiveItemHref("/companies/acme")).toBe("/companies");
     expect(findActiveItemHref("/contacts/jane")).toBe("/contacts");
-    expect(findActiveItemHref("/customers/xyz")).toBe("/customers");
-    expect(findActiveItemHref("/leads/lead-1")).toBe("/leads");
+  });
+
+  it("legacy module records highlight the canonical module, never a hidden one", () => {
+    // Customers/Leads are VIEWS of Contacts (Phase 2). A full-page customer or
+    // lead record must highlight Contacts — never a redundant hidden sidebar
+    // item — so no separate "Customers" module ever appears in the sidebar.
+    expect(canonicalModulePath("/customers")).toBe("/contacts");
+    expect(canonicalModulePath("/customers/xyz")).toBe("/contacts/xyz");
+    expect(canonicalModulePath("/leads")).toBe("/contacts");
+    expect(canonicalModulePath("/leads/lead-1")).toBe("/contacts/lead-1");
+    expect(canonicalModulePath("/files")).toBe("/documents");
+    expect(canonicalModulePath("/inbox")).toBe("/activities");
+    expect(canonicalModulePath("/contacts/jane")).toBe("/contacts/jane");
+
+    expect(findActiveItemHref("/customers/xyz")).toBe("/contacts");
+    expect(findActiveItemHref("/leads/lead-1")).toBe("/contacts");
+    expect(findActiveItemHref("/files")).toBe("/documents");
+    expect(findActiveItemHref("/inbox")).toBe("/activities");
   });
 
   it("handles trailing-slash paths via the prefix rule", () => {
@@ -124,9 +137,12 @@ describe("findActiveItemHref", () => {
     }
   });
 
-  it("only one item is active for every configured nav href", () => {
+  it("only one item is active for every VISIBLE nav href", () => {
+    // Hidden merged modules (Customers/Leads/Files/Inbox) intentionally
+    // normalize to their canonical module — covered by the dedicated test.
     for (const group of navigation) {
       for (const item of group.items) {
+        if (item.hidden) continue;
         const activeHref = findActiveItemHref(item.href);
         expect(activeHref).toBe(item.href);
       }
@@ -136,5 +152,104 @@ describe("findActiveItemHref", () => {
   it("no two nav items share the same href", () => {
     const hrefs = navigation.flatMap((g) => g.items).map((item) => item.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+});
+
+/**
+ * Phase 2 structure contract — locks in the simplified navigation:
+ * - Visible groups: General / CRM / Sales / Work / Documents / Reports / Administration
+ * - Leads + Customers are hidden views under Contacts (CRM)
+ * - Inbox is a hidden view under Activities (Work)
+ * - Sales contains exactly Opportunities, Quotes, Invoices
+ * - Work merges Activities + Tickets
+ * - Files / Profile stay hidden (deep-link only)
+ */
+describe("Phase 2 navigation structure", () => {
+  const allItems = () => navigation.flatMap((g) => g.items);
+  const group = (name: string) => navigation.find((g) => g.group === name);
+
+  it("groups match the simplified target order", () => {
+    expect(navigation.map((g) => g.group)).toEqual([
+      "General",
+      "CRM",
+      "Sales",
+      "Work",
+      "Documents",
+      "Reports",
+      "Administration",
+    ]);
+  });
+
+  it("Leads and Customers are hidden views under CRM (Contacts)", () => {
+    const crm = group("CRM");
+    expect(crm?.items.map((i) => i.title)).toEqual([
+      "Companies",
+      "Contacts",
+      "Customers",
+      "Leads",
+    ]);
+    expect(crm?.items.find((i) => i.title === "Leads")?.hidden).toBe(true);
+    expect(crm?.items.find((i) => i.title === "Customers")?.hidden).toBe(true);
+  });
+
+  it("Sales contains only Opportunities, Quotes, Invoices (no Leads)", () => {
+    const sales = group("Sales");
+    expect(sales?.items.map((i) => i.title)).toEqual([
+      "Opportunities",
+      "Quotes",
+      "Invoices",
+    ]);
+  });
+
+  it("Work merges Activities + Tickets with Inbox hidden", () => {
+    const work = group("Work");
+    expect(work?.items.map((i) => i.title)).toEqual([
+      "Activities",
+      "Tickets",
+      "Inbox",
+    ]);
+    expect(work?.items.find((i) => i.title === "Inbox")?.hidden).toBe(true);
+  });
+
+  it("visible items are exactly the simplified target set", () => {
+    const visible = allItems()
+      .filter((i) => !i.hidden)
+      .map((i) => i.href);
+    expect(visible).toEqual([
+      "/dashboard",
+      "/companies",
+      "/contacts",
+      "/opportunities",
+      "/quotes",
+      "/invoices",
+      "/activities",
+      "/tickets",
+      "/documents",
+      "/reports",
+      "/administration",
+    ]);
+  });
+
+  it("hidden merged routes still resolve deep links to their canonical module", () => {
+    expect(findActiveItemHref("/leads")).toBe("/contacts");
+    expect(findActiveItemHref("/customers")).toBe("/contacts");
+    expect(findActiveItemHref("/inbox")).toBe("/activities");
+    expect(findActiveItemHref("/files")).toBe("/documents");
+    expect(findActiveItemHref("/leads/lead-1")).toBe("/contacts");
+    expect(findActiveItemHref("/customers/xyz")).toBe("/contacts");
+  });
+
+  it("hidden items normalize to their canonical module (active-state contract)", () => {
+    // Legacy merged modules normalize to their canonical module; other hidden
+    // items (e.g. Profile) keep resolving to themselves.
+    const canonical: Record<string, string> = {
+      "/customers": "/contacts",
+      "/leads": "/contacts",
+      "/inbox": "/activities",
+      "/files": "/documents",
+    };
+    for (const item of allItems().filter((i) => i.hidden)) {
+      expect(findActiveItemHref(item.href)).toBe(canonical[item.href] ?? item.href);
+    }
   });
 });

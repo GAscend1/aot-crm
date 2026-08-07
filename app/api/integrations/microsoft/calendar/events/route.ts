@@ -67,4 +67,4 @@ export const POST = withGraphAuth(async (accessToken, req: NextRequest) => {
   });
 
   return Response.json(result, { status: 201 });
-}, { rateLimitAction: "calendar:create" });
+}, { rateLimitAction: "calendar:create", entitlement: "calendar_sync" });

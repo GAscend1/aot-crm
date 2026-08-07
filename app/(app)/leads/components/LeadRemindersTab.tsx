@@ -80,19 +80,19 @@ export function LeadRemindersTab({ leadId }: { leadId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+      <div className="rounded-xl border bg-surface-raised p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Reminder title"
-            className="min-w-0 flex-1 rounded-lg border bg-transparent px-3 py-1.5 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+            className="min-w-0 flex-1 rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           />
           <input
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="rounded-lg border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-blue-400 dark:border-slate-700"
+            className="rounded-lg border border-input bg-transparent px-2 py-1.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           />
           <button
             onClick={handleCreate}
@@ -108,30 +108,30 @@ export function LeadRemindersTab({ leadId }: { leadId: string }) {
         {loading ? (
           <div className="space-y-3 py-2">
             {[0, 1].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
             ))}
           </div>
         ) : reminders.length === 0 ? (
           <EmptyState title="No reminders yet" description="Set reminders for follow-ups and next steps." />
         ) : (
-          <div className="divide-y dark:divide-slate-800">
+          <div className="divide-y divide-border">
             {reminders.map((reminder) => (
               <div key={reminder.id} className="flex items-center gap-3 py-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning-soft text-[color:var(--warning)]">
                   <Bell className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-medium ${reminder.completed ? "text-slate-400 line-through" : "text-slate-900 dark:text-white"}`}>
+                  <p className={`text-sm font-medium ${reminder.completed ? "text-muted-foreground line-through" : "text-foreground"}`}>
                     {reminder.title}
                   </p>
-                  <p className="text-xs text-slate-400">{new Date(reminder.dueDate).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground/70">{new Date(reminder.dueDate).toLocaleString()}</p>
                 </div>
                 <button
                   onClick={() => handleToggle(reminder)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-green-600 dark:hover:bg-slate-800"
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-[color:var(--success)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                   title={reminder.completed ? "Mark as pending" : "Mark as completed"}
                 >
-                  <CheckCircle2 className={`h-4 w-4 ${reminder.completed ? "text-green-500" : ""}`} />
+                  <CheckCircle2 className={`h-4 w-4 ${reminder.completed ? "text-[color:var(--success)]" : ""}`} />
                 </button>
               </div>
             ))}

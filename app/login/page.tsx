@@ -113,9 +113,9 @@ function LoginForm() {
               <Button
                 variant="outline"
                 className="w-full h-12 gap-3 border-white/20 text-white hover:bg-white/10"
-                onClick={() => window.location.href = "/auth/admin-approval-required"}
+                onClick={() => window.location.href = "/auth/error?error=admin_consent_required"}
               >
-                View Admin Approval Instructions
+                View Consent Details
               </Button>
               <Button
                 variant="ghost"

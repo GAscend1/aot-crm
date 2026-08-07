@@ -2,9 +2,20 @@
 
 import "./globals.css";
 
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { useEffect } from "react";
+import { AlertTriangle, RotateCcw, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+
+/** Stale client chunks (dev restart / redeploy) self-heal with one reload. */
+function isChunkLoadError(error: Error & { digest?: string }): boolean {
+  return (
+    error?.name === "ChunkLoadError" ||
+    /ChunkLoadError|Loading chunk .* failed|Failed to fetch dynamically imported module/i.test(
+      error?.message ?? ""
+    )
+  );
+}
 
 /**
  * Root error boundary. Replaces the entire app shell when an unrecoverable
@@ -18,6 +29,17 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const chunkError = isChunkLoadError(error);
+
+  // Single auto-reload per page load (sessionStorage guard prevents loops).
+  useEffect(() => {
+    if (!chunkError) return;
+    if (window.sessionStorage.getItem("aot-chunk-reload") === "1") return;
+    window.sessionStorage.setItem("aot-chunk-reload", "1");
+    const timer = window.setTimeout(() => window.location.reload(), 350);
+    return () => window.clearTimeout(timer);
+  }, [chunkError]);
+
   return (
     <html lang="en">
       <body>
@@ -27,20 +49,33 @@ export default function GlobalError({
               <AlertTriangle className="h-6 w-6 text-[color:var(--danger)]" />
             </div>
             <h1 className="mt-4 text-lg font-semibold text-foreground">
-              Something went wrong
+              {chunkError ? "Refreshing…" : "Something went wrong"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              A critical error occurred. Your data is safe — reload to
-              continue.
+              {chunkError
+                ? "A newer version of the app was loaded. Refreshing automatically — one moment."
+                : "A critical error occurred. Your data is safe — reload to continue."}
               {error.digest && (
                 <span className="mt-2 block font-mono text-xs text-muted-foreground/70">
                   Error ID: {error.digest}
                 </span>
               )}
             </p>
-            <Button className="mt-6" onClick={() => reset()}>
-              <RotateCcw className="mr-1.5 h-4 w-4" />
-              Reload
+            <Button
+              className="mt-6"
+              onClick={() => (chunkError ? window.location.reload() : reset())}
+            >
+              {chunkError ? (
+                <>
+                  <RefreshCw className="mr-1.5 h-4 w-4" />
+                  Reload now
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="mr-1.5 h-4 w-4" />
+                  Reload
+                </>
+              )}
             </Button>
           </div>
         </div>

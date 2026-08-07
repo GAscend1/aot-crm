@@ -39,6 +39,8 @@ interface RelatedApiRow {
   email?: string;
   firstName?: string;
   lastName?: string;
+  category?: string;
+  uploadDate?: string;
 }
 
 function RelatedList({
@@ -156,35 +158,35 @@ const pill = (className: string, label: string) => (
 );
 
 const statusPill = (status: string, tones: Record<string, string>) =>
-  pill(tones[status] ?? "bg-slate-100 text-slate-700", status);
+  pill(tones[status] ?? "bg-muted text-muted-foreground", status);
 
 const quoteTones: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-700",
-  SENT: "bg-blue-100 text-blue-700",
-  ACCEPTED: "bg-emerald-100 text-emerald-700",
-  REJECTED: "bg-red-100 text-red-700",
-  EXPIRED: "bg-orange-100 text-orange-700",
+  DRAFT: "bg-muted text-muted-foreground",
+  SENT: "bg-info-soft text-[color:var(--info)]",
+  ACCEPTED: "bg-success-soft text-[color:var(--success)]",
+  REJECTED: "bg-danger-soft text-[color:var(--danger)]",
+  EXPIRED: "bg-warning-soft text-[color:var(--warning)]",
 };
 
 const invoiceTones: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-700",
-  ISSUED: "bg-blue-100 text-blue-700",
-  PARTIALLY_PAID: "bg-amber-100 text-amber-700",
-  PAID: "bg-emerald-100 text-emerald-700",
-  OVERDUE: "bg-red-100 text-red-700",
-  VOID: "bg-slate-200 text-slate-500",
+  DRAFT: "bg-muted text-muted-foreground",
+  ISSUED: "bg-info-soft text-[color:var(--info)]",
+  PARTIALLY_PAID: "bg-warning-soft text-[color:var(--warning)]",
+  PAID: "bg-success-soft text-[color:var(--success)]",
+  OVERDUE: "bg-danger-soft text-[color:var(--danger)]",
+  VOID: "bg-muted text-muted-foreground",
 };
 
 const stagePill = (stage: string) => {
   const map: Record<string, string> = {
-    "Discovery": "bg-blue-100 text-blue-700",
-    "Qualification": "bg-slate-100 text-slate-700",
-    "Proposal": "bg-amber-100 text-amber-700",
-    "Negotiation": "bg-purple-100 text-purple-700",
-    "Closed Won": "bg-emerald-100 text-emerald-700",
-    "Closed Lost": "bg-red-100 text-red-700",
+    "Discovery": "bg-info-soft text-[color:var(--info)]",
+    "Qualification": "bg-muted text-muted-foreground",
+    "Proposal": "bg-warning-soft text-[color:var(--warning)]",
+    "Negotiation": "bg-[color:var(--color-quote-soft)] text-[color:var(--color-quote)]",
+    "Closed Won": "bg-success-soft text-[color:var(--success)]",
+    "Closed Lost": "bg-danger-soft text-[color:var(--danger)]",
   };
-  return pill(map[stage] ?? "bg-slate-100 text-slate-700", stage);
+  return pill(map[stage] ?? "bg-muted text-muted-foreground", stage);
 };
 
 const moneyFmt = (value: number) =>
@@ -415,10 +417,10 @@ export function RelatedActivitiesList({
               : undefined,
             badge: pill(
               a.status === "Completed"
-                ? "bg-emerald-100 text-emerald-700"
+                ? "bg-success-soft text-[color:var(--success)]"
                 : a.status === "Cancelled"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-blue-100 text-blue-700",
+                  ? "bg-danger-soft text-[color:var(--danger)]"
+                  : "bg-info-soft text-[color:var(--info)]",
               a.status ?? ""
             ),
             href: `/activities?record=${encodeURIComponent(a.id)}`,
@@ -477,8 +479,8 @@ export function RelatedCustomersList({
             meta: c.email || undefined,
             badge: pill(
               c.status === "Active"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-slate-100 text-slate-700",
+                ? "bg-success-soft text-[color:var(--success)]"
+                : "bg-muted text-muted-foreground",
               c.status ?? ""
             ),
             href: `/customers?record=${encodeURIComponent(c.id)}`,
@@ -500,6 +502,61 @@ export function RelatedCustomersList({
         <Loading />
       ) : (
         <RelatedList items={items} emptyMessage="No customers at this company." />
+      )}
+    </SectionCard>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Related Documents (used on the Company 360)                        */
+/* ------------------------------------------------------------------ */
+
+export function RelatedDocumentsList({
+  companyId,
+  limit = 5,
+}: {
+  companyId?: string;
+  limit?: number;
+}) {
+  const [items, setItems] = useState<RelatedItem[]>([]);
+  const [loading, setLoading] = useState(!!companyId);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    fetch(`/api/documents?companyId=${encodeURIComponent(companyId)}&pageSize=${limit}`, {
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((body: { data: RelatedApiRow[] }) => {
+        if (cancelled) return;
+        setItems(
+          (body.data ?? []).map((d) => ({
+            id: d.id,
+            title: d.name ?? "",
+            subtitle: d.category || d.type,
+            meta: d.uploadDate
+              ? new Date(d.uploadDate).toLocaleDateString()
+              : undefined,
+            href: `/documents?record=${encodeURIComponent(d.id)}`,
+          }))
+        );
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, limit]);
+
+  return (
+    <SectionCard title="Documents" count={items.length} viewAllHref="/documents">
+      {loading ? (
+        <Loading />
+      ) : (
+        <RelatedList items={items} emptyMessage="No documents yet." />
       )}
     </SectionCard>
   );
@@ -537,8 +594,8 @@ export function RelatedContactsList({
             meta: c.email || undefined,
             badge: pill(
               c.status === "Active"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-slate-100 text-slate-700",
+                ? "bg-success-soft text-[color:var(--success)]"
+                : "bg-muted text-muted-foreground",
               c.status ?? ""
             ),
             href: `/contacts?record=${encodeURIComponent(c.id)}`,

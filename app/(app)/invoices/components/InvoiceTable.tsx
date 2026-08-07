@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
@@ -39,9 +40,11 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
   const [prefill, setPrefill] = useState<InvoicePrefill | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingInvoice, setDeletingInvoice] = useState<Invoice | undefined>();
+  const mountedRef = useMountedRef();
 
   // When opened from an opportunity detail page, filter to that opportunity's invoices.
   useEffect(() => {
+    let cancelled = false;
     invoiceService
       .findAll(
         prefillOpportunityId
@@ -49,35 +52,50 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
           : undefined
       )
       .then((result) => {
+        if (cancelled) return;
         setInvoices(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (cancelled) return;
         setError("Failed to load invoices.");
         setLoading(false);
       });
+    return () => {
+      // Never touch state after unmount (or when the filter changes mid-flight).
+      cancelled = true;
+    };
   }, [prefillOpportunityId]);
 
   // Prefill from opportunity context (e.g. "Create Invoice" from opportunity detail)
   useEffect(() => {
-    if (prefillOpportunityId) {
-      fetch(`/api/opportunities/${prefillOpportunityId}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((o: { customer?: string; customerId?: string; company?: string; companyId?: string; title?: string } | null) => {
-          if (!o) return;
-          setPrefill({
-            customer: o.customer,
-            customerId: o.customerId,
-            company: o.company,
-            companyId: o.companyId,
-            opportunity: o.title,
-            opportunityId: prefillOpportunityId,
-          });
-          setEditingInvoice(undefined);
-          setModalOpen(true);
+    if (!prefillOpportunityId) return;
+    let cancelled = false;
+    fetch(`/api/opportunities/${prefillOpportunityId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((o: { customer?: string; customerId?: string; company?: string; companyId?: string; title?: string } | null) => {
+        if (!o || cancelled) return;
+        setPrefill({
+          customer: o.customer,
+          customerId: o.customerId,
+          company: o.company,
+          companyId: o.companyId,
+          opportunity: o.title,
+          opportunityId: prefillOpportunityId,
         });
-    }
-  }, [prefillOpportunityId]);
+        setEditingInvoice(undefined);
+        setModalOpen(true);
+      })
+      .catch(() => {
+        // Opportunity could not be loaded — surface the failure instead of
+        // opening a blank, misleading invoice modal.
+        if (cancelled) return;
+        showError("Could not load opportunity", "Failed to load the opportunity details for prefill. Try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [prefillOpportunityId, showError]);
 
   const filtered = useMemo(() => {
     let result = invoices;
@@ -298,7 +316,10 @@ export function InvoiceTable({ prefillOpportunityId }: InvoiceTableProps) {
                 : undefined
             )
             .then((result) => {
-              setInvoices(result.data);
+              if (mountedRef.current) setInvoices(result.data);
+            })
+            .catch(() => {
+              // Refreshing the list is best-effort; keep the current rows.
             });
         }}
       />

@@ -31,6 +31,7 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { contactService } from "@/services/index";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ApiRequestError } from "@/repositories/api/ApiRepository";
+import { useCanUse } from "@/hooks/use-subscription";
 
 import type { Contact } from "../types";
 import { ContactForm } from "./ContactForm";
@@ -50,6 +51,8 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
+
+  const canEmail = useCanUse("outlook_email");
 
   const fullName = useMemo(
     () =>
@@ -104,12 +107,16 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
 
   const actionBar = useMemo(
     () => [
-      {
-        label: "Email",
-        icon: Mail,
-        tone: "--info",
-        onClick: () => setEmailOpen(true),
-      },
+      ...(canEmail
+        ? [
+            {
+              label: "Email",
+              icon: Mail,
+              tone: "--info" as const,
+              onClick: () => setEmailOpen(true),
+            },
+          ]
+        : []),
       {
         label: "Call",
         icon: Phone,
@@ -131,7 +138,7 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
         onClick: handleCreateOpportunity,
       },
     ],
-    [record, handleCreateOpportunity]
+    [record, canEmail, handleCreateOpportunity]
   );
 
   const moreActions = useMemo(

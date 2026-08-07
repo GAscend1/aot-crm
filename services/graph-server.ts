@@ -1,5 +1,6 @@
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
+import { msTokenUrl } from "@/lib/server/ms-auth";
 
 export class GraphServerError extends Error {
   status: number;
@@ -30,7 +31,9 @@ export async function getGraphToken(req?: NextRequest): Promise<string> {
 }
 
 export async function refreshGraphToken(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number }> {
-  const url = `https://login.microsoftonline.com/${process.env.AUTH_MICROSOFT_ENTRA_ID_TENANT_ID}/oauth2/v2.0/token`;
+  // Multi-tenant authority (organizations) — matches the login issuer so refresh
+  // works for users from any Entra tenant.
+  const url = msTokenUrl();
   const body = new URLSearchParams({
     client_id: process.env.AUTH_MICROSOFT_ENTRA_ID_ID!,
     client_secret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET!,

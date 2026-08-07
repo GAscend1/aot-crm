@@ -13,7 +13,7 @@ export async function GET(
   const { id, documentId } = await params;
   try {
     const doc = await prisma.document.findFirst({
-      where: { id: documentId, leadId: id },
+      where: { id: documentId, leadId: id, organizationId: user.organizationId },
     });
     if (!doc) return notFound("Document not found");
     if (!doc.storageKey) {

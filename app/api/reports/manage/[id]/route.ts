@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, forbidden, serverError, logServerError, notFound, isReportsManager } from "@/lib/server/api";
+import { getCrmUser, unauthorized, forbidden, serverError, logServerError, notFound, isReportsManager, featureGate, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { reportSchema } from "@/lib/validation/entities";
 import { reportToUI } from "../route";
@@ -13,10 +13,12 @@ export async function GET(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "reports");
+  if (gate) return gate;
   if (!isReportsManager(user)) return forbidden();
   const { id } = await params;
   try {
-    const report = await prisma.report.findUnique({ where: { id }, include: { createdBy: true } });
+    const report = await prisma.report.findFirst({ where: { id, organizationId: user.organizationId }, include: { createdBy: true } });
     if (!report) return notFound("Report not found");
     return NextResponse.json(reportToUI(report));
   } catch (err) {
@@ -31,12 +33,16 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "reports");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   if (!isReportsManager(user)) return forbidden();
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = reportSchema.partial().parse(body);
-    const existing = await prisma.report.findUnique({ where: { id } });
+    const existing = await prisma.report.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Report not found");
 
     const data: Prisma.ReportUpdateInput = {};
@@ -70,10 +76,14 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "reports");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   if (!isReportsManager(user)) return forbidden();
   const { id } = await params;
   try {
-    const existing = await prisma.report.findUnique({ where: { id } });
+    const existing = await prisma.report.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Report not found");
     await prisma.report.delete({ where: { id } });
     await logAudit({

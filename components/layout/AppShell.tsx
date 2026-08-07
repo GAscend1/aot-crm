@@ -4,6 +4,9 @@ import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
+import { MobileTabBar } from "./MobileTabBar";
+import { TrialBanner } from "@/components/subscription/TrialBanner";
+
 interface AppShellProps {
   sidebar: ReactNode;
   navbar: ReactNode;
@@ -19,9 +22,10 @@ export function AppShell({ sidebar, navbar, children }: AppShellProps) {
       {sidebar}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <TrialBanner />
         {navbar}
 
-        <main className="flex-1 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 overflow-y-auto scrollbar-thin pb-[calc(52px+env(safe-area-inset-bottom))] lg:pb-0">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={pathname}
@@ -35,6 +39,8 @@ export function AppShell({ sidebar, navbar, children }: AppShellProps) {
           </AnimatePresence>
         </main>
       </div>
+
+      <MobileTabBar />
     </div>
   );
 }

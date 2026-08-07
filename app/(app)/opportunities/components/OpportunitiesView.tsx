@@ -11,8 +11,8 @@ import { OpportunityKanban } from "../kanban/OpportunityKanban";
 import { OpportunityForecast } from "./OpportunityForecast";
 
 const VIEWS = [
-  { id: "list", label: "List", icon: List },
   { id: "kanban", label: "Kanban", icon: Kanban },
+  { id: "list", label: "List", icon: List },
   { id: "forecast", label: "Forecast", icon: TrendingUp },
 ];
 
@@ -25,7 +25,9 @@ export function OpportunitiesView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const view = searchParams?.get("view");
-  const active = view === "kanban" || view === "forecast" ? view : "list";
+  // Kanban-first: /opportunities opens the board by default; list and forecast
+  // are explicit opt-in views.
+  const active = view === "list" || view === "forecast" ? view : "kanban";
 
   const handleChange = useCallback(
     (next: string) => {

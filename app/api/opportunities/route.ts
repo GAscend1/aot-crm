@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import { uiStageToDb, dbStageToUi } from "@/lib/server/opportunity-stages";
@@ -32,6 +32,9 @@ export type UIOpportunity = {
   ownerId: string;
   notes: string;
   status: string;
+  wonReason: string;
+  lostReason: string;
+  closedAt: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -77,6 +80,9 @@ export function opportunityToUI(c: OpportunityWithRelations): UIOpportunity {
     ownerId: c.ownerId ?? "",
     notes: c.notes ?? "",
     status: c.status ?? "Open",
+    wonReason: c.wonReason ?? "",
+    lostReason: c.lostReason ?? "",
+    closedAt: c.closedAt?.toISOString() ?? "",
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
@@ -95,7 +101,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const filters = searchParams.get("filters");
 
-  const where: Prisma.OpportunityWhereInput = {};
+  const where: Prisma.OpportunityWhereInput = { organizationId: user.organizationId };
   if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
@@ -148,18 +154,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = opportunitySchema.parse(body);
 
     const data: Prisma.OpportunityCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       title: parsed.title,
       value: parsed.value ?? 0,
       probability: parsed.probability ?? 0,
       priority: parsed.priority ?? "Medium",
       notes: parsed.notes || undefined,
       status: parsed.status ?? "Open",
+      wonReason: parsed.wonReason || undefined,
+      lostReason: parsed.lostReason || undefined,
     };
+    if (parsed.closedAt) data.closedAt = new Date(parsed.closedAt);
     if (parsed.expectedCloseDate) data.expectedCloseDate = new Date(parsed.expectedCloseDate);
     if (parsed.stageId) data.stage = { connect: { id: parsed.stageId } };
     else if (parsed.stage) {
@@ -180,6 +192,7 @@ export async function POST(request: NextRequest) {
       action: "opportunity.created",
       description: `Opportunity "${created.title}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
       after: { title: created.title, value: created.value, stageId: created.stageId },
     });
     await createActivity({
@@ -189,6 +202,7 @@ export async function POST(request: NextRequest) {
       status: "Completed",
       opportunityId: created.id,
       customerId: created.customerId,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(opportunityToUI(created), { status: 201 });

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { leadDuplicateSchema } from "@/lib/validation/entities";
-import { leadToUI } from "../../route";
+import { leadToUI, leadUIInclude } from "../../route";
 export const dynamic = "force-dynamic";
 
 export async function POST(
@@ -13,18 +13,21 @@ export async function POST(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = leadDuplicateSchema.parse(body);
-    const source = await prisma.lead.findUnique({
-      where: { id },
+    const source = await prisma.lead.findFirst({
+      where: { id, organizationId: user.organizationId },
       include: { tagLinks: { include: { tag: true } } },
     });
     if (!source) return notFound("Lead not found");
 
     const duplicated = await prisma.lead.create({
       data: {
+        organizationId: user.organizationId,
         firstName: source.firstName,
         lastName: source.lastName,
         title: source.title ? `${source.title} (copy)` : source.title,
@@ -45,7 +48,7 @@ export async function POST(
           create: source.tagLinks.map((link) => ({ tagId: link.tagId })),
         },
       },
-      include: { assignedTo: true },
+      include: leadUIInclude,
     });
 
     if (parsed.includeDocuments) {
@@ -55,6 +58,7 @@ export async function POST(
       for (const doc of documents) {
         await prisma.document.create({
           data: {
+            organizationId: user.organizationId,
             name: doc.name,
             type: doc.type,
             mimeType: doc.mimeType,
@@ -81,6 +85,7 @@ export async function POST(
       action: "lead.duplicated",
       description: `Lead "${leadDisplayName(source)}" duplicated as "${leadDisplayName(duplicated)}"`,
       userId: user.id,
+      organizationId: user.organizationId,
       data: { sourceLeadId: id },
     });
     await logAudit({
@@ -89,6 +94,7 @@ export async function POST(
       action: "lead.duplicated",
       description: `Lead duplicated into "${leadDisplayName(duplicated)}"`,
       userId: user.id,
+      organizationId: user.organizationId,
       data: { duplicateLeadId: duplicated.id },
     });
     await createActivity({
@@ -97,6 +103,7 @@ export async function POST(
       description: `Duplicated from "${leadDisplayName(source)}"`,
       status: "Completed",
       leadId: duplicated.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(leadToUI(duplicated), { status: 201 });

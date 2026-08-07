@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -28,18 +29,22 @@ export function TicketTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTicket, setDeletingTicket] = useState<Ticket | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
     ticketService
       .findAll()
       .then((result) => {
+        if (!mountedRef.current) return;
         setTickets(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setError("Failed to load tickets.");
         setLoading(false);
       });
-  }, []);
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = tickets;
@@ -247,7 +252,7 @@ export function TicketTable() {
       <TicketWorkspace
         onChanged={() => {
           ticketService.findAll().then((result) => {
-            setTickets(result.data);
+            if (mountedRef.current) setTickets(result.data);
           });
         }}
       />

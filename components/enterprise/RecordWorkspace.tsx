@@ -60,6 +60,13 @@ interface RecordWorkspaceProps {
   contentClassName?: string;
   /** Extra classes merged onto the body container. */
   bodyClassName?: string;
+  /**
+   * Whether the shell renders its own top-right close (X). Defaults to `false`
+   * when a custom `header` is supplied (the header owns the close button — e.g.
+   * OpportunityWorkspaceHeader) and `true` otherwise, so a record never shows
+   * TWO close controls.
+   */
+  showCloseButton?: boolean;
 }
 
 /**
@@ -87,22 +94,43 @@ export function RecordWorkspace({
   sizeClassName,
   contentClassName,
   bodyClassName,
+  showCloseButton,
 }: RecordWorkspaceProps) {
   const split = layout === "split";
+  // A custom header is responsible for its own close control (OpportunityWorkspaceHeader
+  // renders an X). Rendering the shell X too would duplicate the close button.
+  const effectiveShowCloseButton = header
+    ? (showCloseButton ?? false)
+    : (showCloseButton ?? true);
+
+  // Viewport-safe shell: the dialog gets a DEFINITE height (capped to the
+  // viewport) so the `minmax(0,1fr)` body row is bounded and its inner
+  // scroll regions actually scroll. With `h-auto` + `max-h` only, the fr row
+  // sizes to content and the overflow-hidden shell clips the bottom instead
+  // of scrolling — the reported "lower content cut off" bug. The footer (when
+  // present) is its own auto-sized grid row below the scrollable body.
+  const gridRows = footer
+    ? "grid-rows-[auto_minmax(0,1fr)_auto]"
+    : "grid-rows-[auto_minmax(0,1fr)]";
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
+        showCloseButton={effectiveShowCloseButton}
         className={cn(
-          // Mobile: full-screen sheet. sm+: centered dialog.
-          "top-0 left-0 grid h-dvh w-full max-w-none translate-x-0 translate-y-0 grid-cols-1 gap-0 rounded-none border-0 p-0",
+          // Mobile: full-screen sheet (max-h-dvh overrides the base 90dvh cap).
+          // sm+: centered, height-capped dialog.
+          "top-0 left-0 grid h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 grid-cols-1 gap-0 rounded-none border-0 p-0",
+          gridRows,
           split
             ? cn(
-                "grid-rows-[auto_minmax(0,1fr)] sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[min(86dvh,900px)] sm:w-[min(82vw,1220px)] sm:min-w-[min(960px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-1 sm:overflow-hidden sm:rounded-2xl sm:border sm:shadow-2xl",
+                "sm:top-1/2 sm:left-1/2 sm:h-[min(86dvh,900px)] sm:max-h-[min(86dvh,900px)] sm:w-[min(82vw,1220px)] sm:min-w-[min(960px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-1 sm:overflow-hidden sm:rounded-2xl sm:border sm:shadow-2xl",
                 sizeClassName
               )
-            : "sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100%-1rem)] sm:max-w-[min(1320px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-[1fr_auto] sm:rounded-xl sm:border sm:shadow-2xl",
-          contentClassName
+            : cn(
+                "sm:top-1/2 sm:left-1/2 sm:h-[min(90dvh,900px)] sm:max-h-[min(90dvh,900px)] sm:w-[calc(100%-1rem)] sm:max-w-[min(1320px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-1 sm:overflow-hidden sm:rounded-xl sm:border sm:shadow-2xl",
+                contentClassName
+              )
         )}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
@@ -113,7 +141,14 @@ export function RecordWorkspace({
         ) : (
           <>
             {header ?? (editing && !keepHeaderWhileEditing ? null : (
-              <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b bg-popover/95 px-5 py-4 backdrop-blur-sm supports-[backdrop-filter]:bg-popover/80">
+              // pr-14 keeps the header actions clear of the shell's absolute
+              // top-right close (X) — exactly ONE close control per dialog.
+              <header
+                className={cn(
+                  "sticky top-0 z-10 flex items-start justify-between gap-3 border-b bg-popover/95 px-5 py-4 backdrop-blur-sm supports-[backdrop-filter]:bg-popover/80",
+                  effectiveShowCloseButton && "pr-14"
+                )}
+              >
                 <div className="min-w-0">
                   {eyebrow && (
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -167,7 +202,11 @@ export function RecordWorkspace({
                     <aside
                       className={cn(
                         "shrink-0",
-                        split ? "w-full lg:w-auto" : "w-full space-y-5 lg:w-72"
+                        // The split inspector column scrolls independently when
+                        // it is taller than the capped dialog.
+                        split
+                          ? "w-full lg:h-full lg:w-auto lg:min-h-0 lg:overflow-y-auto"
+                          : "w-full space-y-5 lg:w-72"
                       )}
                     >
                       {sidebar}

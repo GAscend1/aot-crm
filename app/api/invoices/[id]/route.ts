@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, badRequest, subscriptionWriteGate, featureGate } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { invoiceCreateSchema, invoiceStatusSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, invoiceToUI } from "@/lib/server/billing";
@@ -20,9 +20,11 @@ const include = {
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "invoices");
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const invoice = await prisma.invoice.findUnique({ where: { id }, include });
+    const invoice = await prisma.invoice.findFirst({ where: { id, organizationId: user.organizationId }, include });
     if (!invoice) return notFound("Invoice not found");
     return NextResponse.json(invoiceToUI(invoice));
   } catch (err) {
@@ -34,10 +36,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "invoices");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const existing = await prisma.invoice.findUnique({ where: { id }, include: { items: true } });
+    const existing = await prisma.invoice.findFirst({ where: { id, organizationId: user.organizationId }, include: { items: true } });
     if (!existing) return notFound("Invoice not found");
 
     // Status transitions (issue, mark paid, void, etc.) — only for pure status payloads,
@@ -145,9 +151,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "invoices");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
-    const existing = await prisma.invoice.findUnique({ where: { id } });
+    const existing = await prisma.invoice.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Invoice not found");
     await prisma.invoice.update({ where: { id }, data: { archivedAt: new Date() } });
     await logAudit({
@@ -167,13 +177,17 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "invoices");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const status = body?.status as InvoiceStatus | undefined;
     if (!status) return badRequest("Status is required");
     if (!["ISSUED", "PARTIALLY_PAID", "PAID", "VOID", "OVERDUE"].includes(status)) return badRequest("Invalid status transition");
-    const existing = await prisma.invoice.findUnique({ where: { id } });
+    const existing = await prisma.invoice.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Invoice not found");
     const updated = await prisma.invoice.update({
       where: { id },

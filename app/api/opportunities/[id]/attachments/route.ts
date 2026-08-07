@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { resolveDocumentStorage, sanitizeFileName, resolveBucket } from "@/lib/storage/DocumentStorage";
 export const dynamic = "force-dynamic";
@@ -21,10 +21,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const opp = await prisma.opportunity.findUnique({ where: { id }, select: { id: true } });
+    const opp = await prisma.opportunity.findFirst({ where: { id, organizationId: user.organizationId }, select: { id: true } });
     if (!opp) return notFound("Opportunity not found");
     const docs = await prisma.document.findMany({
-      where: { opportunityId: id, status: { not: "Archived" } },
+      where: { opportunityId: id, status: { not: "Archived" }, organizationId: user.organizationId },
       include: { uploadedBy: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -48,9 +48,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const opp = await prisma.opportunity.findUnique({ where: { id }, select: { id: true, title: true, ownerId: true } });
+    const opp = await prisma.opportunity.findFirst({ where: { id, organizationId: user.organizationId }, select: { id: true, title: true, ownerId: true } });
     if (!opp) return notFound("Opportunity not found");
 
     const form = await request.formData();
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         category: documentType,
         opportunityId: id,
         uploadedById: user.id,
+        organizationId: user.organizationId,
         status: "Active",
       },
     });
@@ -92,22 +95,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       entityType: "opportunity",
       entityId: id,
       action: "opportunity.document_uploaded",
-      description: `Document \"${safeName}\" uploaded to opportunity \"${opp.title}\"`,
+      description: `Document "${safeName}" uploaded to opportunity "${opp.title}"`,
       userId: user.id,
+      organizationId: user.organizationId,
       data: { documentId: doc.id, size: uploaded.size },
     });
     await createActivity({
       type: "Note",
-      subject: `Document \"${safeName}\" uploaded`,
+      subject: `Document "${safeName}" uploaded`,
       status: "Completed",
       opportunityId: id,
       customerId: null,
+      organizationId: user.organizationId,
     });
     await createNotification({
       userId: user.id,
+      organizationId: user.organizationId,
       type: "Success",
       title: "Document uploaded",
-      message: `\"${safeName}\" was uploaded to ${opp.title}`,
+      message: `"${safeName}" was uploaded to ${opp.title}`,
       entityType: "opportunity",
       entityId: id,
       actionLink: `/opportunities/${id}`,

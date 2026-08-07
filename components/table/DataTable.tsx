@@ -83,6 +83,18 @@ export function DataTable<TData extends { id: string }, TValue>({
   const [rowSelection, setRowSelection] =
     React.useState<RowSelectionState>({});
 
+  // TanStack Table requires a referentially-stable `state` object. Passing an
+  // inline literal creates a NEW reference every render, which TanStack diffs
+  // against its internal state and may react to by calling the on*Change
+  // setters DURING render — React 19 reports that as "Can't perform a React
+  // state update on a component that hasn't mounted yet." Memoizing the state
+  // object (keyed on the individual state values) keeps it stable between
+  // renders unless a value actually changed.
+  const tableState = React.useMemo(
+    () => ({ sorting, columnFilters, columnVisibility, rowSelection }),
+    [sorting, columnFilters, columnVisibility, rowSelection]
+  );
+
   const allColumns = React.useMemo(() => {
     if (!enableRowSelection) return columns;
 
@@ -122,12 +134,7 @@ export function DataTable<TData extends { id: string }, TValue>({
     data,
     columns: allColumns,
 
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      rowSelection,
-    },
+    state: tableState,
 
     getRowId: (row) => row.id,
 
@@ -153,7 +160,26 @@ export function DataTable<TData extends { id: string }, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+
+    // When the `data` prop changes identity (e.g. a fresh mount whose fetch
+    // resolves moments later), TanStack's auto-reset pipeline calls
+    // resetPageIndex → setPagination → onPaginationChange SYNCHRONOUSLY during
+    // render — React 19 reports that as "Can't perform a React state update on
+    // a component that hasn't mounted yet." Disabling the auto-reset (the
+    // documented TanStack + React 19 fix) keeps pagination derived and stable;
+    // new data simply renders at the current page.
+    autoResetPageIndex: false,
   });
+
+  // Because auto-reset is disabled, restore the expected UX manually: when the
+  // user changes a column filter while on a later page, jump back to the first
+  // page (otherwise they could land on an empty page). This runs in an effect
+  // (not during render), so it does not reintroduce the React 19 warning.
+  React.useEffect(() => {
+    if (table.getState().pagination.pageIndex !== 0) {
+      table.setPageIndex(0);
+    }
+  }, [columnFilters, table]);
 
   const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original);
 

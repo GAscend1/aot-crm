@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { withGraphAuth, graphFetchWithTimeout } from "../../../with-graph-auth";
-import { mailForwardSchema, messageIdSchema } from "@/lib/validation/microsoft";
+import { mailForwardSchema, messageIdSchema, normalizeRecipientsToGraph } from "@/lib/validation/microsoft";
 
 export const POST = withGraphAuth(async (accessToken, req: NextRequest) => {
   const id = req.nextUrl.pathname.split("/mail/")[1]?.split("/forward")[0];
@@ -9,13 +9,21 @@ export const POST = withGraphAuth(async (accessToken, req: NextRequest) => {
     return Response.json({ error: "Invalid message ID format" }, { status: 422 });
   }
 
-  const raw = await req.json();
-  const parsed = mailForwardSchema.safeParse(raw);
+  const raw = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (raw && typeof raw.message === "object" && Array.isArray((raw.message as { toRecipients?: unknown }).toRecipients)) {
+    (raw.message as { toRecipients: unknown }).toRecipients = normalizeRecipientsToGraph(
+      (raw.message as { toRecipients?: never[] }).toRecipients,
+    );
+  }
+  const parsed = mailForwardSchema.safeParse(raw ?? {});
 
   if (!parsed.success) {
-    const first = parsed.error.issues[0];
+    console.error(
+      "[mail/forward] validation failed:",
+      parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | "),
+    );
     return Response.json(
-      { error: first?.message || "Invalid request body" },
+      { error: "Message could not be forwarded. Check the recipients and try again." },
       { status: 422 },
     );
   }
@@ -26,4 +34,4 @@ export const POST = withGraphAuth(async (accessToken, req: NextRequest) => {
   });
 
   return Response.json({ success: true });
-}, { rateLimitAction: "mail:forward" });
+}, { rateLimitAction: "mail:forward", entitlement: "outlook_email" });

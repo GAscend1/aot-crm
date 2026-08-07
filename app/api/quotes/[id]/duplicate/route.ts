@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate, featureGate } from "@/lib/server/api";
 import { logAudit, createActivity } from "@/lib/server/records";
 import { nextQuoteNumber, quoteToUI } from "@/lib/server/billing";
 export const dynamic = "force-dynamic";
@@ -8,14 +8,22 @@ export const dynamic = "force-dynamic";
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "quotes");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
-    const existing = await prisma.quote.findUnique({ where: { id }, include: { items: true } });
+    const existing = await prisma.quote.findFirst({
+      where: { id, organizationId: user.organizationId },
+      include: { items: true },
+    });
     if (!existing) return notFound("Quote not found");
     const quoteNumber = await nextQuoteNumber();
 
     const duplicate = await prisma.quote.create({
       data: {
+        organizationId: user.organizationId,
         quoteNumber,
         status: "DRAFT",
         currency: existing.currency,
@@ -56,6 +64,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       action: "quote.duplicated",
       description: `Quote ${existing.quoteNumber} duplicated as ${duplicate.quoteNumber}`,
       userId: user.id,
+      organizationId: user.organizationId,
     });
     await createActivity({
       type: "Note",
@@ -65,6 +74,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       leadId: duplicate.leadId,
       opportunityId: duplicate.opportunityId,
       customerId: duplicate.customerId,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(quoteToUI(duplicate), { status: 201 });

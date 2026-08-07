@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
@@ -31,9 +32,11 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
   const [prefill, setPrefill] = useState<{ customer?: string; company?: string; opportunity?: string; customerId?: string; companyId?: string; opportunityId?: string; leadId?: string } | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingQuote, setDeletingQuote] = useState<Quote | undefined>();
+  const mountedRef = useMountedRef();
 
   // When opened from "View Quotes" on an opportunity, filter to that opportunity's quotes.
   useEffect(() => {
+    let cancelled = false;
     quoteService
       .findAll(
         prefillOpportunityId
@@ -41,13 +44,18 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
           : undefined
       )
       .then((result) => {
+        if (cancelled) return;
         setQuotes(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (cancelled) return;
         setError("Failed to load quotes.");
         setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [prefillOpportunityId]);
 
   // Prefill from opportunity/lead context (e.g. "Create Quote" from opportunity detail)
@@ -334,7 +342,7 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
                 : undefined
             )
             .then((result) => {
-              setQuotes(result.data);
+              if (mountedRef.current) setQuotes(result.data);
             });
         }}
       />

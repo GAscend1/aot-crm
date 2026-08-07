@@ -17,8 +17,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const opp = await prisma.opportunity.findUnique({
-      where: { id },
+    const opp = await prisma.opportunity.findFirst({
+      where: { id, organizationId: user.organizationId },
       include: {
         stageHistory: { include: { fromStage: true, toStage: true } },
         activities: true,

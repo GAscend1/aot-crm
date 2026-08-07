@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { reminderSchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   if (!user) return unauthorized();
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get("leadId");
-  const where: Prisma.ReminderWhereInput = { userId: user.id };
+  const where: Prisma.ReminderWhereInput = { userId: user.id, organizationId: user.organizationId };
   if (leadId) where.leadId = leadId;
   try {
     const data = await prisma.reminder.findMany({
@@ -50,6 +50,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = reminderSchema.parse(body);
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
         title: parsed.title,
         dueDate: new Date(parsed.dueDate),
         userId: user.id,
+        organizationId: user.organizationId,
         leadId: parsed.leadId || undefined,
         entityType: parsed.entityType || undefined,
         entityId: parsed.entityId || undefined,
@@ -69,6 +72,7 @@ export async function POST(request: NextRequest) {
       action: "reminder.created",
       description: `Reminder "${created.title}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
       data: { reminderId: created.id, dueDate: created.dueDate.toISOString() },
     });
     return NextResponse.json({ data: reminderToUI(created) }, { status: 201 });

@@ -10,45 +10,76 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IntegrationWarning } from "@/components/common/IntegrationWarning";
+import { IntegrationStateBanner } from "@/components/common/IntegrationStateBanner";
 import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog";
 import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 import { teamsService } from "@/services/teams.service";
 import { zoomService } from "@/services/zoom.service";
+import {
+  classifyTeamsError,
+  isNotConfiguredError,
+  type IntegrationStatus,
+} from "@/services/integration-gate";
+import { integrations } from "@/config/integrations";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
 import type { TeamsMeeting, ZoomMeeting } from "@/types/common";
+import { cn } from "@/lib/utils";
 
 /**
  * Meetings view of the Activities module (merged from the old /activities/meetings
  * page). Meetings are activities in the same work engine as everything else.
+ *
+ * Microsoft Teams and Zoom are INDEPENDENT providers:
+ * - A Teams failure is reported as "Microsoft Teams unavailable" — it never
+ *   implies Outlook/Calendar or the rest of Microsoft 365 is down.
+ * - Zoom not being configured is a graceful NOT CONFIGURED state, not an error.
  */
 export function MeetingsView() {
   const [teams, setTeams] = useState<TeamsMeeting[]>([]);
   const [zoom, setZoom] = useState<ZoomMeeting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingConsent, setPendingConsent] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [teamsStatus, setTeamsStatus] = useState<IntegrationStatus | null>(null);
+  const [zoomError, setZoomError] = useState<string | null>(null);
+  // True when the Zoom backend itself reports NOT configured (even if the
+  // client flag is on — e.g. NEXT_PUBLIC_USE_ZOOM=true with no backend).
+  const [zoomDisabled, setZoomDisabled] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
 
+  const zoomConfigured = integrations.useZoom;
+
   const load = useCallback(() => {
-    Promise.allSettled([teamsService.getMeetings(), zoomService.getMeetings()])
+    // Initial state is already loading; retries intentionally keep the current
+    // list visible instead of flashing a full-screen spinner.
+    Promise.allSettled([
+      teamsService.getMeetings(),
+      // When Zoom is not configured, don't call its API at all — the section
+      // renders the graceful "Zoom is not configured" state instead.
+      zoomConfigured ? zoomService.getMeetings() : Promise.resolve([] as ZoomMeeting[]),
+    ])
       .then(([teamsResult, zoomResult]) => {
-        if (teamsResult.status === "fulfilled") setTeams(teamsResult.value);
-        if (zoomResult.status === "fulfilled") setZoom(zoomResult.value);
-        const anyPending = [teamsResult, zoomResult].some(
-          (r) => r.status === "rejected" && r.reason instanceof Error && r.reason.message.includes("awaiting administrator approval")
-        );
-        const anyError = [teamsResult, zoomResult].some((r) => r.status === "rejected");
-        if (anyPending) {
-          setPendingConsent(true);
-          setLoadError(null);
+        if (teamsResult.status === "fulfilled") {
+          setTeams(teamsResult.value);
+          setTeamsStatus(null);
         } else {
-          setPendingConsent(false);
-          setLoadError(anyError ? "Could not load meeting lists. Microsoft Teams or Zoom may be unavailable." : null);
+          setTeamsStatus(classifyTeamsError(teamsResult.reason));
+        }
+
+        if (zoomResult.status === "fulfilled") {
+          setZoom(zoomResult.value);
+          setZoomError(null);
+          setZoomDisabled(false);
+        } else if (isNotConfiguredError(zoomResult.reason)) {
+          // Backend reports NOT CONFIGURED — graceful state, not an error.
+          setZoomDisabled(true);
+          setZoomError(null);
+        } else {
+          setZoomError("Could not load Zoom meetings.");
         }
       })
-      .catch(() => setLoadError("Could not load meetings."))
+      .catch(() => setTeamsStatus(classifyTeamsError(new Error("Could not load meetings."))))
       .finally(() => setLoading(false));
-  }, []);
+  }, [zoomConfigured]);
 
   useEffect(() => {
     load();
@@ -59,32 +90,19 @@ export function MeetingsView() {
 
   return (
     <div className="space-y-4">
-      {pendingConsent && (
-        <IntegrationWarning
-          title="Meetings are awaiting approval"
-          message="Your Microsoft 365 connection is waiting for administrator approval. Teams meetings can't sync right now, but Zoom and the rest of the CRM keep working."
-          action={{ label: "Check integration status", onClick: () => window.location.assign("/administration/microsoft-integration") }}
-          onDismiss={() => setPendingConsent(false)}
-        />
-      )}
-
-      {loadError && (
-        <IntegrationWarning
-          title="Could not load meetings"
-          message={loadError}
-          onDismiss={() => setLoadError(null)}
-        />
-      )}
-
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => setTeamsOpen(true)}>
-          <Video className="mr-1.5 h-4 w-4" />
-          Teams
-        </Button>
-        <Button size="sm" onClick={() => setZoomOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Zoom Meeting
-        </Button>
+        <FeatureGate feature="teams" featureLabel="Teams meetings" mode="hide">
+          <Button variant="outline" size="sm" onClick={() => setTeamsOpen(true)}>
+            <Video className="mr-1.5 h-4 w-4" />
+            Teams
+          </Button>
+        </FeatureGate>
+        <FeatureGate feature="zoom" featureLabel="Zoom meetings" mode="hide">
+          <Button size="sm" onClick={() => setZoomOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Zoom Meeting
+          </Button>
+        </FeatureGate>
       </div>
 
       {loading ? (
@@ -93,18 +111,33 @@ export function MeetingsView() {
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {/* Teams */}
+          {/* Microsoft Teams — independent provider */}
           <section className="rounded-xl border bg-surface-raised">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Video className="h-4 w-4 text-[color:var(--chart-5)]" />
                 Microsoft Teams
               </h2>
-              <Button variant="ghost" size="xs" onClick={() => setTeamsOpen(true)}>
-                <Plus className="mr-1 h-3 w-3" />
-                New
-              </Button>
+              <div className="flex items-center gap-2">
+                <StateChip
+                  label={teamsStatus?.state ?? "CONNECTED"}
+                  tone={teamsStatus ? "warning" : "success"}
+                />
+                <FeatureGate feature="teams" featureLabel="Teams meetings" mode="hide">
+                  <Button variant="ghost" size="xs" onClick={() => setTeamsOpen(true)}>
+                    <Plus className="mr-1 h-3 w-3" />
+                    New
+                  </Button>
+                </FeatureGate>
+              </div>
             </div>
+
+            {teamsStatus && (
+              <div className="border-b px-4 py-3">
+                <IntegrationStateBanner status={teamsStatus} onRetry={load} />
+              </div>
+            )}
+
             <div className="divide-y">
               {teams.length === 0 ? (
                 <p className="px-4 py-10 text-center text-sm text-muted-foreground">
@@ -132,20 +165,44 @@ export function MeetingsView() {
             </div>
           </section>
 
-          {/* Zoom */}
+          {/* Zoom — independent provider */}
           <section className="rounded-xl border bg-surface-raised">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <MonitorPlay className="h-4 w-4 text-[color:var(--chart-6)]" />
                 Zoom
               </h2>
-              <Button variant="ghost" size="xs" onClick={() => setZoomOpen(true)}>
-                <Plus className="mr-1 h-3 w-3" />
-                New
-              </Button>
+              <div className="flex items-center gap-2">
+                <StateChip
+                  label={zoomConfigured && !zoomDisabled ? "CONNECTED" : "NOT CONFIGURED"}
+                  tone={zoomConfigured && !zoomDisabled ? "success" : "warning"}
+                />
+                <FeatureGate feature="zoom" featureLabel="Zoom meetings" mode="hide">
+                  <Button variant="ghost" size="xs" onClick={() => setZoomOpen(true)}>
+                    <Plus className="mr-1 h-3 w-3" />
+                    New
+                  </Button>
+                </FeatureGate>
+              </div>
             </div>
+
+            {zoomError && (
+              <div className="border-b px-4 py-3">
+                <IntegrationWarning
+                  title="Could not load Zoom meetings"
+                  message={zoomError}
+                  action={{ label: "Retry", onClick: load }}
+                />
+              </div>
+            )}
+
             <div className="divide-y">
-              {zoom.length === 0 ? (
+              {!zoomConfigured || zoomDisabled ? (
+                <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  Zoom is not configured. Contact your administrator to enable the Zoom
+                  integration — the rest of the CRM keeps working normally.
+                </p>
+              ) : zoom.length === 0 ? (
                 <p className="px-4 py-10 text-center text-sm text-muted-foreground">
                   No Zoom meetings scheduled.
                 </p>
@@ -175,8 +232,38 @@ export function MeetingsView() {
         </div>
       )}
 
-      <TeamsMeetingDialog open={teamsOpen} onClose={() => setTeamsOpen(false)} />
+      <FeatureGate feature="teams" featureLabel="Teams meetings" mode="hide">
+        <TeamsMeetingDialog open={teamsOpen} onClose={() => setTeamsOpen(false)} />
+      </FeatureGate>
       <ZoomMeetingDialog open={zoomOpen} onClose={() => setZoomOpen(false)} />
     </div>
+  );
+}
+
+function StateChip({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "success" | "warning";
+}) {
+  return (
+    <span
+      className={cn(
+        "hidden items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide sm:inline-flex",
+        tone === "success"
+          ? "bg-success-soft text-[color:var(--success)]"
+          : "bg-warning-soft text-[color:var(--warning)]"
+      )}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          tone === "success" ? "bg-[color:var(--success)]" : "bg-[color:var(--warning)]"
+        )}
+        aria-hidden="true"
+      />
+      {label}
+    </span>
   );
 }

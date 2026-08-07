@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, forbidden, serverError, logServerError, notFound, isAdmin } from "@/lib/server/api";
+import { getCrmUser, unauthorized, forbidden, serverError, logServerError, notFound, isAdminOrPlatformOwner } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { adminUserSchema } from "@/lib/validation/entities";
 import { adminUserToUI } from "../route";
@@ -13,10 +13,10 @@ export async function GET(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
-  if (!isAdmin(user)) return forbidden();
+  if (!(await isAdminOrPlatformOwner(user))) return forbidden();
   const { id } = await params;
   try {
-    const target = await prisma.user.findUnique({ where: { id } });
+    const target = await prisma.user.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!target) return notFound("User not found");
     return NextResponse.json(adminUserToUI(target));
   } catch (err) {
@@ -31,12 +31,12 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
-  if (!isAdmin(user)) return forbidden();
+  if (!(await isAdminOrPlatformOwner(user))) return forbidden();
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = adminUserSchema.partial().parse(body);
-    const existing = await prisma.user.findUnique({ where: { id } });
+    const existing = await prisma.user.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("User not found");
 
     const data: Partial<Pick<User, "name" | "email" | "role" | "department" | "team" | "status">> = {};
@@ -70,10 +70,10 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
-  if (!isAdmin(user)) return forbidden();
+  if (!(await isAdminOrPlatformOwner(user))) return forbidden();
   const { id } = await params;
   try {
-    const existing = await prisma.user.findUnique({ where: { id } });
+    const existing = await prisma.user.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("User not found");
     await prisma.user.delete({ where: { id } });
     await logAudit({

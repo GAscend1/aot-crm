@@ -26,4 +26,4 @@ export const POST = withGraphAuth(async (accessToken, req: NextRequest) => {
   });
 
   return Response.json({ success: true });
-}, { rateLimitAction: "mail:reply" });
+}, { rateLimitAction: "mail:reply", entitlement: "outlook_email" });

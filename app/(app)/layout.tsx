@@ -20,11 +20,13 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const isPlatformOwner = session?.user?.isPlatformOwner === true;
+
   return (
     <SidebarProvider>
       <AppProviders>
         <AppShell
-          sidebar={<AppSidebar />}
+          sidebar={<AppSidebar isPlatformOwner={isPlatformOwner} />}
           navbar={<AppNavbar />}
         >
           {children}

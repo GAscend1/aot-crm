@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { X, Video, ExternalLink, Copy, Phone } from "lucide-react";
+import { X, Video, ExternalLink, Copy, Phone, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { teamsService } from "@/services/teams.service";
 import { useToastContext } from "@/app/(app)/AppProviders";
+import { classifyGraphError, type IntegrationStatus } from "@/services/integration-gate";
 import type { TeamsMeeting } from "@/types/common";
 
 interface TeamsMeetingDialogProps {
@@ -16,6 +17,12 @@ interface TeamsMeetingDialogProps {
 
 export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDialogProps) {
   const { success, error: showError } = useToastContext();
+  // Verify Microsoft 365 is actually connected before offering Teams creation.
+  // Do not present the form (or mark the feature ready) when the connection is
+  // missing/expired — the dialog shows a clear Connect/Unavailable state instead.
+  const [status, setStatus] = useState<IntegrationStatus | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [checkToken, setCheckToken] = useState(0);
   const [subject, setSubject] = useState(entityName ? `Meeting with ${entityName}` : "");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState("10:00");
@@ -23,6 +30,29 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
   const [body, setBody] = useState("");
   const [meeting, setMeeting] = useState<TeamsMeeting | null>(null);
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch("/api/integrations/microsoft/status", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: IntegrationStatus | null) => {
+        if (cancelled) return;
+        setStatus(body);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStatus(classifyGraphError(new Error("Could not reach the integration status endpoint")));
+      })
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, checkToken]);
+
+  const connected = status?.state === "CONNECTED";
 
   const handleCreate = async () => {
     setCreating(true);
@@ -45,6 +75,10 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
     }
   };
 
+  const reconnect = () => {
+    window.location.assign("/api/auth/signin/microsoft-entra-id?callbackUrl=" + encodeURIComponent(window.location.pathname));
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     success("Copied to clipboard");
@@ -61,12 +95,49 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
                 <Video className="h-4 w-4 text-[color:var(--chart-5)]" />
                 Microsoft Teams Meeting
               </h2>
-              <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
+              <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" aria-label="Close" />}>
                 <X className="h-4 w-4" />
               </DialogPrimitive.Close>
             </div>
 
-            {meeting ? (
+            {!checking && !connected ? (
+              <div className="flex flex-col items-center gap-4 p-8 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft">
+                  <AlertTriangle className="h-6 w-6 text-[color:var(--warning)]" />
+                </div>
+                <div>
+                  {/* Provider-specific copy: Teams failures must never be
+                      reported as a generic "Microsoft 365 unavailable" when
+                      the rest of Microsoft 365 (e.g. Outlook Calendar) works. */}
+                  <h3 className="font-medium text-foreground">
+                    {status?.state && status.state !== "GRAPH_UNAVAILABLE"
+                      ? status.title
+                      : "Microsoft Teams unavailable"}
+                  </h3>
+                  <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                    {status?.message ?? "Unable to load/create Teams meetings. The rest of the CRM keeps working."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setChecking(true);
+                      setCheckToken((t) => t + 1);
+                    }}
+                  >
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                    Check again
+                  </Button>
+                  <Button onClick={reconnect}>Connect Microsoft 365</Button>
+                </div>
+              </div>
+            ) : checking ? (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Checking Microsoft 365 connection…
+              </div>
+            ) : meeting ? (
               <div className="space-y-4 p-4">
                 <div className="rounded-lg bg-[color:var(--chart-5)]/[0.08] p-4">
                   <h3 className="font-medium text-foreground">{meeting.subject}</h3>
@@ -103,7 +174,7 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
                 </div>
 
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => window.open(meeting.joinUrl, "_blank")}>
+                  <Button className="flex-1" onClick={() => window.open(meeting.joinUrl, "_blank", "noopener,noreferrer")}>
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Join Meeting
                   </Button>
@@ -125,7 +196,7 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-slate-500">Date</label>
+                    <label className="text-xs font-medium text-muted-foreground">Date</label>
                     <input
                       type="date"
                       value={date}
@@ -134,7 +205,7 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-slate-500">Start</label>
+                    <label className="text-xs font-medium text-muted-foreground">Start</label>
                     <input
                       type="time"
                       value={startTime}
@@ -143,7 +214,7 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-slate-500">End</label>
+                    <label className="text-xs font-medium text-muted-foreground">End</label>
                     <input
                       type="time"
                       value={endTime}
@@ -152,8 +223,7 @@ export function TeamsMeetingDialog({ open, onClose, entityName }: TeamsMeetingDi
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500">Description</label>
+                <div>                    <label className="text-xs font-medium text-muted-foreground">Description</label>
                   <textarea
                     value={body}
                     onChange={(e) => setBody(e.target.value)}

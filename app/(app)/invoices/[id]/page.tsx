@@ -19,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { invoiceService } from "@/services/index";
+import { useCanUse } from "@/hooks/use-subscription";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
 import type { Invoice } from "@/services/invoice.service";
 import { invoiceStatusColors, invoiceStatusLabels } from "../types";
 import { InvoiceModal } from "../components/InvoiceModal";
@@ -34,7 +36,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
 
+  // Deep-link gate: a plan without invoices never fires the record fetch (which
+  // would 403) — the FeatureGate locked state below is shown instead. The API
+  // still returns 403; this is presentation only.
+  const canUseInvoices = useCanUse("invoices");
+
   useEffect(() => {
+    if (!canUseInvoices) return;
     let cancelled = false;
     fetch(`/api/invoices/${id}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -49,7 +57,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     return () => {
       cancelled = true;
     };
-  }, [id, router]);
+  }, [id, router, canUseInvoices]);
 
   const runAction = async (method: string, body?: Record<string, unknown>) => {
     if (!invoice) return;
@@ -165,18 +173,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     URL.revokeObjectURL(url);
   };
 
-  if (loading || !invoice) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
-    <>
+    <FeatureGate feature="invoices" featureLabel="Invoices" mode="replace">
+      {loading || !invoice ? (
+        <div className="space-y-6">
+          <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+          <div className="h-48 animate-pulse rounded-xl bg-muted" />
+          <div className="h-48 animate-pulse rounded-xl bg-muted" />
+        </div>
+      ) : (
+      <>
       <div className="mb-6 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-4">
           <Link
@@ -351,6 +357,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         invoice={invoice}
         onSave={handleSave}
       />
-    </>
+      </>
+      )}
+    </FeatureGate>
   );
 }

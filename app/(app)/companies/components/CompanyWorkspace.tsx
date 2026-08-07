@@ -40,6 +40,7 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { companyService } from "@/services/index";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ApiRequestError } from "@/repositories/api/ApiRepository";
+import { useCanUse } from "@/hooks/use-subscription";
 
 import type { Company } from "../types";
 import { CompanyForm } from "./CompanyForm";
@@ -94,6 +95,11 @@ export function CompanyWorkspace({ onChanged }: CompanyWorkspaceProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [metrics, setMetrics] = useState<CompanyMetrics>({ peopleCount: 0, openOpportunities: 0, pipelineValue: 0, wonRevenue: 0, openTickets: 0 });
+
+  // Plan-gated sections: quotes/invoices require Professional+ (server enforces too).
+  const canQuote = useCanUse("quotes");
+  const canInvoice = useCanUse("invoices");
+  const canEmail = useCanUse("outlook_email");
 
   useEffect(() => {
     if (record?.id) {
@@ -160,13 +166,17 @@ export function CompanyWorkspace({ onChanged }: CompanyWorkspaceProps) {
         tone: "--success",
         onClick: handleCreateOpportunity,
       },
-      {
-        label: "Email",
-        icon: Mail,
-        tone: "--info",
-        disabled: !record?.email,
-        onClick: () => setEmailOpen(true),
-      },
+      ...(canEmail
+        ? [
+            {
+              label: "Email",
+              icon: Mail,
+              tone: "--info" as const,
+              disabled: !record?.email,
+              onClick: () => setEmailOpen(true),
+            },
+          ]
+        : []),
       {
         label: "Call",
         icon: Phone,
@@ -176,7 +186,7 @@ export function CompanyWorkspace({ onChanged }: CompanyWorkspaceProps) {
         },
       },
     ],
-    [record, handleCreatePerson, handleCreateOpportunity]
+    [record, handleCreatePerson, handleCreateOpportunity, canEmail]
   );
 
   const moreActions = useMemo(
@@ -342,9 +352,9 @@ export function CompanyWorkspace({ onChanged }: CompanyWorkspaceProps) {
 
             <RelatedOpportunitiesList companyId={record?.id} limit={3} />
 
-            <RelatedQuotesList companyId={record?.id} limit={3} />
+            {canQuote && <RelatedQuotesList companyId={record?.id} limit={3} />}
 
-            <RelatedInvoicesList companyId={record?.id} limit={3} />
+            {canInvoice && <RelatedInvoicesList companyId={record?.id} limit={3} />}
 
             <RelatedActivitiesList companyId={record?.id} limit={3} />
           </div>

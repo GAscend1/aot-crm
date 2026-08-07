@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { reminderSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -20,10 +20,10 @@ export async function GET(
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const lead = await prisma.lead.findUnique({ where: { id }, select: { id: true } });
+    const lead = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId }, select: { id: true } });
     if (!lead) return notFound("Lead not found");
     const reminders = await prisma.reminder.findMany({
-      where: { leadId: id },
+      where: { leadId: id, organizationId: user.organizationId },
       orderBy: { dueDate: "asc" },
     });
     const data: LeadReminder[] = reminders.map((r) => ({
@@ -45,9 +45,11 @@ export async function POST(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const lead = await prisma.lead.findUnique({ where: { id } });
+    const lead = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!lead) return notFound("Lead not found");
     const body = await request.json().catch(() => ({}));
     const parsed = reminderSchema.parse(body);
@@ -56,6 +58,7 @@ export async function POST(
         title: parsed.title,
         dueDate: new Date(parsed.dueDate),
         userId: user.id,
+        organizationId: user.organizationId,
         leadId: id,
         entityType: "lead",
         entityId: id,
@@ -67,6 +70,7 @@ export async function POST(
       action: "lead.reminder_created",
       description: `Reminder "${reminder.title}" added to lead "${leadDisplayName(lead)}"`,
       userId: user.id,
+      organizationId: user.organizationId,
       data: { reminderId: reminder.id, dueDate: reminder.dueDate.toISOString() },
     });
     await createActivity({
@@ -76,6 +80,7 @@ export async function POST(
       status: "Planned",
       dueDate: reminder.dueDate,
       leadId: id,
+      organizationId: user.organizationId,
     });
     return NextResponse.json(
       {

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -28,18 +29,22 @@ export function DocumentTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingDocument, setDeletingDocument] = useState<Document | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
     documentService
       .findAll()
       .then((result) => {
+        if (!mountedRef.current) return;
         setDocuments(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setError("Failed to load documents.");
         setLoading(false);
       });
-  }, []);
+  }, [mountedRef]);
 
   const categories = useMemo(
     () => [...new Set(documents.map((d) => d.category))] as Document["category"][],
@@ -253,7 +258,7 @@ export function DocumentTable() {
       <DocumentWorkspace
         onChanged={() => {
           documentService.findAll().then((result) => {
-            setDocuments(result.data);
+            if (mountedRef.current) setDocuments(result.data);
           });
         }}
       />

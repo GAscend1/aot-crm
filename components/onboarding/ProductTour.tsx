@@ -1,19 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
   ChevronRight,
   Compass,
+  Settings2,
   Sparkles,
   X,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  computeTooltipPlacement,
+  SIDEBAR_RIGHT,
+  TOOLTIP_MARGIN,
+} from "@/lib/tour-placement";
 
 /* ------------------------------------------------------------------ */
 /* Tour steps                                                          */
@@ -51,10 +57,9 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "leads",
-    target: '[data-tour="nav-/leads"]',
     title: "Leads",
     description:
-      "Capture unqualified prospects, then convert them into opportunities when they are ready to move through the pipeline.",
+      "Capture unqualified prospects from the People module — switch to the Leads view, then convert them into opportunities when they are ready to move through the pipeline.",
   },
   {
     id: "opportunities",
@@ -105,7 +110,11 @@ interface SpotlightRect {
 }
 
 function computeRect(el: Element | null, reduceMotion: boolean): SpotlightRect | null {
-  if (!el) return null;
+  // The target must still exist AND be connected to the document. Chrome's
+  // scrollIntoView walks parentNode internally and throws "Cannot read
+  // properties of null (reading 'parentNode')" when called on a detached or
+  // stale element (e.g. a sidebar item removed by a route change mid-tour).
+  if (!el || !el.isConnected) return null;
   const r = el.getBoundingClientRect();
   if (r.width === 0 && r.height === 0) return null;
   if (!reduceMotion) {
@@ -113,6 +122,10 @@ function computeRect(el: Element | null, reduceMotion: boolean): SpotlightRect |
   }
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
+
+/* ------------------------------------------------------------------ */
+/* Tooltip placement engine (pure — moved to lib/tour-placement.ts)    */
+/* ------------------------------------------------------------------ */
 
 function TourOverlay({
   step,
@@ -133,17 +146,24 @@ function TourOverlay({
 }) {
   const reduceMotion = useReducedMotion();
   const [rect, setRect] = useState<SpotlightRect | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const [tooltipSize, setTooltipSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
-    const el = step.target ? document.querySelector(step.target) : null;
+    // Resolve the target FRESH on every measurement — never keep a stale DOM
+    // reference across route changes (a stale reference throws the
+    // parentNode/null error from scrollIntoView once the element leaves the
+    // document). computeRect also re-validates isConnected defensively.
+    const getTarget = (): Element | null => {
+      if (!step.target) return null;
+      const el = document.querySelector(step.target);
+      return el && el.isConnected ? el : null;
+    };
+    const measure = () => setRect(computeRect(getTarget(), !!reduceMotion));
     // Defer first measurement so the element settles after any scroll.
-    const frame = window.requestAnimationFrame(() => {
-      setRect(computeRect(el, !!reduceMotion));
-    });
-    const timer = window.setTimeout(() => {
-      setRect(computeRect(el, !!reduceMotion));
-    }, 300);
-    const onResize = () => setRect(computeRect(el, !!reduceMotion));
+    const frame = window.requestAnimationFrame(measure);
+    const timer = window.setTimeout(measure, 300);
+    const onResize = () => measure();
     window.addEventListener("resize", onResize);
     return () => {
       window.cancelAnimationFrame(frame);
@@ -152,19 +172,50 @@ function TourOverlay({
     };
   }, [step, reduceMotion]);
 
+  // Measure the tooltip's real width AND height (ResizeObserver keeps the
+  // measurements fresh if the card content wraps on narrow screens).
+  useEffect(() => {
+    const el = tooltipRef.current;
+    if (!el) return;
+    const measure = () =>
+      setTooltipSize({ width: el.offsetWidth, height: el.offsetHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [step, rect]);
+
   const isLast = index === total - 1;
   const centered = !rect;
 
-  /* Tooltip placement — anchored below the target when available, else centered. */
+  // Collision-aware placement: measured tooltip size + target bounding rect,
+  // with the fixed sidebar accounted for and safe viewport margins. Falls back
+  // to a centered card when the target cannot be found.
+  const tooltipWidth = tooltipSize?.width ?? 360;
+  const tooltipHeight = tooltipSize?.height ?? 300;
   const tooltipStyle: React.CSSProperties = centered
-    ? {}
-    : {
-        position: "fixed",
-        top: Math.min(rect.top + rect.height + 16, window.innerHeight - 240),
-        left: Math.max(12, Math.min(rect.left + rect.width / 2 - 180, window.innerWidth - 372)),
-        width: 360,
-        maxWidth: "calc(100vw - 24px)",
-      };
+    ? { maxHeight: "calc(100dvh - 24px)", overflowY: "auto" }
+    : (() => {
+        const placement = computeTooltipPlacement(
+          rect!,
+          Math.min(tooltipWidth, window.innerWidth - 2 * TOOLTIP_MARGIN),
+          tooltipHeight,
+          window.innerWidth,
+          window.innerHeight,
+          // The fixed desktop sidebar only exists at the lg breakpoint; on
+          // narrow/mobile viewports there is no sidebar to clear.
+          window.innerWidth >= 1024 ? SIDEBAR_RIGHT : 0
+        );
+        return {
+          position: "fixed" as const,
+          top: placement.top,
+          left: placement.left,
+          width: 360,
+          maxWidth: "calc(100vw - 24px)",
+          maxHeight: "calc(100dvh - 24px)",
+          overflowY: "auto",
+        };
+      })();
 
   return (
     <div
@@ -190,19 +241,24 @@ function TourOverlay({
       {/* Dimmed background when no target found */}
       {!rect && <div className="absolute inset-0 bg-slate-950/50" />}
 
-      {/* Tooltip / welcome card */}
-      {createPortal(
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            className={cn(
-              "rounded-xl border border-border bg-popover p-5 shadow-2xl",
-              centered &&
-                "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-            )}
-            style={tooltipStyle}
-          >
+      {/* Tooltip / welcome card — rendered as a DIRECT child of the dialog
+          (no createPortal): the tooltip uses position:fixed so it needs no
+          portal, and keeping it inside the [role=dialog] element (1) satisfies
+          aria-modal containment, (2) avoids portal-mount/unmount races on
+          step changes that could leave stale DOM references and (3) keeps the
+          whole tour surface under one React tree for deterministic cleanup. */}
+      <motion.div
+        ref={tooltipRef}
+        initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className={cn(
+          "rounded-xl border border-border bg-popover p-5 shadow-2xl",
+          centered &&
+            "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+        )}
+        style={tooltipStyle}
+      >
             <div className="flex items-start justify-between gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-[color:var(--primary)]">
                 <Compass className="h-4 w-4" />
@@ -268,9 +324,7 @@ function TourOverlay({
                 )}
               </div>
             </div>
-          </motion.div>,
-          document.body
-        )}
+      </motion.div>
     </div>
   );
 }
@@ -289,6 +343,7 @@ function WelcomeModal({
   onNeverShowAgain: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const router = useRouter();
   return (
     <div
       role="dialog"
@@ -328,26 +383,30 @@ function WelcomeModal({
               {point}
             </div>
           ))}
-        </div>
-
-        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
-            onClick={onNeverShowAgain}
-            className="text-left text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-          >
-            Do not show again
-          </button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onSkip}>
-              Skip for Now
+        </div>          <div className="mt-6 flex flex-col gap-2">
+            <Button onClick={() => router.push("/onboarding")} className="w-full">
+              <Settings2 className="mr-1.5 h-4 w-4" />
+              Guided setup
             </Button>
-            <Button onClick={onStart}>
-              Start Tour
-              <ChevronRight className="ml-1.5 h-4 w-4" />
-            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={onNeverShowAgain}
+                className="text-left text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              >
+                Do not show again
+              </button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onSkip}>
+                  Skip for Now
+                </Button>
+                <Button onClick={onStart}>
+                  Start Tour
+                  <ChevronRight className="ml-1.5 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
       </motion.div>
     </div>
   );
@@ -393,20 +452,23 @@ export function ProductTour({
     }
   };
 
-  // Keyboard support: Escape skips, Arrow keys navigate.
+  // Keyboard support: Escape dismisses in both modes; Arrow keys navigate the
+  // guided tour. Welcome modal has no X, so Escape is its primary keyboard close.
   useEffect(() => {
-    if (!open || mode !== "tour") return;
+    if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
         onSkip();
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        if (currentStep < TOUR_STEPS.length - 1) onStepChange(currentStep + 1);
-        else onComplete();
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        if (currentStep > 0) onStepChange(currentStep - 1);
+      } else if (mode === "tour") {
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          if (currentStep < TOUR_STEPS.length - 1) onStepChange(currentStep + 1);
+          else onComplete();
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          if (currentStep > 0) onStepChange(currentStep - 1);
+        }
       }
     };
     window.addEventListener("keydown", onKeyDown);

@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, featureGate } from "@/lib/server/api";
+import { getSubscription } from "@/lib/server/tenant";
+import { canUseFeature } from "@/lib/entitlements";
 import { dbStageToUi, uiStageToDb } from "@/lib/server/opportunity-stages";
+import {
+  averageCycleDays,
+  breakdownByReason,
+  buildForecastSeries,
+  buildTeamProductivity,
+  buildWinRateTrend,
+  computeVelocity,
+  type OwnerMetric,
+} from "@/lib/analytics";
+import { getHealthSnapshot } from "@/lib/server/health-snapshot";
 import type { InvoiceStatus, QuoteStatus } from "@/generated/prisma/client";
 export const dynamic = "force-dynamic";
 
@@ -50,6 +62,10 @@ function initMonthSeries(from: Date, to: Date): { label: string; key: string }[]
 export async function GET(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "reports");
+  if (gate) return gate;
+  const subscription = await getSubscription(user.organizationId);
+  const advancedAnalytics = canUseFeature(subscription?.planCode ?? "", "advanced_analytics");
   const { searchParams } = new URL(request.url);
   const { from, to, fromStr, toStr } = parseRange(searchParams);
   const ownerId = searchParams.get("ownerId");
@@ -73,6 +89,7 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       prisma.opportunity.findMany({
         where: {
+          organizationId: user.organizationId,
           createdAt: { gte: from, lte: to },
           ...(ownerId ? { ownerId } : {}),
           ...(customerId ? { customerId } : {}),
@@ -88,6 +105,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.lead.findMany({
         where: {
+          organizationId: user.organizationId,
           createdAt: { gte: from, lte: to },
           ...(ownerId ? { assignedToId: ownerId } : {}),
           ...(source ? { source } : {}),
@@ -95,20 +113,27 @@ export async function GET(request: NextRequest) {
         select: { source: true, status: true, createdAt: true },
       }),
       prisma.customer.findMany({
-        where: { createdAt: { gte: from, lte: to } },
+        where: { organizationId: user.organizationId, createdAt: { gte: from, lte: to } },
         include: { company: true },
       }),
-      prisma.company.findMany({ where: { createdAt: { gte: from, lte: to } } }),
+      prisma.company.findMany({ where: { organizationId: user.organizationId, createdAt: { gte: from, lte: to } } }),
       prisma.ticket.findMany({
-        where: { createdAt: { gte: from, lte: to } },
+        where: { organizationId: user.organizationId, createdAt: { gte: from, lte: to } },
         select: { status: true, createdAt: true },
       }),
       prisma.activity.findMany({
-        where: { createdAt: { gte: from, lte: to } },
-        select: { type: true, createdAt: true },
+        where: { organizationId: user.organizationId, createdAt: { gte: from, lte: to } },
+        select: {
+          type: true,
+          status: true,
+          completedAt: true,
+          createdAt: true,
+          assignee: { select: { name: true } },
+        },
       }),
       prisma.quote.findMany({
         where: {
+          organizationId: user.organizationId,
           createdAt: { gte: from, lte: to },
           archivedAt: null,
           ...(customerId ? { customerId } : {}),
@@ -118,6 +143,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.invoice.findMany({
         where: {
+          organizationId: user.organizationId,
           createdAt: { gte: from, lte: to },
           archivedAt: null,
           ...(customerId ? { customerId } : {}),
@@ -125,7 +151,7 @@ export async function GET(request: NextRequest) {
         },
         select: { status: true, total: true, dueDate: true, paidAt: true, issueDate: true, createdAt: true },
       }),
-      prisma.user.findMany({ select: { id: true, name: true } }),
+      prisma.user.findMany({ where: { organizationId: user.organizationId }, select: { id: true, name: true } }),
     ]);
 
     // ---------- Pipeline analytics ----------
@@ -188,6 +214,100 @@ export async function GET(request: NextRequest) {
       stage: s,
       days: Math.round((daysInStage[s].reduce((a, b) => a + b, 0) / daysInStage[s].length) * 10) / 10,
     }));
+
+    // ---------- Pipeline velocity ----------
+    // Average sales cycle (days) from won deals that carry a closedAt.
+    const avgCycleDays = advancedAnalytics ? averageCycleDays(
+      won.map((o) => ({ createdAt: o.createdAt, closedAt: o.closedAt })),
+    ) : 0;
+    const velocityPerDay = advancedAnalytics ? computeVelocity(weightedRevenue, avgCycleDays) : 0;
+    // Deals advanced into each stage during the window (stage history entries).
+    // Gated with the rest of the velocity block — non-entitled plans get no
+    // per-stage movement data (server-side enforcement, not just UI hiding).
+    const dealsMovedByStage = advancedAnalytics
+      ? (() => {
+          const movedByStage: Record<string, number> = {};
+          for (const h of stageHistory) {
+            const name = dbStageToUi(h.toStage?.name ?? "");
+            if (h.createdAt >= from && h.createdAt <= to) movedByStage[name] = (movedByStage[name] || 0) + 1;
+          }
+          return STAGE_ORDER.filter((s) => movedByStage[s]).map((s) => ({
+            stage: s,
+            count: movedByStage[s],
+          }));
+        })()
+      : [];
+
+    // ---------- Revenue forecast (next 6 months from open deals) ----------
+    const forecast = advancedAnalytics
+      ? buildForecastSeries(
+          opportunities
+            .filter((o) => !["Closed Won", "Closed Lost"].includes(dbStageToUi(o.stage?.name ?? "")))
+            .filter((o) => o.expectedCloseDate)
+            .map((o) => ({
+              value: o.value,
+              probability: o.probability,
+              expectedCloseDate: o.expectedCloseDate as Date,
+            })),
+          6,
+          to,
+        )
+      : { months: [], totals: { committed: 0, weighted: 0, best: 0 } };
+
+    // ---------- Win/loss analytics ----------
+    const wonByReason = advancedAnalytics
+      ? breakdownByReason(
+          won.map((o) => ({ value: o.value, reason: o.wonReason })),
+          "No reason recorded",
+        )
+      : [];
+    const lostByReason = advancedAnalytics
+      ? breakdownByReason(
+          lost.map((o) => ({ value: o.value, reason: o.lostReason })),
+          "No reason recorded",
+        )
+      : [];
+    const winRateTrend = advancedAnalytics
+      ? buildWinRateTrend(
+          [...won, ...lost].map((o) => ({
+            isWon: dbStageToUi(o.stage?.name ?? "") === "Closed Won",
+            closedAt: o.closedAt,
+            createdAt: o.createdAt,
+          })),
+          from,
+          to,
+        )
+      : [];
+    const wonValueByReason = wonByReason.reduce((s, r) => s + r.value, 0);
+    const lostValueByReason = lostByReason.reduce((s, r) => s + r.value, 0);
+
+    // ---------- Team productivity ----------
+    const teamProductivity: OwnerMetric[] = advancedAnalytics
+      ? buildTeamProductivity(
+          opportunities.map((o) => {
+            const stageUi = dbStageToUi(o.stage?.name ?? "");
+            return {
+              owner: o.owner,
+              value: o.value,
+              isWon: stageUi === "Closed Won",
+              isClosed: stageUi === "Closed Won" || stageUi === "Closed Lost",
+            };
+          }),
+          activities,
+        )
+      : [];
+
+    // ---------- Customer health ----------
+    const customerHealth = advancedAnalytics
+      ? await getHealthSnapshot(user.organizationId)
+      : {
+          distribution: [],
+          healthy: 0,
+          atRisk: 0,
+          needsAttention: 0,
+          atRiskCompanies: [],
+          topCompanies: [],
+        };
 
     // ---------- Lead analytics ----------
     const leadSourceCounts: Record<string, number> = {};
@@ -342,6 +462,13 @@ export async function GET(request: NextRequest) {
       ticketsByStatus,
       activitiesOverTime,
       users: users.map((u) => ({ id: u.id, name: u.name ?? "" })),
+      // Phase 6 analytics blocks (gated: require the advanced_analytics entitlement)
+      advancedAnalytics,
+      velocity: { avgCycleDays, velocityPerDay, dealsMovedByStage },
+      forecast,
+      winLoss: { wonByReason, lostByReason, winRateTrend, wonValue: wonValueByReason, lostValue: lostValueByReason },
+      teamProductivity,
+      customerHealth,
     });
   } catch (err) {
     logServerError("GET /api/reports", err);

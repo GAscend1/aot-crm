@@ -36,6 +36,7 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { customerService } from "@/services/index";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ApiRequestError } from "@/repositories/api/ApiRepository";
+import { useCanUse } from "@/hooks/use-subscription";
 
 import type { Customer } from "../types";
 import { CustomerForm } from "./CustomerForm";
@@ -55,6 +56,11 @@ export function CustomerWorkspace({ onChanged }: CustomerWorkspaceProps) {
   const [emailOpen, setEmailOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Plan-gated sections: quotes/invoices require Professional+ (server enforces too).
+  const canQuote = useCanUse("quotes");
+  const canInvoice = useCanUse("invoices");
+  const canEmail = useCanUse("outlook_email");
 
   const handleSave = useCallback(
     async (data: Partial<Customer>) => {
@@ -92,12 +98,16 @@ export function CustomerWorkspace({ onChanged }: CustomerWorkspaceProps) {
 
   const actionBar = useMemo(
     () => [
-      {
-        label: "Email",
-        icon: Mail,
-        tone: "--info",
-        onClick: () => setEmailOpen(true),
-      },
+      ...(canEmail
+        ? [
+            {
+              label: "Email",
+              icon: Mail,
+              tone: "--info" as const,
+              onClick: () => setEmailOpen(true),
+            },
+          ]
+        : []),
       {
         label: "Call",
         icon: Phone,
@@ -123,7 +133,7 @@ export function CustomerWorkspace({ onChanged }: CustomerWorkspaceProps) {
         },
       },
     ],
-    [record]
+    [record, canEmail]
   );
 
   const moreActions = useMemo(
@@ -271,9 +281,9 @@ export function CustomerWorkspace({ onChanged }: CustomerWorkspaceProps) {
 
           <RelatedOpportunitiesList customerId={record?.id} limit={3} />
 
-          <RelatedQuotesList customerId={record?.id} limit={3} />
+          {canQuote && <RelatedQuotesList customerId={record?.id} limit={3} />}
 
-          <RelatedInvoicesList customerId={record?.id} limit={3} />
+          {canInvoice && <RelatedInvoicesList customerId={record?.id} limit={3} />}
 
           <RelatedActivitiesList customerId={record?.id} limit={3} refreshKey={refreshKey} />
 

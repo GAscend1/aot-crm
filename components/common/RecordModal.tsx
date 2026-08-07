@@ -80,7 +80,7 @@ export function RecordModal({
                     variant="ghost"
                     size="icon-sm"
                     className="shrink-0"
-                    aria-label="Close dialog"
+                    aria-label="Close"
                   />
                 }
               >

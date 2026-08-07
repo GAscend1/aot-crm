@@ -25,65 +25,51 @@ interface PricingTier {
 
 const tiers: PricingTier[] = [
   {
-    name: "Trial",
-    description: "Explore the full platform risk-free.",
-    price: "Free",
-    period: "14 days",
-    features: [
-      "Up to 10 contacts",
-      "Pipeline management",
-      "Email sync",
-      "Community support",
-    ],
-    cta: { label: "Start Free Trial", href: "/login" },
-  },
-  {
     name: "Starter",
     description: "For small teams getting started.",
-    price: "Contact us",
+    price: "Contact Sales",
     period: "per seat / month",
     features: [
-      "Unlimited contacts",
-      "Pipeline management",
-      "Email & calendar sync",
-      "Basic automation",
-      "Reporting dashboards",
-      "Standard support",
+      "Companies, contacts & leads",
+      "Opportunities & pipeline",
+      "Kanban board",
+      "Tasks & activities",
+      "Quotes",
+      "Standard reports",
     ],
-    cta: { label: "Talk to Sales", href: "/book-demo" },
+    cta: { label: "Contact Sales", href: "/contact" },
   },
   {
     name: "Professional",
     description: "For growing teams that need more power.",
-    price: "Contact us",
+    price: "Contact Sales",
     period: "per seat / month",
     highlighted: true,
     features: [
       "Everything in Starter",
-      "Advanced automation",
-      "Custom workflows",
-      "Teams integration",
-      "Sales forecasting",
+      "Outlook Email",
+      "Outlook Calendar sync",
+      "Microsoft Teams",
+      "Advanced analytics",
+      "Automation",
       "API access",
       "Priority support",
     ],
-    cta: { label: "Talk to Sales", href: "/book-demo" },
+    cta: { label: "Contact Sales", href: "/contact" },
   },
   {
     name: "Enterprise",
     description: "For organizations with complex needs.",
-    price: "Contact us",
-    period: "custom pricing",
+    price: "Custom",
+    period: "tailored to your needs",
     features: [
       "Everything in Professional",
-      "Azure SQL integration",
-      "Custom data retention",
-      "SSO & SCIM provisioning",
-      "Dedicated success manager",
-      "99.9% SLA",
-      "24/7 premium support",
+      "Highest limits",
+      "Advanced configuration",
+      "Custom integrations",
+      "Enterprise security controls",
     ],
-    cta: { label: "Contact Us", href: "/book-demo" },
+    cta: { label: "Talk to Sales", href: "/book-demo" },
   },
 ]
 
@@ -121,8 +107,8 @@ export function PricingSection() {
             variants={fadeUp}
             className="mt-3 text-muted-foreground"
           >
-            Start free, then scale with a plan that fits your team size and
-            requirements.
+            Transparent plans that fit your team size and requirements. Talk to
+            sales to get started.
           </motion.p>
         </motion.div>
 
@@ -131,21 +117,22 @@ export function PricingSection() {
           whileInView="visible"
           viewport={{ once: true }}
           variants={stagger}
-          className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
+          className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
           {tiers.map((tier) => (
-            <motion.div key={tier.name} variants={fadeUp}>
+            <motion.div key={tier.name} variants={fadeUp} className="relative">
+              {/* Badge sits on the wrapper (not the Card): Card clips overflow. */}
+              {tier.highlighted && (
+                <span className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[oklch(0.546_0.245_262.881)] px-3 py-0.5 text-[11px] font-medium whitespace-nowrap text-white">
+                  Recommended
+                </span>
+              )}
               <Card
                 className={cn(
                   "relative flex h-full flex-col transition-shadow duration-300",
                   tier.highlighted && "ring-2 ring-[oklch(0.546_0.245_262.881)] shadow-lg",
                 )}
               >
-                {tier.highlighted && (
-                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[oklch(0.546_0.245_262.881)] px-3 py-0.5 text-[11px] font-medium text-white">
-                    Recommended
-                  </span>
-                )}
                 <CardHeader>
                   <CardTitle>{tier.name}</CardTitle>
                   <CardDescription>{tier.description}</CardDescription>

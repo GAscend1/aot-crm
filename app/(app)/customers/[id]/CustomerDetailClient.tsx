@@ -20,6 +20,7 @@ import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog
 import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 
 import { useToastContext } from "@/app/(app)/AppProviders";
+import { useCanUse } from "@/hooks/use-subscription";
 import { customerService } from "@/services/index";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type { Customer } from "@/services/customer.service";
@@ -32,6 +33,11 @@ interface CustomerDetailClientProps {
 export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
   const router = useRouter();
   const { success, error: showError } = useToastContext();
+  // Plan-gated actions (server enforces too): Email requires Professional+,
+  // Teams/Zoom require Enterprise. Locked plans get no dead buttons.
+  const canEmail = useCanUse("outlook_email");
+  const canTeams = useCanUse("teams");
+  const canZoom = useCanUse("zoom");
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -101,9 +107,9 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
   if (loading || !customer) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -220,27 +226,33 @@ export function CustomerDetailClient({ id }: CustomerDetailClientProps) {
 
             <SectionCard title="Quick Actions">
               <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => setEmailOpen(true)}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
-                >
-                  <Mail className="h-4 w-4" />
-                  Send Email
-                </button>
-                <button
-                  onClick={() => setTeamsOpen(true)}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
-                >
-                  <Video className="h-4 w-4 text-purple-500" />
-                  Teams Meeting
-                </button>
-                <button
-                  onClick={() => setZoomOpen(true)}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
-                >
-                  <Video className="h-4 w-4 text-blue-500" />
-                  Zoom Meeting
-                </button>
+                {canEmail && (
+                  <button
+                    onClick={() => setEmailOpen(true)}
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send Email
+                  </button>
+                )}
+                {canTeams && (
+                  <button
+                    onClick={() => setTeamsOpen(true)}
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                  >
+                    <Video className="h-4 w-4 text-purple-500" />
+                    Teams Meeting
+                  </button>
+                )}
+                {canZoom && (
+                  <button
+                    onClick={() => setZoomOpen(true)}
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"
+                  >
+                    <Video className="h-4 w-4 text-blue-500" />
+                    Zoom Meeting
+                  </button>
+                )}
                 <button
                   onClick={() => setEventOpen(true)}
                   className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors dark:border-slate-700"

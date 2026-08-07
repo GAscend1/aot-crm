@@ -48,29 +48,29 @@ export function RevenueChart() {
   );
 
   const barColor: Record<ViewKey, string> = {
-    revenue: "bg-blue-600",
-    paid: "bg-emerald-500",
-    target: "bg-slate-300",
+    revenue: "bg-[color:var(--primary)]",
+    paid: "bg-[color:var(--success)]",
+    target: "bg-muted-foreground/40",
   };
 
   return (
-    <div className="rounded-xl border bg-white shadow-sm">
+    <div className="rounded-xl border bg-surface-raised shadow-sm">
       <div className="flex items-center justify-between border-b px-6 py-4">
         <div>
           <h2 className="font-semibold">Revenue Overview</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Won vs paid revenue and 12-month average target
           </p>
         </div>
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
+        <div className="flex gap-1 rounded-lg bg-muted p-0.5">
           {VIEWS.map((v) => (
             <button
               key={v.key}
               onClick={() => setView(v.key)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+              className={`rounded-md px-3 py-1 text-xs font-medium transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
                 view === v.key
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {v.label}
@@ -89,14 +89,14 @@ export function RevenueChart() {
                 key={m.month}
                 className="flex flex-1 flex-col items-center gap-1"
               >
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-muted-foreground/70">
                   ${(value / 1000).toFixed(0)}k
                 </span>
                 <div
                   className={`w-full rounded-t ${barColor[view]}`}
                   style={{ height: `${height}%` }}
                 />
-                <span className="text-[11px] font-medium text-slate-600">
+                <span className="text-[11px] font-medium text-foreground/70">
                   {m.month}
                 </span>
               </div>

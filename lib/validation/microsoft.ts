@@ -1,11 +1,22 @@
 import { z } from "zod/v4";
 
-const emailAddress = z.object({
+// Graph recipient shape: each recipient is wrapped in an `emailAddress`
+// object with `address` + optional `name`. These routes are thin proxies to
+// Microsoft Graph, so the schemas must match the Graph wire format — a flat
+// `{ name, email }` shape used to produce "Invalid input: expected string,
+// received undefined" on every send because `email` was never present.
+const graphEmailAddress = z.object({
+  address: z.string().email("Invalid email address"),
   name: z.string().max(256).optional().default(""),
-  email: z.string().email("Invalid email address"),
 }).strict();
 
-const recipientList = z.array(emailAddress).min(1, "At least one recipient is required").max(50, "Too many recipients");
+const graphRecipient = z.object({
+  emailAddress: graphEmailAddress,
+}).strict();
+
+const recipientList = z.array(graphRecipient).min(1, "At least one recipient is required").max(50, "Too many recipients");
+
+const optionalRecipientList = z.array(graphRecipient).max(50).optional().default([]);
 
 const attachmentSchema = z.object({
   name: z.string().max(256),
@@ -18,11 +29,12 @@ export const mailSendSchema = z.object({
     subject: z.string().min(1, "Subject is required").max(256),
     body: z.object({
       contentType: z.enum(["text", "html"]).optional().default("text"),
-      content: z.string().min(1).max(1_048_576),
+      // Graph accepts empty bodies; only the content type must be present.
+      content: z.string().max(1_048_576).optional().default(""),
     }).strict(),
     toRecipients: recipientList,
-    ccRecipients: z.array(emailAddress).max(50).optional().default([]),
-    bccRecipients: z.array(emailAddress).max(50).optional().default([]),
+    ccRecipients: optionalRecipientList,
+    bccRecipients: optionalRecipientList,
     attachments: z.array(attachmentSchema).max(20).optional().default([]),
   }).strict(),
   saveToSentItems: z.boolean().optional().default(true),
@@ -34,7 +46,7 @@ export const mailDraftSchema = z.object({
     contentType: z.enum(["text", "html"]).optional().default("text"),
     content: z.string().max(1_048_576).optional().default(""),
   }).strict().optional(),
-  toRecipients: z.array(emailAddress).max(50).optional().default([]),
+  toRecipients: optionalRecipientList,
 }).strict();
 
 export const mailReplySchema = z.object({
@@ -51,6 +63,26 @@ export const mailForwardSchema = z.object({
   }).strict(),
   comment: z.string().max(1_048_576).optional().default(""),
 }).strict();
+
+/**
+ * Accept either the Graph wire shape (`[{ emailAddress: { address, name } }]`)
+ * or the flat convenience shape (`[{ name, email }]`) and normalize to the
+ * Graph shape. Used by legacy/alternate clients before they migrate to the
+ * Graph payload format.
+ */
+export function normalizeRecipientsToGraph(
+  recipients: { emailAddress?: { address?: string; name?: string }; name?: string; email?: string }[] | undefined,
+): { emailAddress: { address: string; name: string } }[] {
+  if (!Array.isArray(recipients)) return [];
+  return recipients
+    .map((r) => {
+      const address = (r.emailAddress?.address ?? r.email ?? "").trim();
+      const name = r.emailAddress?.name ?? r.name ?? "";
+      if (!address) return null;
+      return { emailAddress: { address, name } };
+    })
+    .filter((r): r is { emailAddress: { address: string; name: string } } => r !== null);
+}
 
 const supportedTimeZones = [
   "UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",

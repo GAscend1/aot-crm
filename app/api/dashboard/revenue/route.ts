@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCrmUser, unauthorized } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
 
@@ -10,19 +11,22 @@ function monthKey(d: Date): string {
 }
 
 export async function GET() {
+  const user = await getCrmUser();
+  if (!user) return unauthorized();
+
   const now = new Date();
   // Rolling 12-month window (Jan 1 of 11 months ago through today)
   const from = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
   // Won revenue: opportunities in the Closed Won stage
   const won = await prisma.opportunity.findMany({
-    where: { archivedAt: null, stage: { name: "ClosedWon" }, createdAt: { gte: from } },
+    where: { archivedAt: null, organizationId: user.organizationId, stage: { name: "ClosedWon" }, createdAt: { gte: from } },
     select: { value: true, createdAt: true },
   });
 
   // Paid revenue: invoices marked PAID in the window
   const paid = await prisma.invoice.findMany({
-    where: { archivedAt: null, status: "PAID", paidAt: { gte: from } },
+    where: { archivedAt: null, organizationId: user.organizationId, status: "PAID", paidAt: { gte: from } },
     select: { total: true, paidAt: true, createdAt: true },
   });
 

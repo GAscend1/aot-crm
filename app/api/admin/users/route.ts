@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, forbidden, serverError, logServerError, badRequest, isAdmin } from "@/lib/server/api";
+import { getCrmUser, unauthorized, forbidden, serverError, logServerError, badRequest, isAdminOrPlatformOwner } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { adminUserSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -37,9 +37,16 @@ export function adminUserToUI(u: User): UIAdminUser {
 export async function GET() {
   const user = await getCrmUser();
   if (!user) return unauthorized();
-  if (!isAdmin(user)) return forbidden();
+  // In-workspace admins AND verified AOT Platform Owners may administer users.
+  // The Platform Owner bypass keeps this table working for owners whose CRM
+  // workspace role is not ADMIN (e.g. VIEWER) — it never fakes zero users.
+  if (!(await isAdminOrPlatformOwner(user))) return forbidden();
   try {
-    const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
+    // Admin manages users within their own organization only.
+    const users = await prisma.user.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { createdAt: "desc" },
+    });
     return NextResponse.json({ data: users.map(adminUserToUI), total: users.length });
   } catch (err) {
     logServerError("GET /api/admin/users", err);
@@ -50,7 +57,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
-  if (!isAdmin(user)) return forbidden();
+  if (!(await isAdminOrPlatformOwner(user))) return forbidden();
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = adminUserSchema.parse(body);
@@ -66,6 +73,7 @@ export async function POST(request: NextRequest) {
         department: parsed.department,
         team: parsed.team,
         status: parsed.status,
+        organization: { connect: { id: user.organizationId } },
       },
     });
 
@@ -75,6 +83,7 @@ export async function POST(request: NextRequest) {
       action: "admin.user.created",
       description: `User "${created.name ?? created.email}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(adminUserToUI(created), { status: 201 });

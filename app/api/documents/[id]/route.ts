@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { documentSchema } from "@/lib/validation/entities";
 import { documentToUI } from "../route";
@@ -15,7 +15,7 @@ export async function GET(
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const doc = await prisma.document.findUnique({ where: { id }, include: { uploadedBy: true } });
+    const doc = await prisma.document.findFirst({ where: { id, organizationId: user.organizationId }, include: { uploadedBy: true } });
     if (!doc) return notFound("Document not found");
     return NextResponse.json(documentToUI(doc));
   } catch (err) {
@@ -30,11 +30,13 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = documentSchema.partial().parse(body);
-    const existing = await prisma.document.findUnique({ where: { id } });
+    const existing = await prisma.document.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Document not found");
 
     const data: Prisma.DocumentUpdateInput = {};
@@ -85,9 +87,11 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.document.findUnique({ where: { id } });
+    const existing = await prisma.document.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Document not found");
     await prisma.document.delete({ where: { id } });
     await logAudit({

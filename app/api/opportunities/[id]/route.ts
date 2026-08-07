@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { opportunitySchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
@@ -15,8 +15,8 @@ export async function GET(
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const opp = await prisma.opportunity.findUnique({
-      where: { id },
+    const opp = await prisma.opportunity.findFirst({
+      where: { id, organizationId: user.organizationId },
       include: opportunityInclude,
     });
     if (!opp) return notFound("Opportunity not found");
@@ -33,6 +33,8 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
@@ -42,7 +44,7 @@ export async function PATCH(
     } catch (err) {
       return zodValidationError(err, "OPPORTUNITY_UPDATE_FAILED", "The opportunity could not be updated.");
     }
-    const existing = await prisma.opportunity.findUnique({ where: { id } });
+    const existing = await prisma.opportunity.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Opportunity not found");
 
     const data: Prisma.OpportunityUpdateInput = {};
@@ -54,6 +56,9 @@ export async function PATCH(
     if (parsed.priority !== undefined) data.priority = parsed.priority;
     if (parsed.status !== undefined) data.status = parsed.status;
     if (parsed.notes !== undefined) data.notes = parsed.notes || null;
+    if (parsed.wonReason !== undefined) data.wonReason = parsed.wonReason || null;
+    if (parsed.lostReason !== undefined) data.lostReason = parsed.lostReason || null;
+    if (parsed.closedAt !== undefined) data.closedAt = parsed.closedAt ? new Date(parsed.closedAt) : null;
     if (parsed.expectedCloseDate !== undefined) {
       data.expectedCloseDate = parsed.expectedCloseDate ? new Date(parsed.expectedCloseDate) : null;
     }
@@ -81,6 +86,21 @@ export async function PATCH(
       changes.push(
         `stage moved from "${existing.stageId ? await stageName(existing.stageId) : "—"}" to "${await stageName(toStageId)}"`
       );
+    }
+
+    // Safety net: moving to a closed stage implies Won/Lost status and a
+    // closedAt timestamp unless the client explicitly set them.
+    if (stageChanged && toStageId) {
+      const stage = await prisma.pipelineStage.findUnique({ where: { id: toStageId }, select: { name: true } });
+      if (stage?.name === "ClosedWon") {
+        data.status = data.status ?? "Won";
+        data.probability = data.probability ?? 100;
+        data.closedAt = data.closedAt ?? new Date();
+      } else if (stage?.name === "ClosedLost") {
+        data.status = data.status ?? "Lost";
+        data.probability = data.probability ?? 0;
+        data.closedAt = data.closedAt ?? new Date();
+      }
     }
 
     const updated = await prisma.opportunity.update({
@@ -155,9 +175,11 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.opportunity.findUnique({ where: { id } });
+    const existing = await prisma.opportunity.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Opportunity not found");
     await prisma.opportunity.update({ where: { id }, data: { archivedAt: new Date() } });
     await logAudit({

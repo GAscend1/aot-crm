@@ -9,12 +9,35 @@ import type { Notification } from "@/types/common";
  * (calendar, meetings, emails) so the bell always reflects both sources.
  * Persists read/unread state to PostgreSQL through the API.
  */
+/**
+ * Whether the user has opted in to in-app notifications. Defaults to on;
+ * the onboarding wizard and profile settings write the `aot-notifications-enabled`
+ * key. When disabled, server polling is paused (local events still work).
+ */
+export function notificationsEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem("aot-notifications-enabled") !== "false";
+  } catch {
+    return true;
+  }
+}
+
 export function useSyncedNotifications() {
-  const [notifications, setNotifications] = useState<Notification[]>(() =>
-    synchronizedNotificationService.getAll()
-  );
+  // Deterministic initial state: SSR and the FIRST client render must produce
+  // identical DOM (the NotificationCenter unread badge previously differed
+  // because this initializer read localStorage on the client but not the
+  // server → hydration mismatch). The mount effect below immediately merges
+  // server notifications AND any local ones via subscribe(), so the badge
+  // appears right after hydration without a mismatch.
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [serverLoaded, setServerLoaded] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Deterministic initial value (true): reading the localStorage preference in
+  // the initializer would diverge from the server snapshot on first render
+  // (same hydration-mismatch class as the badge). The mount effect syncs the
+  // real preference immediately after hydration.
+  const [enabled, setEnabled] = useState(true);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleLocalUpdate = useCallback((local: Notification[]) => {
@@ -30,6 +53,10 @@ export function useSyncedNotifications() {
   useEffect(() => {
     let cancelled = false;
     async function fetchFromServer() {
+      // Sync the persisted opt-in preference here (async scope, post-hydration)
+      // so the initial state stays deterministic — never a synchronous
+      // setState inside the effect body (react-hooks/set-state-in-effect).
+      setEnabled(notificationsEnabled());
       try {
         const res = await fetch("/api/notifications?limit=100", { cache: "no-store" });
         if (!res.ok) return;
@@ -47,15 +74,28 @@ export function useSyncedNotifications() {
         /* offline / unauthenticated: keep local state */
       }
     }
+    // Respect the onboarding/profile opt-in preference. When disabled we pause
+    // server polling (local events keep flowing through the service).
     void fetchFromServer();
-    refreshTimer.current = setInterval(() => void fetchFromServer(), 15000);
+    if (enabled) {
+      refreshTimer.current = setInterval(() => void fetchFromServer(), 15000);
+    }
     const unsub = synchronizedNotificationService.subscribe(handleLocalUpdate);
+    // React to preference changes from the wizard/settings in other tabs or
+    // same-tab navigation (custom event dispatched by the onboarding wizard).
+    const onPrefChange = () => {
+      setEnabled(notificationsEnabled());
+    };
+    window.addEventListener("storage", onPrefChange);
+    window.addEventListener("aot:notifications-pref-change", onPrefChange);
     return () => {
       if (refreshTimer.current) clearInterval(refreshTimer.current);
       cancelled = true;
       unsub();
+      window.removeEventListener("storage", onPrefChange);
+      window.removeEventListener("aot:notifications-pref-change", onPrefChange);
     };
-  }, [handleLocalUpdate, refreshKey]);
+  }, [handleLocalUpdate, refreshKey, enabled]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -87,6 +127,7 @@ export function useSyncedNotifications() {
     notifications,
     unreadCount,
     serverLoaded,
+    enabled,
     refresh: useCallback(() => setRefreshKey((k) => k + 1), []),
     markAsRead,
     markAllAsRead,

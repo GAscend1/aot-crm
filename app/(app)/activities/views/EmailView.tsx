@@ -13,8 +13,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IntegrationWarning } from "@/components/common/IntegrationWarning";
+import { IntegrationStateBanner } from "@/components/common/IntegrationStateBanner";
 import { EmailComposer } from "@/components/integrations/EmailComposer";
 import { outlookService } from "@/services/outlook.service";
+import { classifyGraphError, type IntegrationStatus } from "@/services/integration-gate";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { cn } from "@/lib/utils";
 import type { EmailMessage } from "@/types/common";
 
@@ -34,7 +37,7 @@ export function EmailView() {
   const [folder, setFolder] = useState<Folder>("inbox");
   const [messages, setMessages] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingConsent, setPendingConsent] = useState(false);
+  const [integrationIssue, setIntegrationIssue] = useState<IntegrationStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -44,18 +47,18 @@ export function EmailView() {
       .getMessages(folder)
       .then((result) => {
         setMessages(result);
-        setPendingConsent(false);
+        setIntegrationIssue(null);
         setLoadError(null);
       })
       .catch((err: unknown) => {
         setMessages([]);
-        const message = err instanceof Error ? err.message : "Failed to load messages";
-        if (message.includes("awaiting administrator approval")) {
-          setPendingConsent(true);
-          setLoadError(null);
+        const status = classifyGraphError(err);
+        if (status.state === "GRAPH_UNAVAILABLE" && !status.detail?.includes("graph_not_enabled")) {
+          setIntegrationIssue(null);
+          setLoadError(status.detail || "Failed to load messages");
         } else {
-          setLoadError(message);
-          setPendingConsent(false);
+          setIntegrationIssue(status);
+          setLoadError(null);
         }
       })
       .finally(() => setLoading(false));
@@ -87,13 +90,13 @@ export function EmailView() {
   const unreadCount = messages.filter((m) => !m.isRead).length;
 
   return (
+    <FeatureGate feature="outlook_email" featureLabel="Outlook Email" mode="replace">
     <div className="space-y-4">
-      {pendingConsent && (
-        <IntegrationWarning
-          title="Microsoft Outlook is awaiting approval"
-          message="Your Microsoft 365 connection is waiting for administrator approval. Email can't sync right now, but the rest of the CRM keeps working."
-          action={{ label: "Check integration status", onClick: () => window.location.assign("/administration/microsoft-integration") }}
-          onDismiss={() => setPendingConsent(false)}
+      {integrationIssue && (
+        <IntegrationStateBanner
+          status={integrationIssue}
+          onRetry={loadMessages}
+          onDismiss={() => setIntegrationIssue(null)}
         />
       )}
 
@@ -225,5 +228,6 @@ export function EmailView() {
         onSent={() => loadMessages()}
       />
     </div>
+    </FeatureGate>
   );
 }

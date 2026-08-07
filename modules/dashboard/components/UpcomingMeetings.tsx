@@ -43,20 +43,20 @@ export function UpcomingMeetings() {
           <div
             key={meeting.id}
             className={`flex items-start gap-3 px-4 py-3 ${
-              index < upcomingMeetings.length - 1 ? "border-b border-slate-100" : ""
+              index < upcomingMeetings.length - 1 ? "border-b border-border" : ""
             }`}
           >
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color:var(--color-activity-soft)] text-[color:var(--color-activity)]">
               <Video className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-900">{meeting.subject}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{formatDateTime(meeting.dueDate)}</p>
+              <p className="truncate text-sm font-medium text-foreground">{meeting.subject}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(meeting.dueDate)}</p>
               {meeting.related && (
-                <p className="mt-0.5 truncate text-xs text-slate-400">{meeting.related}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground/70">{meeting.related}</p>
               )}
             </div>
-            <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-400">
+            <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
               <CalendarClock className="h-3 w-3" />
               {meeting.assignee || "Unassigned"}
             </span>

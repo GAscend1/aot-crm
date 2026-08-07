@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -27,18 +28,22 @@ export function ContactTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingContact, setDeletingContact] = useState<Contact | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
     contactService
       .findAll()
       .then((result) => {
+        if (!mountedRef.current) return;
         setContacts(result.data);
         setLoading(false);
       })
       .catch(() => {
+        if (!mountedRef.current) return;
         setError("Failed to load contacts.");
         setLoading(false);
       });
-  }, []);
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = contacts;
@@ -229,7 +234,7 @@ export function ContactTable() {
       <ContactWorkspace
         onChanged={() => {
           contactService.findAll().then((result) => {
-            setContacts(result.data);
+            if (mountedRef.current) setContacts(result.data);
           });
         }}
       />

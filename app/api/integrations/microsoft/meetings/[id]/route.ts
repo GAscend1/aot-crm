@@ -11,4 +11,4 @@ export const DELETE = withGraphAuth(async (accessToken, req: NextRequest) => {
     method: "DELETE",
   });
   return Response.json({ success: true });
-});
+}, { rateLimitAction: "meetings:delete", entitlement: "teams" });

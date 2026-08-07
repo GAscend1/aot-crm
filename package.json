@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build && node scripts/check-bundle-budget.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:integration": "vitest run tests/microsoft-integration.test.ts",
+    "test:e2e": "vitest run tests/e2e/api-smoke.test.ts",
+    "audit:security": "node scripts/security-audit.mjs",
+    "load:test": "node scripts/load-test.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

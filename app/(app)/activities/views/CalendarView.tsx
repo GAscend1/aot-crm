@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Cloud, CloudOff, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventModal } from "@/components/integrations/EventModal";
-import { IntegrationWarning } from "@/components/common/IntegrationWarning";
-import { calendarService } from "@/services/calendar.service";
+import { IntegrationStateBanner } from "@/components/common/IntegrationStateBanner";
+import { calendarService, type CalendarSyncStatus } from "@/services/calendar.service";
+import { classifyGraphError, type IntegrationStatus } from "@/services/integration-gate";
 import type { CalendarEvent } from "@/types/common";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,9 @@ export function CalendarView() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [pendingConsent, setPendingConsent] = useState(false);
+  const [integrationIssue, setIntegrationIssue] = useState<IntegrationStatus | null>(null);
+  const [syncStatus, setSyncStatus] = useState<CalendarSyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -47,19 +50,63 @@ export function CalendarView() {
       .getEvents(monthStart, monthEnd)
       .then((result) => {
         setEvents(result);
-        setPendingConsent(false);
+        setIntegrationIssue(null);
       })
       .catch((err: unknown) => {
         setEvents([]);
-        if (err instanceof Error && err.message.includes("awaiting administrator approval")) {
-          setPendingConsent(true);
-        }
+        setIntegrationIssue(classifyGraphError(err));
       });
   }, [monthStart, monthEnd]);
 
+  const loadSyncStatus = useCallback(() => {
+    calendarService.getSyncStatus().then(setSyncStatus);
+  }, []);
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const result = await calendarService.syncNow();
+      if (result.ok && result.pulled && result.pulled.imported + result.pulled.updated + result.pulled.removed > 0) {
+        loadEvents();
+      }
+      if (result.error) {
+        setIntegrationIssue(
+          classifyGraphError(new Error(result.error))
+        );
+      }
+    } finally {
+      setSyncing(false);
+      loadSyncStatus();
+    }
+  }, [loadEvents, loadSyncStatus]);
+
   useEffect(() => {
+    let cancelled = false;
     loadEvents();
-  }, [loadEvents]);
+    // Background sync on mount: pull Microsoft 365 changes and flush retries.
+    // setState happens inside the promise callbacks, so the effect stays free
+    // of synchronous state updates.
+    calendarService
+      .syncNow()
+      .then((result) => {
+        if (cancelled) return;
+        if (result.ok && result.pulled && result.pulled.imported + result.pulled.updated + result.pulled.removed > 0) {
+          loadEvents();
+        }
+        if (result.error) {
+          setIntegrationIssue(classifyGraphError(new Error(result.error)));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) loadSyncStatus();
+      });
+    // Refresh sync status periodically while the calendar is open.
+    const interval = setInterval(loadSyncStatus, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [loadEvents, loadSyncStatus]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();
@@ -93,13 +140,45 @@ export function CalendarView() {
 
   return (
     <div className="space-y-4">
-      {pendingConsent && (
-        <IntegrationWarning
-          title="Microsoft Calendar is awaiting approval"
-          message="Your Microsoft 365 connection is waiting for administrator approval. Calendar events can't sync right now, but the rest of the CRM keeps working."
-          onDismiss={() => setPendingConsent(false)}
+      {integrationIssue && (
+        <IntegrationStateBanner
+          status={integrationIssue}
+          onRetry={handleSync}
+          onDismiss={() => setIntegrationIssue(null)}
         />
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-surface-raised p-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {syncStatus?.lastSyncAt ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 font-medium text-[color:var(--success)]">
+              <Cloud className="h-3.5 w-3.5" />
+              Synced {formatRelative(new Date(syncStatus.lastSyncAt))}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 font-medium text-muted-foreground">
+              <CloudOff className="h-3.5 w-3.5" />
+              Outlook sync not started
+            </span>
+          )}
+          {syncStatus && syncStatus.errorEvents > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2.5 py-1 font-medium text-[color:var(--danger)]">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {syncStatus.errorEvents} sync error{syncStatus.errorEvents > 1 ? "s" : ""}
+            </span>
+          )}
+          {syncStatus && syncStatus.pendingJobs > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 font-medium text-[color:var(--warning)]">
+              <RefreshCw className="h-3.5 w-3.5" />
+              {syncStatus.pendingJobs} queued
+            </span>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={() => void handleSync()} disabled={syncing}>
+          {syncing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+          {syncing ? "Syncing…" : "Sync now"}
+        </Button>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-surface-raised p-3">
         <div className="flex items-center gap-2">
@@ -191,13 +270,20 @@ export function CalendarView() {
                           <button
                             key={event.id}
                             onClick={() => handleEventClick(event)}
+                            title={event.syncError ? `Sync issue: ${event.syncError}` : undefined}
                             className={cn(
-                              "w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
-                              color
+                              "group flex w-full items-center gap-1 rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
+                              color,
+                              event.graphSyncStatus === "ERROR" && "ring-1 ring-inset ring-[color:var(--danger)]/40"
                             )}
                           >
-                            {new Date(event.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
-                            {event.subject}
+                            {event.graphSyncStatus === "ERROR" && (
+                              <AlertCircle className="h-2.5 w-2.5 shrink-0 text-[color:var(--danger)]" aria-label="Sync error" />
+                            )}
+                            <span className="truncate">
+                              {new Date(event.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
+                              {event.subject}
+                            </span>
                           </button>
                         );
                       })}
@@ -218,4 +304,12 @@ export function CalendarView() {
       />
     </div>
   );
+}
+
+function formatRelative(iso: Date): string {
+  const diff = Date.now() - iso.getTime();
+  if (diff < 60_000) return "just now";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return iso.toLocaleDateString();
 }

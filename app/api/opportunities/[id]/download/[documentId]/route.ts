@@ -10,7 +10,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { id, documentId } = await params;
   try {
     const doc = await prisma.document.findFirst({
-      where: { id: documentId, opportunityId: id },
+      where: { id: documentId, opportunityId: id, organizationId: user.organizationId },
     });
     if (!doc) return notFound("Document not found");
     if (!doc.storageKey) {

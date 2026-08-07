@@ -113,3 +113,73 @@ describe("CRM modal refactor (Drawer → RecordModal, DeleteDialog → ConfirmDi
     }
   });
 });
+
+describe("Record workspace close-control invariants (single X per dialog)", () => {
+  const recordWorkspaceSrc = read(join(process.cwd(), "components", "enterprise", "RecordWorkspace.tsx"));
+  const oppHeaderSrc = read(join(APP_ROOT, "opportunities", "components", "OpportunityWorkspaceHeader.tsx"));
+  const oppWorkspaceSrc = read(join(APP_ROOT, "opportunities", "components", "OpportunityWorkspace.tsx"));
+  const dialogSrc = read(join(process.cwd(), "components", "ui", "dialog.tsx"));
+
+  it("RecordWorkspace suppresses the shell close button when a custom header owns it", () => {
+    // The shadcn DialogContent renders an absolute top-right X by default.
+    expect(dialogSrc).toContain("showCloseButton = true");
+    // RecordWorkspace must forward a showCloseButton that is FALSE when a
+    // custom header (which renders its own X) is supplied.
+    expect(recordWorkspaceSrc).toMatch(/showCloseButton=\{effectiveShowCloseButton\}/);
+    expect(recordWorkspaceSrc).toMatch(/const effectiveShowCloseButton = header/);
+    expect(recordWorkspaceSrc).toContain("(showCloseButton ?? false)");
+  });
+
+  it("OpportunityWorkspace passes a custom header (so the shell X is suppressed)", () => {
+    expect(oppWorkspaceSrc).toMatch(/<RecordWorkspace[\s\S]*?header=\{/);
+  });
+
+  it("OpportunityWorkspaceHeader renders exactly ONE aria-label=Close button", () => {
+    const closeButtons = oppHeaderSrc.match(/aria-label="Close"/g) ?? [];
+    expect(closeButtons).toHaveLength(1);
+  });
+
+  it("no nested opportunity dialog renders more than one close X", () => {
+    const nested = [
+      "CreateQuoteModal.tsx",
+      "CreateInvoiceModal.tsx",
+      "AddActivityDialog.tsx",
+      "AssignOpportunityDialog.tsx",
+      "UploadDocumentDialog.tsx",
+      "EditOpportunityDialog.tsx",
+    ];
+    for (const file of nested) {
+      const src = read(join(APP_ROOT, "opportunities", "components", file));
+      const xs = src.match(/<DialogPrimitive\.Close/g) ?? [];
+      expect(xs, `${file} has exactly one DialogPrimitive.Close`).toHaveLength(1);
+    }
+  });
+});
+
+describe("Record workspace viewport invariants (no bottom clipping)", () => {
+  const src = read(join(process.cwd(), "components", "enterprise", "RecordWorkspace.tsx"));
+
+  it("gives the dialog a definite, viewport-capped height so the body scrolls", () => {
+    // Regression guard: `h-auto` + `max-h` with minmax(0,1fr) grid rows made
+    // the body row size to its content; the overflow-hidden shell then CLIPPED
+    // the lower content/buttons instead of scrolling. A definite capped height
+    // keeps the row bounded and the inner scroll regions functional.
+    expect(src).toContain("sm:h-[min(86dvh,900px)]");
+    expect(src).toContain("sm:h-[min(90dvh,900px)]");
+    expect(src).toContain("grid-rows-[auto_minmax(0,1fr)]");
+    expect(src).toContain("max-h-dvh");
+  });
+
+  it("never uses the broken two-column grid on the default layout", () => {
+    // sm:grid-cols-[1fr_auto] mis-placed the body into a narrow auto column.
+    expect(src).not.toContain("sm:grid-cols-[1fr_auto]");
+  });
+
+  it("keeps header actions clear of the single shell close X", () => {
+    expect(src).toContain("pr-14");
+  });
+
+  it("split inspector column scrolls independently when taller than the dialog", () => {
+    expect(src).toContain("lg:overflow-y-auto");
+  });
+});

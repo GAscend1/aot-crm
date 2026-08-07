@@ -37,10 +37,10 @@ function eventIcon(type: string): React.ElementType {
 }
 
 function colorFor(type: string): string {
-  if (type.includes("deleted")) return "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300";
-  if (type.includes("created") || type.includes("starred")) return "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300";
-  if (type.includes("assigned") || type.includes("converted")) return "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300";
-  return "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300";
+  if (type.includes("deleted")) return "bg-danger-soft text-[color:var(--danger)]";
+  if (type.includes("created") || type.includes("starred")) return "bg-success-soft text-[color:var(--success)]";
+  if (type.includes("assigned") || type.includes("converted")) return "bg-[color:var(--color-quote-soft)] text-[color:var(--color-quote)]";
+  return "bg-info-soft text-[color:var(--info)]";
 }
 
 export function LeadHistoryTab({ leadId }: { leadId: string }) {
@@ -72,7 +72,7 @@ export function LeadHistoryTab({ leadId }: { leadId: string }) {
       <SectionCard title="History">
         <div className="space-y-3 py-4">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+            <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
           ))}
         </div>
       </SectionCard>
@@ -85,23 +85,23 @@ export function LeadHistoryTab({ leadId }: { leadId: string }) {
         <EmptyState title="No history yet" description="Changes and activities will appear here." />
       ) : (
         <div className="relative">
-          <div className="absolute left-[13px] top-2 h-[calc(100%-16px)] w-px bg-slate-200 dark:bg-slate-700" />
+          <div className="absolute left-[13px] top-2 h-[calc(100%-16px)] w-px bg-border" />
           <div className="space-y-0">
             {entries.map((entry) => {
               const Icon = eventIcon(entry.eventType);
               return (
                 <div key={entry.id} className="relative flex gap-3 pb-5 pl-9">
                   <div
-                    className={`absolute left-1.5 flex h-6 w-6 items-center justify-center rounded-full ${colorFor(entry.eventType)} ring-4 ring-white dark:ring-slate-900`}
+                    className={`absolute left-1.5 flex h-6 w-6 items-center justify-center rounded-full ${colorFor(entry.eventType)} ring-4 ring-background`}
                   >
                     <Icon className="h-3 w-3" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-900 dark:text-white">{entry.actor}</span>
-                      <span className="text-xs text-slate-400">{formatTimestamp(entry.timestamp)}</span>
+                      <span className="text-sm font-medium text-foreground">{entry.actor}</span>
+                      <span className="text-xs text-muted-foreground/70">{formatTimestamp(entry.timestamp)}</span>
                     </div>
-                    <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{entry.description}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{entry.description}</p>
                   </div>
                 </div>
               );

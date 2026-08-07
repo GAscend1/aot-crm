@@ -1,15 +1,83 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import clsx from "clsx";
 import { X, ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { navigation, findActiveItemHref } from "@/config/navigation";
+import { navigationForUser, findActiveItemHref, type NavigationGroup } from "@/config/navigation";
 import { useSidebar } from "@/components/layout/SidebarProvider";
 import { Button } from "@/components/ui/button";
+
+/**
+ * Persisted sidebar group expansion.
+ *
+ * Implemented as a tiny external store read through useSyncExternalStore so
+ * that: (1) SSR and the first client render both produce the DEFAULT state
+ * (no hydration mismatch — the earlier aria-expanded failure came from reading
+ * localStorage inside the useState initializer); (2) the persisted expansion
+ * is applied on the client after hydration via the store's server snapshot
+ * fallback; (3) no setState-in-effect lint violation.
+ *
+ * Snapshot stability: React requires BOTH the server snapshot and the client
+ * snapshot to be referentially stable whenever the underlying state has not
+ * changed (a fresh object literal per call triggers the "getServerSnapshot
+ * should be cached" infinite-loop warning). EMPTY_GROUPS is a single frozen
+ * constant shared by the server snapshot and the pre-hydration client state.
+ */
+const GROUPS_KEY = "crm-sidebar-groups";
+const EMPTY_GROUPS: Record<string, boolean> = {};
+let groupsCache: Record<string, boolean> = EMPTY_GROUPS;
+let groupsHydrated = false;
+const groupListeners = new Set<() => void>();
+
+function readGroupsSnapshot(): Record<string, boolean> {
+  return groupsCache;
+}
+
+function subscribeGroups(listener: () => void): () => void {
+  groupListeners.add(listener);
+  return () => {
+    groupListeners.delete(listener);
+  };
+}
+
+/**
+ * Server/initial snapshot — always the deterministic default, and referentially
+ * stable (same constant every call). This is what makes SSR and the first
+ * client hydration render produce identical markup and avoids the React
+ * "cached snapshot" warning.
+ */
+function getServerGroups(): Record<string, boolean> {
+  return EMPTY_GROUPS;
+}
+
+function hydrateGroups() {
+  if (groupsHydrated) return;
+  groupsHydrated = true;
+  try {
+    const saved = localStorage.getItem(GROUPS_KEY);
+    groupsCache = saved ? (JSON.parse(saved) as Record<string, boolean>) : EMPTY_GROUPS;
+  } catch {
+    groupsCache = EMPTY_GROUPS;
+  }
+  groupListeners.forEach((listener) => listener());
+}
+
+function updateGroups(
+  updater: (prev: Record<string, boolean>) => Record<string, boolean>,
+) {
+  groupsCache = updater(groupsCache);
+  try {
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsCache));
+  } catch {
+    /* storage unavailable — in-memory only */
+  }
+  groupListeners.forEach((listener) => listener());
+}
 
 function NavGroup({
   group,
@@ -19,19 +87,19 @@ function NavGroup({
   activeHref,
   onNavigate,
 }: {
-  group: (typeof navigation)[number];
+  group: NavigationGroup;
   collapsed: boolean;
   isOpen: boolean;
   onToggle: () => void;
   activeHref: string | null;
   onNavigate: () => void;
 }) {
-  // Hidden items stay in config for deep links/command palette, but only
-  // surface in the sidebar when they are the active route so users always
-  // know where they are.
-  const visibleItems = group.items.filter(
-    (item) => !item.hidden || item.href === activeHref
-  );
+  // Hidden items (merged legacy modules like Customers/Leads/Files/Inbox)
+  // stay in config for deep links and the command palette but are NEVER
+  // surfaced in the sidebar. CanonicalModulePath normalization in
+  // findActiveItemHref means a legacy full-page record (/customers/<uuid>)
+  // highlights its canonical module (Contacts) instead of a redundant item.
+  const visibleItems = group.items.filter((item) => !item.hidden);
   if (visibleItems.length === 0) return null;
 
   const hasActive = visibleItems.some((item) => item.href === activeHref);
@@ -124,36 +192,48 @@ function NavGroup({
   );
 }
 
-export function AppSidebar() {
+export function AppSidebar({ isPlatformOwner = false }: { isPlatformOwner?: boolean }) {
   const pathname = usePathname();
   const activeHref = findActiveItemHref(pathname);
   const { collapsed, toggle, mobileOpen, closeMobile } = useSidebar();
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return JSON.parse(localStorage.getItem("crm-sidebar-groups") ?? "{}");
-      } catch {
-        return {};
-      }
-    }
-    return {};
-  });
+
+  // Expanded groups come from an external store (useSyncExternalStore): the
+  // server and first client render both use the deterministic default, and the
+  // persisted localStorage value is applied on the client after hydration via a
+  // store notification (no setState-in-effect). Owner-only items
+  // (Administration) are filtered OUT of every discovery surface for non-
+  // Platform Owners — the entry simply does not exist.
+  const expandedGroups = useSyncExternalStore(
+    subscribeGroups,
+    readGroupsSnapshot,
+    getServerGroups,
+  );
+  // Hydrate the persisted expansion on the client after mount. The store
+  // notifies useSyncExternalStore, which re-renders with the persisted value —
+  // the server HTML is always the deterministic default, so SSR and the first
+  // client render agree (no hydration mismatch).
+  useEffect(() => {
+    hydrateGroups();
+  }, []);
+  const navigation = navigationForUser(isPlatformOwner);
 
   const toggleGroup = useCallback((group: string) => {
-    setExpandedGroups((prev) => {
-      const next = { ...prev, [group]: !prev[group] };
-      localStorage.setItem("crm-sidebar-groups", JSON.stringify(next));
-      return next;
-    });
+    updateGroups((prev) => ({ ...prev, [group]: !prev[group] }));
   }, []);
 
   const sidebarContent = (
     <>
       <div className="flex h-14 items-center border-b px-3.5">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[color:var(--primary)] text-xs font-bold text-primary-foreground">
-            A
-          </span>
+          {/* Same brand artwork as the favicon (public/Logo.png). */}
+          <Image
+            src="/Logo.png"
+            alt="AOT CRM logo"
+            width={28}
+            height={28}
+            priority
+            className="h-7 w-7 shrink-0 rounded-md object-contain"
+          />
           {!collapsed && (
             <h1 className="truncate text-sm font-bold tracking-tight text-foreground">
               AOT CRM
@@ -238,9 +318,14 @@ export function AppSidebar() {
             >
               <div className="flex h-14 items-center justify-between border-b px-4">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[color:var(--primary)] text-xs font-bold text-primary-foreground">
-                    A
-                  </span>
+                  <Image
+                    src="/Logo.png"
+                    alt="AOT CRM logo"
+                    width={28}
+                    height={28}
+                    priority
+                    className="h-7 w-7 rounded-md object-contain"
+                  />
                   <h1 className="text-sm font-bold tracking-tight text-foreground">
                     AOT CRM
                   </h1>

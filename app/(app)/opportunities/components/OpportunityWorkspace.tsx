@@ -12,9 +12,11 @@ import {
   Pencil,
   Phone,
   StickyNote,
+  Trophy,
   UserRound,
   Video,
   X,
+  XCircle,
 } from "lucide-react";
 
 import { RecordWorkspace, useRecordWorkspace } from "@/components/enterprise/RecordWorkspace";
@@ -26,6 +28,8 @@ import { EventModal } from "@/components/integrations/EventModal";
 import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog";
 import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 import { cn } from "@/lib/utils";
+import { computeDealHealth, dealHealthToneClass } from "@/lib/deal-health";
+import { useCanUse } from "@/hooks/use-subscription";
 
 import type { Opportunity } from "@/services/opportunity.service";
 import { isOpportunityStage, type OpportunityStage } from "../stageConfig";
@@ -45,6 +49,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ApiRequestError } from "@/repositories/api/ApiRepository";
 import { OpportunityForm } from "./OpportunityForm";
 import { AssignOpportunityDialog } from "./AssignOpportunityDialog";
+import { DealQuickUpdateDialog } from "./DealQuickUpdateDialog";
 
 interface OpportunityWorkspaceProps {
   onChanged?: () => void;
@@ -303,6 +308,8 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
   const [eventOpen, setEventOpen] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickOutcome, setQuickOutcome] = useState<"won" | "lost" | undefined>(undefined);
 
   const [feedTab, setFeedTab] = useState<TimelineFilter>("all");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("details");
@@ -312,6 +319,16 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
   const [converting, setConverting] = useState(false);
 
   const { favorite, toggle: toggleFavorite } = useOpportunityFavorite(record?.id);
+
+  // Plan-gated sections (server enforces too): quotes/invoices require
+  // Professional+, Email (Outlook Mail) requires Professional+, and Teams /
+  // Zoom require Enterprise (Trial + full access, so they show). Locked
+  // features never render dead buttons.
+  const canQuote = useCanUse("quotes");
+  const canInvoice = useCanUse("invoices");
+  const canEmail = useCanUse("outlook_email");
+  const canTeams = useCanUse("teams");
+  const canZoom = useCanUse("zoom");
 
   const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -429,6 +446,22 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
   // actions live in the overflow menu.
   const overflowActions = [
     {
+      label: "Mark as Won",
+      icon: Trophy,
+      onClick: () => {
+        setQuickOutcome("won");
+        setQuickOpen(true);
+      },
+    },
+    {
+      label: "Mark as Lost",
+      icon: XCircle,
+      onClick: () => {
+        setQuickOutcome("lost");
+        setQuickOpen(true);
+      },
+    },
+    {
       label: "Assign Owner",
       icon: UserRound,
       onClick: () => setAssignOpen(true),
@@ -438,16 +471,33 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
       icon: Calendar,
       onClick: () => setEventOpen(true),
     },
-    {
-      label: "Email Customer",
-      icon: Mail,
-      onClick: () => setEmailOpen(true),
-    },
-    {
-      label: "Teams Meeting",
-      icon: Video,
-      onClick: () => setTeamsOpen(true),
-    },
+    ...(canEmail
+      ? [
+          {
+            label: "Email Customer",
+            icon: Mail,
+            onClick: () => setEmailOpen(true),
+          },
+        ]
+      : []),
+    ...(canTeams
+      ? [
+          {
+            label: "Teams Meeting",
+            icon: Video,
+            onClick: () => setTeamsOpen(true),
+          },
+        ]
+      : []),
+    ...(canZoom
+      ? [
+          {
+            label: "Zoom Meeting",
+            icon: Video,
+            onClick: () => setZoomOpen(true),
+          },
+        ]
+      : []),
     {
       label: "Archive",
       icon: Archive,
@@ -463,6 +513,8 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
         .map((part) => part[0]?.toUpperCase() ?? "")
         .join("")
     : "?";
+
+  const dealHealth = record ? computeDealHealth(record) : null;
 
   const tags = [
     ...(record?.priority ? [{ label: record.priority, tone: "warning" as const }] : []),
@@ -695,13 +747,17 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
                           compact
                           onUpload={() => setUploadOpen(true)}
                         />
-                        <RelatedQuotesSection
-                          opportunityId={record.id}
-                          refreshKey={refreshKey}
-                          compact
-                          onConvert={handleConvertQuote}
-                        />
-                        <RelatedInvoicesSection opportunityId={record.id} refreshKey={refreshKey} compact />
+                        {canQuote && (
+                          <RelatedQuotesSection
+                            opportunityId={record.id}
+                            refreshKey={refreshKey}
+                            compact
+                            onConvert={handleConvertQuote}
+                          />
+                        )}
+                        {canInvoice && (
+                          <RelatedInvoicesSection opportunityId={record.id} refreshKey={refreshKey} compact />
+                        )}
                       </div>
                     </div>
 
@@ -734,6 +790,21 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
                         />
                         <InspectorField label="Revenue" value={record.value != null ? moneyFmt(record.value) : undefined} />
                         <InspectorField label="Probability" value={record.probability != null ? `${record.probability}%` : undefined} />
+                        <InspectorField
+                          label="Deal Health"
+                          value={
+                            dealHealth ? (
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+                                  dealHealthToneClass(dealHealth.tone)
+                                )}
+                              >
+                                {dealHealth.label}
+                              </span>
+                            ) : undefined
+                          }
+                        />
                         <InspectorField label="Priority" value={record.priority || undefined} />
                         <InspectorField label="Lead Source" value={record.leadSource || undefined} />
                         <InspectorField label="Status" value={record.status || undefined} />
@@ -741,6 +812,12 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
                           label="Expected Close"
                           value={record.expectedCloseDate ? new Date(record.expectedCloseDate).toLocaleDateString() : undefined}
                         />
+                        {(record.wonReason || record.lostReason) && (
+                          <InspectorField
+                            label={record.status === "Won" ? "Win reason" : record.status === "Lost" ? "Loss reason" : "Close reason"}
+                            value={record.wonReason || record.lostReason || undefined}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -819,6 +896,18 @@ export function OpportunityWorkspace({ onChanged, siblings }: OpportunityWorkspa
           <EventModal open={eventOpen} onClose={() => setEventOpen(false)} entityType="opportunity" entityId={record.id} />
           <TeamsMeetingDialog open={teamsOpen} onClose={() => setTeamsOpen(false)} entityName={record.title} />
           <ZoomMeetingDialog open={zoomOpen} onClose={() => setZoomOpen(false)} entityName={record.title} />
+          <DealQuickUpdateDialog
+            key={`${record.id}:${quickOutcome ?? "open"}`}
+            open={quickOpen}
+            onClose={() => setQuickOpen(false)}
+            opportunity={record}
+            presetOutcome={quickOutcome}
+            onSaved={() => {
+              onChanged?.();
+              bumpRefresh();
+              reload();
+            }}
+          />
         </>
       )}
     </>
