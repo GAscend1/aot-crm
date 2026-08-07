@@ -18,6 +18,31 @@ interface RelatedItem {
   href?: string;
 }
 
+/** Minimal API row shape shared by the related-list fetches. */
+interface RelatedApiRow {
+  id: string;
+  title?: string;
+  customer?: string;
+  company?: string;
+  value?: number | null;
+  stage?: string;
+  status?: string | null;
+  total?: number | null;
+  quoteNumber?: string;
+  invoiceNumber?: string;
+  createdAt?: string;
+  dueDate?: string;
+  subject?: string;
+  type?: string;
+  name?: string;
+  position?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  category?: string;
+  uploadDate?: string;
+}
+
 function RelatedList({
   items,
   emptyMessage,
@@ -133,35 +158,35 @@ const pill = (className: string, label: string) => (
 );
 
 const statusPill = (status: string, tones: Record<string, string>) =>
-  pill(tones[status] ?? "bg-slate-100 text-slate-700", status);
+  pill(tones[status] ?? "bg-muted text-muted-foreground", status);
 
 const quoteTones: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-700",
-  SENT: "bg-blue-100 text-blue-700",
-  ACCEPTED: "bg-emerald-100 text-emerald-700",
-  REJECTED: "bg-red-100 text-red-700",
-  EXPIRED: "bg-orange-100 text-orange-700",
+  DRAFT: "bg-muted text-muted-foreground",
+  SENT: "bg-info-soft text-[color:var(--info)]",
+  ACCEPTED: "bg-success-soft text-[color:var(--success)]",
+  REJECTED: "bg-danger-soft text-[color:var(--danger)]",
+  EXPIRED: "bg-warning-soft text-[color:var(--warning)]",
 };
 
 const invoiceTones: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-700",
-  ISSUED: "bg-blue-100 text-blue-700",
-  PARTIALLY_PAID: "bg-amber-100 text-amber-700",
-  PAID: "bg-emerald-100 text-emerald-700",
-  OVERDUE: "bg-red-100 text-red-700",
-  VOID: "bg-slate-200 text-slate-500",
+  DRAFT: "bg-muted text-muted-foreground",
+  ISSUED: "bg-info-soft text-[color:var(--info)]",
+  PARTIALLY_PAID: "bg-warning-soft text-[color:var(--warning)]",
+  PAID: "bg-success-soft text-[color:var(--success)]",
+  OVERDUE: "bg-danger-soft text-[color:var(--danger)]",
+  VOID: "bg-muted text-muted-foreground",
 };
 
 const stagePill = (stage: string) => {
   const map: Record<string, string> = {
-    "Discovery": "bg-blue-100 text-blue-700",
-    "Qualification": "bg-slate-100 text-slate-700",
-    "Proposal": "bg-amber-100 text-amber-700",
-    "Negotiation": "bg-purple-100 text-purple-700",
-    "Closed Won": "bg-emerald-100 text-emerald-700",
-    "Closed Lost": "bg-red-100 text-red-700",
+    "Discovery": "bg-info-soft text-[color:var(--info)]",
+    "Qualification": "bg-muted text-muted-foreground",
+    "Proposal": "bg-warning-soft text-[color:var(--warning)]",
+    "Negotiation": "bg-[color:var(--color-quote-soft)] text-[color:var(--color-quote)]",
+    "Closed Won": "bg-success-soft text-[color:var(--success)]",
+    "Closed Lost": "bg-danger-soft text-[color:var(--danger)]",
   };
-  return pill(map[stage] ?? "bg-slate-100 text-slate-700", stage);
+  return pill(map[stage] ?? "bg-muted text-muted-foreground", stage);
 };
 
 const moneyFmt = (value: number) =>
@@ -199,15 +224,15 @@ export function RelatedOpportunitiesList({
       cache: "no-store",
     })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((o) => ({
             id: o.id,
-            title: o.title,
+            title: o.title ?? "",
             subtitle: o.customer,
             meta: o.value != null ? moneyFmt(o.value) : undefined,
-            badge: stagePill(o.stage),
+            badge: stagePill(o.stage ?? ""),
             href: `/opportunities?record=${encodeURIComponent(o.id)}`,
           }))
         );
@@ -258,12 +283,12 @@ export function RelatedQuotesList({
       : "";
     fetch(`/api/quotes?${qs}&pageSize=${limit}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((q) => ({
             id: q.id,
-            title: q.quoteNumber,
+            title: q.quoteNumber ?? "",
             subtitle: q.createdAt
               ? new Date(q.createdAt).toLocaleDateString()
               : undefined,
@@ -319,12 +344,12 @@ export function RelatedInvoicesList({
       : "";
     fetch(`/api/invoices?${qs}&pageSize=${limit}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((inv) => ({
             id: inv.id,
-            title: inv.invoiceNumber,
+            title: inv.invoiceNumber ?? "",
             subtitle: inv.dueDate
               ? `Due ${new Date(inv.dueDate).toLocaleDateString()}`
               : undefined,
@@ -380,22 +405,22 @@ export function RelatedActivitiesList({
     if (companyId) params.set("companyId", companyId);
     fetch(`/api/activities?${params.toString()}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((a) => ({
             id: a.id,
-            title: a.subject,
+            title: a.subject ?? "",
             subtitle: a.type,
             meta: a.createdAt
               ? new Date(a.createdAt).toLocaleDateString()
               : undefined,
             badge: pill(
               a.status === "Completed"
-                ? "bg-emerald-100 text-emerald-700"
+                ? "bg-success-soft text-[color:var(--success)]"
                 : a.status === "Cancelled"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-blue-100 text-blue-700",
+                  ? "bg-danger-soft text-[color:var(--danger)]"
+                  : "bg-info-soft text-[color:var(--info)]",
               a.status ?? ""
             ),
             href: `/activities?record=${encodeURIComponent(a.id)}`,
@@ -434,31 +459,28 @@ export function RelatedCustomersList({
   limit?: number;
 }) {
   const [items, setItems] = useState<RelatedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!companyId);
 
   useEffect(() => {
-    if (!companyId) {
-      setLoading(false);
-      return;
-    }
+    if (!companyId) return;
     let cancelled = false;
     fetch(
       `/api/customers?filters=${encodeURIComponent(JSON.stringify({ companyId }))}&pageSize=${limit}`,
       { cache: "no-store" }
     )
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((c) => ({
             id: c.id,
-            title: c.name,
+            title: c.name ?? "",
             subtitle: c.position,
             meta: c.email || undefined,
             badge: pill(
               c.status === "Active"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-slate-100 text-slate-700",
+                ? "bg-success-soft text-[color:var(--success)]"
+                : "bg-muted text-muted-foreground",
               c.status ?? ""
             ),
             href: `/customers?record=${encodeURIComponent(c.id)}`,
@@ -486,6 +508,61 @@ export function RelatedCustomersList({
 }
 
 /* ------------------------------------------------------------------ */
+/* Related Documents (used on the Company 360)                        */
+/* ------------------------------------------------------------------ */
+
+export function RelatedDocumentsList({
+  companyId,
+  limit = 5,
+}: {
+  companyId?: string;
+  limit?: number;
+}) {
+  const [items, setItems] = useState<RelatedItem[]>([]);
+  const [loading, setLoading] = useState(!!companyId);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    fetch(`/api/documents?companyId=${encodeURIComponent(companyId)}&pageSize=${limit}`, {
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((body: { data: RelatedApiRow[] }) => {
+        if (cancelled) return;
+        setItems(
+          (body.data ?? []).map((d) => ({
+            id: d.id,
+            title: d.name ?? "",
+            subtitle: d.category || d.type,
+            meta: d.uploadDate
+              ? new Date(d.uploadDate).toLocaleDateString()
+              : undefined,
+            href: `/documents?record=${encodeURIComponent(d.id)}`,
+          }))
+        );
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, limit]);
+
+  return (
+    <SectionCard title="Documents" count={items.length} viewAllHref="/documents">
+      {loading ? (
+        <Loading />
+      ) : (
+        <RelatedList items={items} emptyMessage="No documents yet." />
+      )}
+    </SectionCard>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Related Contacts (used on the Company workspace)                   */
 /* ------------------------------------------------------------------ */
 
@@ -497,20 +574,17 @@ export function RelatedContactsList({
   limit?: number;
 }) {
   const [items, setItems] = useState<RelatedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!companyId);
 
   useEffect(() => {
-    if (!companyId) {
-      setLoading(false);
-      return;
-    }
+    if (!companyId) return;
     let cancelled = false;
     fetch(
       `/api/contacts?filters=${encodeURIComponent(JSON.stringify({ companyId }))}&pageSize=${limit}`,
       { cache: "no-store" }
     )
       .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((body: { data: any[] }) => {
+      .then((body: { data: RelatedApiRow[] }) => {
         if (cancelled) return;
         setItems(
           (body.data ?? []).map((c) => ({
@@ -520,8 +594,8 @@ export function RelatedContactsList({
             meta: c.email || undefined,
             badge: pill(
               c.status === "Active"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-slate-100 text-slate-700",
+                ? "bg-success-soft text-[color:var(--success)]"
+                : "bg-muted text-muted-foreground",
               c.status ?? ""
             ),
             href: `/contacts?record=${encodeURIComponent(c.id)}`,

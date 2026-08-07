@@ -1,17 +1,11 @@
-import { PageLayout } from "@/components/common/PageLayout";
+import { ViewRedirect } from "@/components/common/ViewRedirect";
 
-import { CustomerStats } from "./components/CustomerStats";
-import { CustomerTable } from "./components/CustomerTable";
-
-export default function CustomersPage() {
+export default function CustomersRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   return (
-    <PageLayout
-      title="Customers"
-      description="Manage customer accounts, contacts, and relationships."
-    >
-      <CustomerStats />
-
-      <CustomerTable />
-    </PageLayout>
+    <ViewRedirect pathname="/contacts" view="customers" searchParams={searchParams} />
   );
 }

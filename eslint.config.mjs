@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Deliberately CommonJS Node scripts (require() is correct here — the
+    // TypeScript import rules do not apply to .cjs helpers).
+    "scripts/*.cjs",
   ]),
 ]);
 

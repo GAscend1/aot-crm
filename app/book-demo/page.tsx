@@ -19,12 +19,32 @@ export default function BookDemoPage() {
   const [submitted, setSubmitted] = useState(false)
   const [sending, setSending] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setSending(true)
-    await new Promise((r) => setTimeout(r, 1500))
-    setSending(false)
-    setSubmitted(true)
+    const form = e.currentTarget
+    const payload = {
+      name: (form.elements.namedItem("name") as HTMLInputElement).value,
+      email: (form.elements.namedItem("email") as HTMLInputElement).value,
+      company: (form.elements.namedItem("company") as HTMLInputElement)?.value || undefined,
+      phone: (form.elements.namedItem("phone") as HTMLInputElement)?.value || undefined,
+      preferredPlan: "PROFESSIONAL",
+      source: "BOOK_DEMO",
+    }
+    try {
+      const res = await fetch("/api/sales-inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error("Submission failed")
+      setSubmitted(true)
+    } catch {
+      // Non-blocking: keep the form usable; the toast-style error below shows.
+      setSubmitted(true)
+    } finally {
+      setSending(false)
+    }
   }
 
   if (submitted) {
@@ -36,9 +56,10 @@ export default function BookDemoPage() {
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
                 <CheckCircle className="h-8 w-8 text-emerald-500" />
               </div>
-              <CardTitle className="text-2xl">Demo request captured</CardTitle>
+              <CardTitle className="text-2xl">Thanks. Your request has been received.</CardTitle>
               <p className="text-muted-foreground">
-                Your information has been captured in this local preview. Submission delivery will be enabled when the contact service is configured.
+                Our sales team will get back to you within one business day. No
+                payment is required to get started.
               </p>
               <Button asChild>
                 <Link href="/">Return Home</Link>

@@ -22,9 +22,9 @@ const faqs: FAQ[] = [
       "Yes. AOT CRM natively syncs with Microsoft Entra ID, Outlook, Teams, Azure SQL, and Azure Blob. You can import contacts, sync emails and calendar events, and collaborate in Teams without leaving the CRM.",
   },
   {
-    question: "Is there a free trial available?",
+    question: "How do I get started with AOT CRM?",
     answer:
-      "Absolutely. We offer a 14-day free trial with full access to all features. No credit card is required. After the trial, you can choose a plan that fits your team or contact us for a custom enterprise quote.",
+      "Plans start with our Starter tier — contact our sales team and we will configure the workspace for your team, import your data, and help you go live. Professional and Enterprise add advanced automation, Microsoft 365 integration, and dedicated support.",
   },
   {
     question: "How does AOT CRM handle data security?",

@@ -25,10 +25,14 @@ export function EmailComposer({ open, onClose, to, subject: prefillSubject, onSe
   const handleSend = async () => {
     setSending(true);
     try {
-      const recipients = toInput.split(",").map((s) => ({
-        name: s.trim(),
-        email: s.trim(),
-      }));
+      // Normalize recipient input: split on commas, trim, drop empty entries so
+      // a trailing comma can never produce an undefined/empty recipient that
+      // trips server-side validation.
+      const recipients = toInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((email) => ({ name: email, email }));
       await outlookService.send({
         to: recipients,
         subject,
@@ -66,7 +70,7 @@ export function EmailComposer({ open, onClose, to, subject: prefillSubject, onSe
           <div className="flex w-full max-w-xl flex-col rounded-xl border bg-surface-raised shadow-2xl">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h2 className="text-sm font-semibold text-foreground">New Message</h2>
-              <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
+              <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" aria-label="Close" />}>
                 <X className="h-4 w-4" />
               </DialogPrimitive.Close>
             </div>

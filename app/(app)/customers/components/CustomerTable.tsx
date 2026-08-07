@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -9,8 +10,8 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { customerService } from "@/services/index";
 import type { Customer } from "@/services/customer.service";
-import { CustomerDrawer } from "./CustomerDrawer";
-import { CustomerDeleteDialog } from "./CustomerDeleteDialog";
+import { CustomerModal } from "./CustomerModal";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { CustomerToolbar } from "./CustomerToolbar";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 
@@ -21,17 +22,28 @@ export function CustomerTable() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
-    customerService.findAll().then((result) => {
-      setCustomers(result.data);
-      setLoading(false);
-    });
-  }, []);
+    customerService
+      .findAll()
+      .then((result) => {
+        if (!mountedRef.current) return;
+        setCustomers(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setError("Failed to load customers.");
+        setLoading(false);
+      });
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = customers;
@@ -55,7 +67,7 @@ export function CustomerTable() {
 
   const handleEdit = useCallback((customer: Customer) => {
     setEditingCustomer(customer);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleDelete = useCallback((customer: Customer) => {
@@ -65,7 +77,10 @@ export function CustomerTable() {
 
   const handleRowClick = useCallback(
     (customer: Customer) => {
-      router.push(`/customers?record=${encodeURIComponent(customer.id)}`, {
+      // Customers is a view inside the Contacts module — navigate directly to
+      // the merged workspace so the row click is a single client-side
+      // transition.
+      router.push(`/contacts?view=customers&record=${encodeURIComponent(customer.id)}`, {
         scroll: false,
       });
     },
@@ -91,40 +106,49 @@ export function CustomerTable() {
           setCustomers((prev) => [created, ...prev]);
           success("Customer created", `${created.name} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingCustomer(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save customer.");
+        throw err;
       }
     },
     [editingCustomer, success, showError]
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingCustomer) {
-      try {
-        await customerService.delete(deletingCustomer.id);
-        setCustomers((prev) =>
-          prev.filter((c) => c.id !== deletingCustomer.id)
-        );
-        success("Customer deleted", `${deletingCustomer.name} has been removed.`);
-        setDeletingCustomer(undefined);
-      } catch {
-        showError("Error", "Failed to delete customer.");
-      }
+    if (!deletingCustomer) return;
+    const target = deletingCustomer;
+    const previous = customers;
+    // Optimistic removal; restored if the API call fails.
+    setCustomers((prev) => prev.filter((c) => c.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingCustomer(undefined);
+    try {
+      await customerService.delete(target.id);
+      success("Customer archived", `${target.name} has been archived.`);
+    } catch {
+      setCustomers(previous);
+      showError("Error", "Failed to archive customer.");
     }
-  }, [deletingCustomer, success, showError]);
+  }, [customers, deletingCustomer, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingCustomer(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await customerService.findAll();
-    setCustomers(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await customerService.findAll();
+      setCustomers(result.data);
+    } catch {
+      setError("Failed to load customers.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -136,7 +160,7 @@ export function CustomerTable() {
         setCustomers((prev) =>
           prev.filter((c) => !rows.find((r) => r.id === c.id))
         );
-        success("Deleted", `${rows.length} customer(s) deleted.`);
+        success("Archived", `${rows.length} customer(s) archived.`);
       } else if (action === "export") {
         const csv = [
           "Name,Company,Email,Phone,Status,Created",
@@ -157,20 +181,14 @@ export function CustomerTable() {
     [success]
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection={true}
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -186,30 +204,38 @@ export function CustomerTable() {
         }
       />
 
-      <CustomerDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditingCustomer(undefined);
+      <CustomerModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingCustomer(undefined);
         }}
         customer={editingCustomer}
         onSave={handleSave}
       />
 
-      <CustomerDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open);
-          if (!open) setDeletingCustomer(undefined);
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setDeletingCustomer(undefined);
         }}
-        customer={deletingCustomer}
+        title="Archive Customer"
+        message={
+          <>
+            Archive <strong>{deletingCustomer?.name}</strong>? This will remove
+            the customer from active lists while keeping linked records intact.
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
         onConfirm={handleConfirmDelete}
       />
 
       <CustomerWorkspace
         onChanged={() => {
           customerService.findAll().then((result) => {
-            setCustomers(result.data);
+            if (mountedRef.current) setCustomers(result.data);
           });
         }}
       />

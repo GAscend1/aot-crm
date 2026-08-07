@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, isUniqueConstraint } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, isUniqueConstraint, subscriptionWriteGate, featureGate } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification } from "@/lib/server/records";
 import { invoiceCreateSchema } from "@/lib/validation/entities";
 import { calculateTotals, formatLineItems, nextInvoiceNumber, invoiceToUI, type InvoiceWithRelations } from "@/lib/server/billing";
@@ -21,6 +21,8 @@ const include = {
 export async function GET(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "invoices");
+  if (gate) return gate;
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "50")));
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const filters = searchParams.get("filters");
 
-  const where: Prisma.InvoiceWhereInput = { archivedAt: null };
+  const where: Prisma.InvoiceWhereInput = { archivedAt: null, organizationId: user.organizationId };
   if (search) {
     where.OR = [
       { invoiceNumber: { contains: search, mode: "insensitive" } },
@@ -84,6 +86,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "invoices");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = invoiceCreateSchema.parse(body);
@@ -92,6 +98,7 @@ export async function POST(request: NextRequest) {
     const totals = calculateTotals(items, parsed.discount, parsed.taxRate);
 
     const created = await createInvoiceWithRetry({
+      organization: { connect: { id: user.organizationId } },
       status: "DRAFT",
       currency: parsed.currency ?? "USD",
       subtotal: totals.subtotal,
@@ -124,6 +131,7 @@ export async function POST(request: NextRequest) {
       action: "invoice.created",
       description: `Invoice ${created.invoiceNumber} created ($${created.total.toLocaleString()})`,
       userId: user.id,
+      organizationId: user.organizationId,
       after: { invoiceNumber: created.invoiceNumber, total: created.total, status: created.status },
     });
     await createActivity({
@@ -134,10 +142,12 @@ export async function POST(request: NextRequest) {
       leadId: created.leadId,
       opportunityId: created.opportunityId,
       customerId: created.customerId,
+      organizationId: user.organizationId,
     });
     if (created.opportunityId) {
       await createNotification({
         userId: user.id,
+        organizationId: user.organizationId,
         type: "Success",
         title: `Invoice ${created.invoiceNumber} created`,
         message: `Invoice created for ${created.customer?.name ?? "customer"} totalling $${created.total.toLocaleString()}`,

@@ -94,6 +94,7 @@ export const activitySchema = z.object({
   opportunityId: z.string().optional().nullable(),
   customerId: z.string().optional().nullable(),
   ticketId: z.string().optional().nullable(),
+  companyId: z.string().optional().nullable(),
   assigneeId: z.string().optional().nullable(),
   createReminder: z.boolean().optional(),
   reminderDue: z.string().nullable().optional(),
@@ -147,6 +148,7 @@ export const contactSchema = z.object({
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
   status: z.string().optional(),
+  role: z.string().nullable().optional(),
 });
 
 export const opportunitySchema = z.object({
@@ -166,6 +168,9 @@ export const opportunitySchema = z.object({
   expectedCloseDate: z.string().nullable().optional(),
   notes: z.string().optional(),
   status: z.string().optional(),
+  wonReason: z.string().nullable().optional(),
+  lostReason: z.string().nullable().optional(),
+  closedAt: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
 });
 

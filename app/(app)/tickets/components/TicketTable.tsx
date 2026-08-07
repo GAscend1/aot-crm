@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -9,8 +10,8 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { ticketService } from "@/services/index";
 import type { Ticket } from "@/services/ticket.service";
-import { TicketDrawer } from "./TicketDrawer";
-import { TicketDeleteDialog } from "./TicketDeleteDialog";
+import { TicketModal } from "./TicketModal";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { TicketToolbar } from "./TicketToolbar";
 import { TicketWorkspace } from "./TicketWorkspace";
 
@@ -22,17 +23,28 @@ export function TicketTable() {
   const [priorityFilter, setPriorityFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTicket, setDeletingTicket] = useState<Ticket | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
-    ticketService.findAll().then((result) => {
-      setTickets(result.data);
-      setLoading(false);
-    });
-  }, []);
+    ticketService
+      .findAll()
+      .then((result) => {
+        if (!mountedRef.current) return;
+        setTickets(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setError("Failed to load tickets.");
+        setLoading(false);
+      });
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = tickets;
@@ -60,7 +72,7 @@ export function TicketTable() {
 
   const handleEdit = useCallback((ticket: Ticket) => {
     setEditingTicket(ticket);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleView = useCallback(
@@ -105,40 +117,49 @@ export function TicketTable() {
           setTickets((prev) => [created, ...prev]);
           success("Ticket created", `${created.subject} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingTicket(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save ticket.");
+        throw err;
       }
     },
     [editingTicket, success, showError],
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingTicket) {
-      try {
-        await ticketService.delete(deletingTicket.id);
-        setTickets((prev) =>
-          prev.filter((t) => t.id !== deletingTicket.id),
-        );
-        success("Ticket deleted", `${deletingTicket.subject} has been removed.`);
-        setDeletingTicket(undefined);
-      } catch {
-        showError("Error", "Failed to delete ticket.");
-      }
+    if (!deletingTicket) return;
+    const target = deletingTicket;
+    const previous = tickets;
+    // Optimistic removal; restored if the API call fails.
+    setTickets((prev) => prev.filter((t) => t.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingTicket(undefined);
+    try {
+      await ticketService.delete(target.id);
+      success("Ticket deleted", `${target.subject} has been removed.`);
+    } catch {
+      setTickets(previous);
+      showError("Error", "Failed to delete ticket.");
     }
-  }, [deletingTicket, success, showError]);
+  }, [tickets, deletingTicket, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingTicket(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await ticketService.findAll();
-    setTickets(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await ticketService.findAll();
+      setTickets(result.data);
+    } catch {
+      setError("Failed to load tickets.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -171,20 +192,14 @@ export function TicketTable() {
     [success],
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection={true}
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -206,30 +221,38 @@ export function TicketTable() {
         }
       />
 
-      <TicketDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditingTicket(undefined);
+      <TicketModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingTicket(undefined);
         }}
         ticket={editingTicket ?? null}
         onSave={handleSave}
       />
 
-      <TicketDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        ticket={deletingTicket ?? null}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => {
+        onClose={() => {
           setDeleteDialogOpen(false);
           setDeletingTicket(undefined);
         }}
+        title="Delete Ticket"
+        message={
+          <>
+            Are you sure you want to delete <strong>{deletingTicket?.subject}</strong>?
+            This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
       />
 
       <TicketWorkspace
         onChanged={() => {
           ticketService.findAll().then((result) => {
-            setTickets(result.data);
+            if (mountedRef.current) setTickets(result.data);
           });
         }}
       />

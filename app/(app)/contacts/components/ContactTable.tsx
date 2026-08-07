@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -9,8 +10,8 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { contactService } from "@/services/index";
 import type { Contact } from "@/services/contact.service";
-import { ContactDrawer } from "./ContactDrawer";
-import { ContactDeleteDialog } from "./ContactDeleteDialog";
+import { ContactModal } from "./ContactModal";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ContactToolbar } from "./ContactToolbar";
 import { ContactWorkspace } from "./ContactWorkspace";
 
@@ -21,17 +22,28 @@ export function ContactTable() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingContact, setDeletingContact] = useState<Contact | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
-    contactService.findAll().then((result) => {
-      setContacts(result.data);
-      setLoading(false);
-    });
-  }, []);
+    contactService
+      .findAll()
+      .then((result) => {
+        if (!mountedRef.current) return;
+        setContacts(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setError("Failed to load contacts.");
+        setLoading(false);
+      });
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = contacts;
@@ -56,7 +68,7 @@ export function ContactTable() {
 
   const handleEdit = useCallback((contact: Contact) => {
     setEditingContact(contact);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleDelete = useCallback((contact: Contact) => {
@@ -92,40 +104,49 @@ export function ContactTable() {
           setContacts((prev) => [created, ...prev]);
           success("Contact created", `${created.firstName} ${created.lastName} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingContact(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save contact.");
+        throw err;
       }
     },
     [editingContact, success, showError],
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingContact) {
-      try {
-        await contactService.delete(deletingContact.id);
-        setContacts((prev) =>
-          prev.filter((c) => c.id !== deletingContact.id),
-        );
-        success("Contact deleted", `${deletingContact.firstName} ${deletingContact.lastName} has been removed.`);
-        setDeletingContact(undefined);
-      } catch {
-        showError("Error", "Failed to delete contact.");
-      }
+    if (!deletingContact) return;
+    const target = deletingContact;
+    const previous = contacts;
+    // Optimistic removal; restored if the API call fails.
+    setContacts((prev) => prev.filter((c) => c.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingContact(undefined);
+    try {
+      await contactService.delete(target.id);
+      success("Contact archived", `${target.firstName} ${target.lastName} has been archived.`);
+    } catch {
+      setContacts(previous);
+      showError("Error", "Failed to archive contact.");
     }
-  }, [deletingContact, success, showError]);
+  }, [contacts, deletingContact, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingContact(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await contactService.findAll();
-    setContacts(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await contactService.findAll();
+      setContacts(result.data);
+    } catch {
+      setError("Failed to load contacts.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -137,7 +158,7 @@ export function ContactTable() {
         setContacts((prev) =>
           prev.filter((c) => !rows.find((r) => r.id === c.id)),
         );
-        success("Deleted", `${rows.length} contact(s) deleted.`);
+        success("Archived", `${rows.length} contact(s) archived.`);
       } else if (action === "export") {
         const csv = [
           "Name,Company,Email,Phone,Status,Created",
@@ -158,20 +179,14 @@ export function ContactTable() {
     [success],
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection={true}
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -187,30 +202,39 @@ export function ContactTable() {
         }
       />
 
-      <ContactDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditingContact(undefined);
+      <ContactModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingContact(undefined);
         }}
         contact={editingContact}
         onSave={handleSave}
       />
 
-      <ContactDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open);
-          if (!open) setDeletingContact(undefined);
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setDeletingContact(undefined);
         }}
-        contact={deletingContact}
+        title="Archive Contact"
+        message={
+          <>
+            Archive <strong>{deletingContact?.firstName} {deletingContact?.lastName}</strong>?
+            This will remove the contact from active lists while keeping linked
+            records intact.
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
         onConfirm={handleConfirmDelete}
       />
 
       <ContactWorkspace
         onChanged={() => {
           contactService.findAll().then((result) => {
-            setContacts(result.data);
+            if (mountedRef.current) setContacts(result.data);
           });
         }}
       />

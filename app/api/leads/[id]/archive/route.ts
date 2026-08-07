@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
-import { leadToUI } from "../../route";
+import { leadToUI, leadUIInclude } from "../../route";
 import type { Prisma } from "@/generated/prisma/client";
 export const dynamic = "force-dynamic";
 
-type LeadWithOwner = Prisma.LeadGetPayload<{ include: { assignedTo: true } }>;
+type LeadWithOwner = Prisma.LeadGetPayload<{ include: typeof leadUIInclude }>;
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.lead.findUnique({ where: { id } });
+    const existing = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Lead not found");
     const updated = await prisma.lead.update({
       where: { id },
       data: { archivedAt: new Date() },
-      include: { assignedTo: true },
+      include: leadUIInclude,
     });
     await logAudit({
       entityType: "lead",
@@ -37,14 +39,16 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.lead.findUnique({ where: { id } });
+    const existing = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Lead not found");
     const updated = await prisma.lead.update({
       where: { id },
       data: { archivedAt: null },
-      include: { assignedTo: true },
+      include: leadUIInclude,
     });
     await logAudit({
       entityType: "lead",

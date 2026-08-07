@@ -64,7 +64,7 @@ export function EditOpportunityDialog({ open, onClose, opportunity, onSaved }: E
             <div className="flex-1 overflow-y-auto p-4">
               <OpportunityForm
                 initialData={opportunity}
-                onSubmit={(data) => void handleSubmit(data)}
+                onSubmit={handleSubmit}
                 onCancel={onClose}
               />
             </div>

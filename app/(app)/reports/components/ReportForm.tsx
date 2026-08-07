@@ -16,7 +16,7 @@ import { Report, ReportCategory, ReportStatus, ReportType } from "../types";
 
 interface ReportFormProps {
   initialData?: Report;
-  onSubmit: (data: Report) => void;
+  onSubmit: (data: Report) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -57,20 +57,27 @@ export function ReportForm({
   const [status, setStatus] = useState<ReportStatus>(
     initialData?.status ?? "Draft"
   );
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit() {
-    onSubmit({
-      id: initialData?.id ?? crypto.randomUUID(),
-      name,
-      category,
-      type,
-      description,
-      createdBy: initialData?.createdBy ?? "Current User",
-      createdAt:
-        initialData?.createdAt ?? new Date().toISOString().split("T")[0],
-      lastRun: initialData?.lastRun ?? new Date().toISOString().split("T")[0],
-      status,
-    });
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        id: initialData?.id ?? crypto.randomUUID(),
+        name,
+        category,
+        type,
+        description,
+        createdBy: initialData?.createdBy ?? "Current User",
+        createdAt:
+          initialData?.createdAt ?? new Date().toISOString().split("T")[0],
+        lastRun: initialData?.lastRun ?? new Date().toISOString().split("T")[0],
+        status,
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isEditing = !!initialData;
@@ -174,12 +181,12 @@ export function ReportForm({
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit}>
-          {isEditing ? "Save Changes" : "Create Report"}
+        <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          {submitting ? "Saving..." : isEditing ? "Save Changes" : "Create Report"}
         </Button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import {
   X,
@@ -56,20 +57,20 @@ export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps)
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/40 supports-backdrop-filter:backdrop-blur-sm data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <DialogPrimitive.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 transition-all duration-150">
-          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border bg-white shadow-2xl dark:bg-slate-950 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-800">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border bg-popover shadow-2xl">
+            <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="flex items-center gap-2 min-w-0">
-                <FilePreviewIcon type={file.type} className="h-5 w-5 shrink-0 text-slate-500" />
-                <span className="text-sm font-medium truncate text-slate-900 dark:text-white">
+                <FilePreviewIcon type={file.type} className="h-5 w-5 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium truncate text-foreground">
                   {file.name}
                 </span>
-                <span className="text-xs text-slate-400 shrink-0">{formatSize(file.size)}</span>
+                <span className="text-xs text-muted-foreground/70 shrink-0">{formatSize(file.size)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <a
                   href={file.url}
                   download={file.name}
-                  className="inline-flex size-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   <Download className="h-4 w-4" />
                 </a>
@@ -78,7 +79,7 @@ export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps)
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 )}
-                <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
+                <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" aria-label="Close" />}>
                   <X className="h-4 w-4" />
                 </DialogPrimitive.Close>
               </div>
@@ -86,10 +87,13 @@ export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps)
 
             <div className="flex-1 overflow-auto p-4">
               {file.type === "image" && (
-                <img
+                <Image
                   src={file.url}
                   alt={file.name}
-                  className="mx-auto max-h-[70vh] rounded-lg object-contain"
+                  width={800}
+                  height={600}
+                  unoptimized
+                  className="mx-auto max-h-[70vh] w-auto rounded-lg object-contain"
                 />
               )}
               {file.type === "pdf" && (
@@ -100,7 +104,7 @@ export function FilePreview({ file, open, onClose, onDelete }: FilePreviewProps)
                 />
               )}
               {(file.type === "office" || file.type === "other") && (
-                <div className="flex flex-col items-center justify-center gap-4 py-16 text-slate-400">
+                <div className="flex flex-col items-center justify-center gap-4 py-16 text-muted-foreground">
                   <FilePreviewIcon type={file.type} className="h-16 w-16" />
                   <p className="text-sm">Preview not available for {file.mimeType}</p>
                   <a

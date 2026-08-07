@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, TicketPriority } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate, featureGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { ticketSchema } from "@/lib/validation/entities";
 import { ticketToUI, uiTicketStatusToDb } from "../route";
@@ -13,9 +13,11 @@ export async function GET(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "tickets");
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const ticket = await prisma.ticket.findUnique({ where: { id }, include: { assignee: true } });
+    const ticket = await prisma.ticket.findFirst({ where: { id, organizationId: user.organizationId }, include: { assignee: true } });
     if (!ticket) return notFound("Ticket not found");
     return NextResponse.json(ticketToUI(ticket));
   } catch (err) {
@@ -30,11 +32,15 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "tickets");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = ticketSchema.partial().parse(body);
-    const existing = await prisma.ticket.findUnique({ where: { id } });
+    const existing = await prisma.ticket.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Ticket not found");
 
     const data: Prisma.TicketUpdateInput = {};
@@ -77,9 +83,13 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "tickets");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   const { id } = await params;
   try {
-    const existing = await prisma.ticket.findUnique({ where: { id } });
+    const existing = await prisma.ticket.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Ticket not found");
     await prisma.ticket.delete({ where: { id } });
     await logAudit({

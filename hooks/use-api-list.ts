@@ -1,35 +1,31 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchJson } from "@/lib/client/api";
 
-export function useApiList<T = Record<string, unknown>>(
-  path: string
-): { data: T[]; loading: boolean; refresh: () => void } {
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
+/**
+ * Fetch a paginated API list with dedupe + caching via TanStack Query.
+ * All callers of the same `path` share one query (e.g. the module stats
+ * components that each request `?pageSize=1000`).
+ */
+export function useApiList<T = Record<string, unknown>>(path: string): {
+  data: T[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+} {
+  const query = useQuery<T[]>({
+    queryKey: ["api-list", path],
+    queryFn: async () => {
+      const body = await fetchJson<{ data?: T[] }>(path);
+      return Array.isArray(body?.data) ? (body.data as T[]) : [];
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchData() {
-      try {
-        const res = await fetch(path);
-        if (!res.ok) throw new Error(`API ${res.status}`);
-        const body = await res.json();
-        if (!cancelled) setData(Array.isArray(body?.data) ? (body.data as T[]) : []);
-      } catch {
-        if (!cancelled) setData([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    fetchData();
-    return () => {
-      cancelled = true;
-    };
-  }, [path, refreshKey]);
-
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
-
-  return { data, loading, refresh };
+  return {
+    data: query.data ?? [],
+    loading: query.isPending && !query.isPlaceholderData,
+    error: query.isError ? "Failed to load data. Please try again." : null,
+    refresh: () => void query.refetch(),
+  };
 }

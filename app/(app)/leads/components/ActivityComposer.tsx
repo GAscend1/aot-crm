@@ -56,12 +56,12 @@ export function ActivityComposer({ leadId, onCreated }: ActivityComposerProps) {
   };
 
   return (
-    <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+    <div className="rounded-xl border bg-surface-raised p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={type}
           onChange={(e) => setType(e.target.value as typeof type)}
-          className="rounded-lg border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-blue-400 dark:border-slate-700"
+          className="rounded-lg border border-input bg-transparent px-2 py-1.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           {activityTypes.map((t) => (
             <option key={t} value={t}>
@@ -73,7 +73,7 @@ export function ActivityComposer({ leadId, onCreated }: ActivityComposerProps) {
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Subject"
-          className="min-w-0 flex-1 rounded-lg border bg-transparent px-3 py-1.5 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+          className="min-w-0 flex-1 rounded-lg border border-input bg-transparent px-3 py-1.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
       </div>
       <textarea
@@ -81,26 +81,26 @@ export function ActivityComposer({ leadId, onCreated }: ActivityComposerProps) {
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Add details (optional)"
         rows={2}
-        className="mt-2 w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+        className="mt-2 w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <input
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
-          className="rounded-lg border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-blue-400 dark:border-slate-700"
+          className="rounded-lg border border-input bg-transparent px-2 py-1.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border bg-transparent px-2 py-1.5 text-sm outline-none focus:border-blue-400 dark:border-slate-700"
+          className="rounded-lg border border-input bg-transparent px-2 py-1.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <option value="Planned">Planned</option>
           <option value="Completed">Completed</option>
           <option value="Cancelled">Cancelled</option>
         </select>
         <div className="ml-auto flex items-center gap-2">
-          {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+          {error && <p className="text-xs text-[color:var(--danger)]">{error}</p>}
           <Button size="sm" onClick={handleSubmit} disabled={saving}>
             {saving ? <X className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             {saving ? "Adding..." : "Add Activity"}

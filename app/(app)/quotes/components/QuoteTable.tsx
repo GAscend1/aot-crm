@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { quoteService } from "@/services/index";
 import type { Quote } from "@/services/quote.service";
-import { QuoteDrawer } from "./QuoteDrawer";
-import { QuoteDeleteDialog } from "./QuoteDeleteDialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { QuoteModal } from "./QuoteModal";
 import { QuoteToolbar } from "./QuoteToolbar";
 import { QuoteWorkspace } from "./QuoteWorkspace";
 import { quoteStatusLabels } from "../types";
@@ -25,14 +26,17 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | undefined>();
   const [prefill, setPrefill] = useState<{ customer?: string; company?: string; opportunity?: string; customerId?: string; companyId?: string; opportunityId?: string; leadId?: string } | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingQuote, setDeletingQuote] = useState<Quote | undefined>();
+  const mountedRef = useMountedRef();
 
   // When opened from "View Quotes" on an opportunity, filter to that opportunity's quotes.
   useEffect(() => {
+    let cancelled = false;
     quoteService
       .findAll(
         prefillOpportunityId
@@ -40,9 +44,18 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
           : undefined
       )
       .then((result) => {
+        if (cancelled) return;
         setQuotes(result.data);
         setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("Failed to load quotes.");
+        setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [prefillOpportunityId]);
 
   // Prefill from opportunity/lead context (e.g. "Create Quote" from opportunity detail)
@@ -68,7 +81,7 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
           if (!l) return;
           setPrefill({ customer: l.title, opportunity: l.title, leadId: prefillLeadId, company: l.company });
           setEditingQuote(undefined);
-          setDrawerOpen(true);
+          setModalOpen(true);
         });
     }
   }, [prefillOpportunityId, prefillLeadId]);
@@ -107,7 +120,7 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
 
   const handleEdit = useCallback((quote: Quote) => {
     setEditingQuote(quote);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleDelete = useCallback((quote: Quote) => {
@@ -193,38 +206,49 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
           setQuotes((prev) => [created, ...prev]);
           success("Quote created", `${created.quoteNumber} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingQuote(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save quote.");
+        throw err;
       }
     },
     [editingQuote, success, showError]
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingQuote) {
-      try {
-        await quoteService.delete(deletingQuote.id);
-        setQuotes((prev) => prev.filter((q) => q.id !== deletingQuote.id));
-        success("Quote archived", `${deletingQuote.quoteNumber} has been archived.`);
-        setDeletingQuote(undefined);
-      } catch {
-        showError("Error", "Failed to archive quote.");
-      }
+    if (!deletingQuote) return;
+    const target = deletingQuote;
+    const previous = quotes;
+    // Optimistic removal; restored if the API call fails.
+    setQuotes((prev) => prev.filter((q) => q.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingQuote(undefined);
+    try {
+      await quoteService.delete(target.id);
+      success("Quote archived", `${target.quoteNumber} has been archived.`);
+    } catch {
+      setQuotes(previous);
+      showError("Error", "Failed to archive quote.");
     }
-  }, [deletingQuote, success, showError]);
+  }, [quotes, deletingQuote, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingQuote(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await quoteService.findAll();
-    setQuotes(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await quoteService.findAll();
+      setQuotes(result.data);
+    } catch {
+      setError("Failed to load quotes.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -250,20 +274,14 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
     [success]
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -283,10 +301,10 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
         }
       />
 
-      <QuoteDrawer
-        open={drawerOpen}
+      <QuoteModal
+        open={modalOpen}
         onOpenChange={(open) => {
-          setDrawerOpen(open);
+          setModalOpen(open);
           if (!open) {
             setEditingQuote(undefined);
             setPrefill(undefined);
@@ -297,14 +315,22 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
         onSave={handleSave}
       />
 
-      <QuoteDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        quote={deletingQuote ?? null}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => {
+        onClose={() => {
           setDeleteDialogOpen(false);
           setDeletingQuote(undefined);
         }}
+        title="Archive Quote"
+        message={
+          <>
+            Are you sure you want to archive{" "}
+            <strong>{deletingQuote?.quoteNumber}</strong>? This action cannot be undone.
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
       />
 
       <QuoteWorkspace
@@ -316,7 +342,7 @@ export function QuoteTable({ prefillOpportunityId, prefillLeadId }: QuoteTablePr
                 : undefined
             )
             .then((result) => {
-              setQuotes(result.data);
+              if (mountedRef.current) setQuotes(result.data);
             });
         }}
       />

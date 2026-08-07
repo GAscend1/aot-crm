@@ -56,7 +56,7 @@ export const PATCH = withGraphAuth(async (accessToken, req: NextRequest) => {
   });
 
   return Response.json(result);
-}, { rateLimitAction: "calendar:update" });
+}, { rateLimitAction: "calendar:update", entitlement: "calendar_sync" });
 
 export const DELETE = withGraphAuth(async (accessToken, req: NextRequest) => {
   const id = req.nextUrl.pathname.split("/calendar/events/")[1];
@@ -70,4 +70,4 @@ export const DELETE = withGraphAuth(async (accessToken, req: NextRequest) => {
   });
 
   return Response.json({ success: true });
-}, { rateLimitAction: "calendar:delete" });
+}, { rateLimitAction: "calendar:delete", entitlement: "calendar_sync" });

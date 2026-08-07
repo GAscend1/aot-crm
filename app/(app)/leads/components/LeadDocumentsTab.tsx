@@ -17,11 +17,11 @@ type LeadAttachment = {
 };
 
 const categoryColors: Record<string, string> = {
-  PDF: "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300",
-  Image: "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300",
-  XLSX: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300",
-  DOCX: "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300",
-  PPTX: "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300",
+  PDF: "bg-danger-soft text-[color:var(--danger)]",
+  Image: "bg-success-soft text-[color:var(--success)]",
+  XLSX: "bg-success-soft text-[color:var(--success)]",
+  DOCX: "bg-info-soft text-[color:var(--info)]",
+  PPTX: "bg-warning-soft text-[color:var(--warning)]",
 };
 
 export function LeadDocumentsTab({ leadId }: { leadId: string }) {
@@ -89,7 +89,7 @@ export function LeadDocumentsTab({ leadId }: { leadId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">Attachments are stored in your workspace document library.</p>
+        <p className="text-sm text-muted-foreground">Attachments are stored in your workspace document library.</p>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
@@ -114,32 +114,32 @@ export function LeadDocumentsTab({ leadId }: { leadId: string }) {
         {loading ? (
           <div className="space-y-3 py-2">
             {[0, 1].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
             ))}
           </div>
         ) : documents.length === 0 ? (
           <EmptyState title="No documents yet" description="Upload proposals, contracts, and agreements." />
         ) : (
-          <div className="divide-y dark:divide-slate-800">
+          <div className="divide-y divide-border">
             {documents.map((doc) => {
               const Icon = typeIcon(doc.category, doc.mimeType);
               return (
                 <div key={doc.id} className="flex items-center gap-3 py-3">
                   <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${categoryColors[doc.category || ""] || "bg-slate-100 text-slate-500 dark:bg-slate-800"}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${categoryColors[doc.category || ""] || "bg-muted text-muted-foreground"}`}
                   >
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{doc.name}</p>
-                    <p className="text-xs text-slate-400">
+                    <p className="truncate text-sm font-medium text-foreground">{doc.name}</p>
+                    <p className="text-xs text-muted-foreground/70">
                       {doc.category || "Attachment"}
                       {doc.size ? ` · ${formatSize(doc.size)}` : ""} · {doc.uploadedByName || "Uploaded"}
                     </p>
                   </div>
                   <button
                     onClick={() => handleDownload(doc)}
-                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-[color:var(--primary)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     title="Download"
                   >
                     <Download className="h-4 w-4" />

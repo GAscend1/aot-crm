@@ -26,7 +26,8 @@ export function CTASection() {
               Ready to transform your customer relationships?
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-base text-white/80">
-              Start your free trial today. No credit card required.
+              Sign in with your Microsoft work account — your workspace is ready
+              instantly with a free 7-day full-feature trial, no credit card required.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button

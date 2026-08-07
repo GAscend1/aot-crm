@@ -12,12 +12,12 @@ interface IntegrationWarningProps {
 }
 
 /**
- * Non-blocking banner shown when an integration (e.g. Microsoft Graph) is in
- * a pending-consent or degraded state. CRM functionality stays operational.
+ * Non-blocking banner shown when an integration (e.g. Microsoft Graph) is
+ * degraded or disconnected. CRM functionality stays operational.
  */
 export function IntegrationWarning({
   title = "Integration needs attention",
-  message = "Your Microsoft 365 connection is waiting for approval. CRM data continues to work normally.",
+  message = "Your Microsoft 365 connection needs attention. CRM data continues to work normally.",
   action,
   onDismiss,
   className,

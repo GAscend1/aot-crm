@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Shield, Mail, MessageSquare, Video, Database, HardDrive, ArrowRight, BarChart3 } from "lucide-react"
+import { Shield, Mail, MessageSquare, Database, HardDrive, ArrowRight, BarChart3 } from "lucide-react"
 import Link from "next/link"
 import { MarketingLayout } from "@/components/marketing/MarketingLayout"
 import { ScrollReveal } from "@/components/marketing/ScrollReveal"
@@ -13,7 +13,6 @@ const integrations = [
   { name: "Microsoft Entra ID", description: "Enterprise-grade authentication and identity management.", icon: Shield, status: "available" as const },
   { name: "Outlook", description: "Email, calendar, and contact sync with Microsoft 365.", icon: Mail, status: "admin-required" as const },
   { name: "Teams", description: "Collaborate on CRM records directly within Microsoft Teams.", icon: MessageSquare, status: "admin-required" as const },
-  { name: "Zoom", description: "Schedule and log Zoom meetings linked to CRM records.", icon: Video, status: "ready" as const },
   { name: "Azure SQL", description: "Secure, scalable database for CRM data storage.", icon: Database, status: "ready" as const },
   { name: "Azure Blob", description: "Document and file storage with Azure Blob Storage.", icon: HardDrive, status: "ready" as const },
   { name: "Power BI", description: "Export analytics to Power BI for advanced visualization.", icon: BarChart3, status: "ready" as const },

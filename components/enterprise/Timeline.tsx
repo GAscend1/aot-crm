@@ -25,18 +25,18 @@ interface TimelineProps {
 }
 
 const actionConfig = {
-  created: { icon: Plus, color: "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300" },
-  updated: { icon: Edit3, color: "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300" },
-  deleted: { icon: Trash2, color: "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300" },
-  restored: { icon: RotateCcw, color: "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300" },
-  archived: { icon: Archive, color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
-  note: { icon: Info, color: "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300" },
+  created: { icon: Plus, color: "bg-success-soft text-[color:var(--success)]" },
+  updated: { icon: Edit3, color: "bg-info-soft text-[color:var(--info)]" },
+  deleted: { icon: Trash2, color: "bg-danger-soft text-[color:var(--danger)]" },
+  restored: { icon: RotateCcw, color: "bg-warning-soft text-[color:var(--warning)]" },
+  archived: { icon: Archive, color: "bg-muted text-muted-foreground" },
+  note: { icon: Info, color: "bg-[color:var(--color-quote-soft)] text-[color:var(--color-quote)]" },
 };
 
 export function Timeline({ entries }: TimelineProps) {
   if (entries.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-8 text-sm text-slate-500">
+      <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
         <Info className="h-8 w-8" />
         <p>No activity recorded yet</p>
       </div>
@@ -45,7 +45,7 @@ export function Timeline({ entries }: TimelineProps) {
 
   return (
     <div className="relative">
-      <div className="absolute left-[15px] top-2 h-[calc(100%-16px)] w-px bg-slate-200 dark:bg-slate-700" />
+      <div className="absolute left-[15px] top-2 h-[calc(100%-16px)] w-px bg-border" />
       <div className="space-y-0">
         {entries.map((entry, index) => {
           const config = actionConfig[entry.action];
@@ -60,20 +60,20 @@ export function Timeline({ entries }: TimelineProps) {
               className="relative flex gap-4 pb-6 pl-10"
             >
               <div
-                className={`absolute left-2.5 flex h-7 w-7 items-center justify-center rounded-full ${config.color} ring-4 ring-white dark:ring-slate-900`}
+                className={`absolute left-2.5 flex h-7 w-7 items-center justify-center rounded-full ${config.color} ring-4 ring-background`}
               >
                 <Icon className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-slate-900 dark:text-white">
+                  <span className="text-sm font-medium text-foreground">
                     {entry.userName}
                   </span>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-muted-foreground/70">
                     {formatTimestamp(entry.timestamp)}
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                   {entry.action === "created" && "Created this record"}
                   {entry.action === "deleted" && "Deleted this record"}
                   {entry.action === "restored" && "Restored this record"}
@@ -81,17 +81,17 @@ export function Timeline({ entries }: TimelineProps) {
                   {entry.action === "updated" && entry.field && (
                     <>
                       Updated{" "}
-                      <span className="font-medium text-slate-900 dark:text-white">
+                      <span className="font-medium text-foreground">
                         {entry.field}
                       </span>
                       {entry.oldValue && entry.newValue && (
                         <>
                           {" "}from{" "}
-                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                          <span className="font-medium text-foreground/80">
                             &ldquo;{entry.oldValue}&rdquo;
                           </span>{" "}
                           to{" "}
-                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                          <span className="font-medium text-foreground/80">
                             &ldquo;{entry.newValue}&rdquo;
                           </span>
                         </>

@@ -50,7 +50,19 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
       const categories = [...(event?.categories || [])];
       if (entityType) categories.push(entityType);
 
-      const data = {
+      const data: {
+        subject: string;
+        body: string;
+        start: string;
+        end: string;
+        isAllDay: boolean;
+        location: string;
+        onlineMeeting: { provider: string; url: string };
+        attendees: { name: string; email: string; status: string }[];
+        reminder: number;
+        entityType?: "lead" | "opportunity" | "customer" | "contact" | "company";
+        entityId?: string;
+      } = {
         subject,
         body,
         start,
@@ -61,12 +73,22 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
           ? { provider: "teams", url: "" }
           : { provider: "", url: "" },
         attendees: [],
-        organizer: { name: "", email: "" },
-        showAs: "busy" as const,
-        categories,
-        recurrence: null,
         reminder: 15,
       };
+
+      // Link the event to the CRM record it was scheduled from so it shows up
+      // on the record's calendar/timeline.
+      if (
+        entityId &&
+        (entityType === "lead" ||
+          entityType === "opportunity" ||
+          entityType === "customer" ||
+          entityType === "contact" ||
+          entityType === "company")
+      ) {
+        data.entityType = entityType as "lead" | "opportunity" | "customer" | "contact" | "company";
+        data.entityId = entityId;
+      }
 
       if (isExisting && event) {
         await calendarService.update(event.id, data);
@@ -134,7 +156,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
               <>
                 <div className="flex items-center justify-between border-b px-4 py-3">
                   <h2 className="text-sm font-semibold text-foreground">Meeting Details</h2>
-                  <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
+                  <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" aria-label="Close" />}>
                     <X className="h-4 w-4" />
                   </DialogPrimitive.Close>
                 </div>
@@ -142,13 +164,31 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                 <div className="max-h-[60vh] space-y-3 overflow-y-auto p-4">
                   <h3 className="text-base font-bold text-foreground">{event.subject}</h3>
 
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {event.onlineMeeting?.provider === "teams" ? "Teams Meeting" : "Outlook Event"}
-                    <span className="rounded bg-muted px-1.5 py-0.5">
-                      {providerMode === "live" ? "Live" : "Mock"}
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {event.onlineMeeting?.provider === "teams" ? "Teams Meeting" : "Calendar Event"}
+                  <span className="rounded bg-muted px-1.5 py-0.5">
+                    {providerMode === "live" ? "Outlook live" : "Local"}
+                  </span>
+                  {event.graphSyncStatus === "SYNCED" && (
+                    <span className="rounded bg-success-soft px-1.5 py-0.5 font-medium text-[color:var(--success)]">
+                      Synced to Outlook
                     </span>
-                  </div>
+                  )}
+                  {event.graphSyncStatus === "ERROR" && (
+                    <span
+                      className="rounded bg-danger-soft px-1.5 py-0.5 font-medium text-[color:var(--danger)]"
+                      title={event.syncError ?? "Sync failed"}
+                    >
+                      Sync error{event.lastSyncedAt ? ` — last synced ${new Date(event.lastSyncedAt).toLocaleDateString()}` : ""}
+                    </span>
+                  )}
+                  {(event.graphSyncStatus === "NOT_SYNCED" || event.graphSyncStatus === "SYNCING" || !event.graphSyncStatus) && (
+                    <span className="rounded bg-warning-soft px-1.5 py-0.5 font-medium text-[color:var(--warning)]">
+                      {event.graphSyncStatus === "SYNCING" ? "Syncing…" : "Awaiting sync"}
+                    </span>
+                  )}
+                </div>
 
                   <div className="rounded-lg bg-muted/40 p-3 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
@@ -254,14 +294,14 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                   <h2 className="text-sm font-semibold text-foreground">
                     {isExisting ? "Edit Event" : "New Event"}
                   </h2>
-                  <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
+                  <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" aria-label="Close" />}>
                     <X className="h-4 w-4" />
                   </DialogPrimitive.Close>
                 </div>
 
                 <div className="space-y-4 p-4">
                   <div>
-                    <label className="text-xs font-medium text-slate-500">Title</label>
+                    <label className="text-xs font-medium text-muted-foreground">Title</label>
                     <input
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
@@ -272,7 +312,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="text-xs font-medium text-slate-500">Date</label>
+                      <label className="text-xs font-medium text-muted-foreground">Date</label>
                       <input
                         type="date"
                         value={date}
@@ -281,7 +321,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-slate-500">Start</label>
+                      <label className="text-xs font-medium text-muted-foreground">Start</label>
                       <input
                         type="time"
                         value={startTime}
@@ -290,7 +330,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-slate-500">End</label>
+                      <label className="text-xs font-medium text-muted-foreground">End</label>
                       <input
                         type="time"
                         value={endTime}
@@ -301,7 +341,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-slate-500">Location</label>
+                    <label className="text-xs font-medium text-muted-foreground">Location</label>
                     <input
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
@@ -316,7 +356,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                       id="isTeams"
                       checked={isTeams}
                       onChange={(e) => setIsTeams(e.target.checked)}
-                      className="rounded border-slate-300"
+                      className="rounded border-input"
                     />
                     <label htmlFor="isTeams" className="flex items-center gap-1.5 text-sm text-foreground">
                       <Video className="h-4 w-4" />
@@ -325,7 +365,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-slate-500">Description</label>
+                    <label className="text-xs font-medium text-muted-foreground">Description</label>
                     <textarea
                       value={body}
                       onChange={(e) => setBody(e.target.value)}

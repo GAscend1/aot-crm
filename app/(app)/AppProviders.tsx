@@ -1,14 +1,29 @@
 "use client";
 
-import { useState, useCallback, createContext, useContext } from "react";
+import { useState, useCallback, useEffect, createContext, useContext } from "react";
+import dynamic from "next/dynamic";
 import { v4 as uuid } from "uuid";
-import { CommandPalette } from "@/components/enterprise/CommandPalette";
-import { QuickCreate } from "@/components/enterprise/QuickCreate";
 import { ToastContainer } from "@/components/enterprise/Toast";
 import { AppEventBridge } from "@/components/enterprise/AppEventBridge";
+
+// Lazy-load the heavy modal surfaces — they are only interactive when opened,
+// so deferring them keeps the initial app bundle small (route-level split).
+const CommandPalette = dynamic(
+  () => import("@/components/enterprise/CommandPalette").then((m) => m.CommandPalette),
+  { ssr: false },
+);
+const QuickCreate = dynamic(
+  () => import("@/components/enterprise/QuickCreate").then((m) => m.QuickCreate),
+  { ssr: false },
+);
+const ProductTour = dynamic(
+  () => import("@/components/onboarding/ProductTour").then((m) => m.ProductTour),
+  { ssr: false },
+);
 import { useSyncedNotifications } from "@/hooks/use-synced-notifications";
 import { useToast } from "@/hooks/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useOnboarding } from "@/hooks/use-onboarding";
 import type { Notification } from "@/types/common";
 
 interface AppContextType {
@@ -21,6 +36,7 @@ interface AppContextType {
   warning: (title: string, message?: string) => void;
   openCommandPalette: () => void;
   openQuickCreate: () => void;
+  restartOnboarding: () => void;
   notifications: Notification[];
   unreadCount: number;
   markAsRead: (id: string) => void;
@@ -69,6 +85,12 @@ export function useToastContext() {
   };
 }
 
+export function useRestartOnboarding() {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useRestartOnboarding must be inside AppProviders");
+  return ctx.restartOnboarding;
+}
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
@@ -81,6 +103,17 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     removeNotification,
   } = useSyncedNotifications();
   const { toasts, removeToast, success, error, info, warning } = useToast();
+  const {
+    loaded: onboardingLoaded,
+    mode: onboardingMode,
+    stepIndex: onboardingStepIndex,
+    startTour,
+    skip: skipOnboarding,
+    neverShowAgain,
+    complete: completeOnboarding,
+    handleStepChange,
+    restart,
+  } = useOnboarding();
 
   const openCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
@@ -132,6 +165,19 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     true
   );
 
+  // First-time user flow: the onboarding wizard dispatches
+  // `aot:onboarding-complete` when it finishes — auto-start the guided tour so
+  // the user moves straight from setup into the tour (never stuck discovering
+  // the Dashboard Get Started card first).
+  useEffect(() => {
+    const onOnboardingComplete = () => {
+      void startTour();
+    };
+    window.addEventListener("aot:onboarding-complete", onOnboardingComplete);
+    return () =>
+      window.removeEventListener("aot:onboarding-complete", onOnboardingComplete);
+  }, [startTour]);
+
   return (
     <>
       <AppEventBridge />
@@ -146,6 +192,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           warning,
         openCommandPalette,
         openQuickCreate,
+        restartOnboarding: restart,
         notifications,
         unreadCount,
         markAsRead,
@@ -167,6 +214,19 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       />
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
+
+      {onboardingLoaded && (
+        <ProductTour
+          open={onboardingMode !== null}
+          mode={onboardingMode ?? "tour"}
+          stepIndex={onboardingStepIndex}
+          onStart={() => void startTour()}
+          onSkip={() => void skipOnboarding()}
+          onNeverShowAgain={() => void neverShowAgain()}
+          onStepChange={(index) => void handleStepChange(index)}
+          onComplete={() => void completeOnboarding()}
+        />
+      )}
     </AppContext.Provider>
     </>
   );

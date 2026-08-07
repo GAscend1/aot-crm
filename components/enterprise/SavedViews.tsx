@@ -49,8 +49,8 @@ export function SavedViews({
           onClick={() => onSelectView(view.id)}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
             activeViewId === view.id
-              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-              : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:bg-muted"
           }`}
         >
           {view.isDefault && <Check className="h-3 w-3" />}
@@ -61,7 +61,7 @@ export function SavedViews({
                 e.stopPropagation();
                 onDeleteView(view.id);
               }}
-              className="ml-1 rounded p-0.5 hover:bg-slate-700 dark:hover:bg-slate-300"
+              className="ml-1 rounded p-0.5 hover:bg-background/20"
             >
               <Trash2 className="h-3 w-3" />
             </button>

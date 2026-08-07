@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, EntityStatus } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, findOrCreateCompany } from "@/lib/server/records";
 import { customerSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -51,7 +52,8 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const filters = searchParams.get("filters");
 
-  const where: Prisma.CustomerWhereInput = {};
+  const where: Prisma.CustomerWhereInput = { organizationId: user.organizationId };
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
@@ -105,12 +107,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = customerSchema.parse(body);
 
-    const companyId = parsed.companyId ?? (parsed.company ? await findOrCreateCompany(parsed.company) : null);
+    const companyId = parsed.companyId ?? (parsed.company ? await findOrCreateCompany(parsed.company, user.organizationId) : null);
     const data: Prisma.CustomerCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       name: parsed.name,
       email: parsed.email || undefined,
       phone: parsed.phone || undefined,
@@ -132,10 +137,14 @@ export async function POST(request: NextRequest) {
       action: "customer.created",
       description: `Customer "${created.name}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(customerToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "CUSTOMER_VALIDATION_FAILED", "Invalid customer data.");
+    }
     logServerError("POST /api/customers", err);
     return serverError("Failed to create customer");
   }

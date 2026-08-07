@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useMountedRef } from "@/hooks/use-mounted";
 
 import { DataTable } from "@/components/table/DataTable";
 import { useToastContext } from "@/app/(app)/AppProviders";
@@ -9,8 +10,8 @@ import { useToastContext } from "@/app/(app)/AppProviders";
 import { createColumns } from "../columns";
 import { opportunityService } from "@/services/index";
 import type { Opportunity } from "@/services/opportunity.service";
-import { OpportunityDrawer } from "./OpportunityDrawer";
-import { OpportunityDeleteDialog } from "./OpportunityDeleteDialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { OpportunityModal } from "./OpportunityModal";
 import { OpportunityToolbar } from "./OpportunityToolbar";
 import { OpportunityWorkspace } from "./OpportunityWorkspace";
 
@@ -23,17 +24,28 @@ export function OpportunityTable() {
   const [stageFilter, setStageFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingOpportunity, setDeletingOpportunity] = useState<Opportunity | undefined>();
 
+  const mountedRef = useMountedRef();
+
   useEffect(() => {
-    opportunityService.findAll().then((result) => {
-      setOpportunities(result.data);
-      setLoading(false);
-    });
-  }, []);
+    opportunityService
+      .findAll()
+      .then((result) => {
+        if (!mountedRef.current) return;
+        setOpportunities(result.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setError("Failed to load opportunities.");
+        setLoading(false);
+      });
+  }, [mountedRef]);
 
   const filtered = useMemo(() => {
     let result = opportunities;
@@ -61,7 +73,7 @@ export function OpportunityTable() {
 
   const handleEdit = useCallback((opportunity: Opportunity) => {
     setEditingOpportunity(opportunity);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleView = useCallback(
@@ -106,40 +118,49 @@ export function OpportunityTable() {
           setOpportunities((prev) => [created, ...prev]);
           success("Opportunity created", `${created.title} has been added.`);
         }
-        setDrawerOpen(false);
+        setModalOpen(false);
         setEditingOpportunity(undefined);
-      } catch {
+      } catch (err) {
         showError("Error", "Failed to save opportunity.");
+        throw err;
       }
     },
     [editingOpportunity, success, showError],
   );
 
   const handleConfirmDelete = useCallback(async () => {
-    if (deletingOpportunity) {
-      try {
-        await opportunityService.delete(deletingOpportunity.id);
-        setOpportunities((prev) =>
-          prev.filter((o) => o.id !== deletingOpportunity.id),
-        );
-        success("Opportunity deleted", `${deletingOpportunity.title} has been removed.`);
-        setDeletingOpportunity(undefined);
-      } catch {
-        showError("Error", "Failed to delete opportunity.");
-      }
+    if (!deletingOpportunity) return;
+    const target = deletingOpportunity;
+    const previous = opportunities;
+    // Optimistic removal; restored if the API call fails.
+    setOpportunities((prev) => prev.filter((o) => o.id !== target.id));
+    setDeleteDialogOpen(false);
+    setDeletingOpportunity(undefined);
+    try {
+      await opportunityService.delete(target.id);
+      success("Opportunity archived", `${target.title} has been archived.`);
+    } catch {
+      setOpportunities(previous);
+      showError("Error", "Failed to archive opportunity.");
     }
-  }, [deletingOpportunity, success, showError]);
+  }, [opportunities, deletingOpportunity, success, showError]);
 
   const handleAdd = useCallback(() => {
     setEditingOpportunity(undefined);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }, []);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
-    const result = await opportunityService.findAll();
-    setOpportunities(result.data);
-    setLoading(false);
+    setError(null);
+    try {
+      const result = await opportunityService.findAll();
+      setOpportunities(result.data);
+    } catch {
+      setError("Failed to load opportunities.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleBulkAction = useCallback(
@@ -151,7 +172,7 @@ export function OpportunityTable() {
         setOpportunities((prev) =>
           prev.filter((o) => !rows.find((r) => r.id === o.id)),
         );
-        success("Deleted", `${rows.length} opportunity(ies) deleted.`);
+        success("Archived", `${rows.length} opportunity(ies) archived.`);
       } else if (action === "export") {
         const csv = [
           "Title,Customer,Value,Stage,Status,Created",
@@ -172,20 +193,14 @@ export function OpportunityTable() {
     [success],
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-80 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <DataTable
         columns={columns}
         data={filtered}
+        loading={loading}
+        error={error}
+        onRetry={handleRefresh}
         enableRowSelection={true}
         onRowClick={handleRowClick}
         onBulkAction={handleBulkAction}
@@ -207,24 +222,32 @@ export function OpportunityTable() {
         }
       />
 
-      <OpportunityDrawer
-        open={drawerOpen}
-        onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) setEditingOpportunity(undefined);
+      <OpportunityModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingOpportunity(undefined);
         }}
-        opportunity={editingOpportunity ?? null}
+        opportunity={editingOpportunity}
         onSave={handleSave}
       />
 
-      <OpportunityDeleteDialog
+      <ConfirmDialog
         open={deleteDialogOpen}
-        opportunity={deletingOpportunity ?? null}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => {
+        onClose={() => {
           setDeleteDialogOpen(false);
           setDeletingOpportunity(undefined);
         }}
+        title="Archive Opportunity"
+        message={
+          <>
+            Archive <strong>{deletingOpportunity?.title}</strong>? This will remove
+            the opportunity from the pipeline while keeping related records intact.
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
       />
 
       <OpportunityWorkspace
@@ -232,7 +255,7 @@ export function OpportunityTable() {
         siblings={filtered.map((o) => ({ id: o.id, title: o.title }))}
         onChanged={() => {
           opportunityService.findAll().then((result) => {
-            setOpportunities(result.data);
+            if (mountedRef.current) setOpportunities(result.data);
           });
         }}
       />

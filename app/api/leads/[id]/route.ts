@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { leadUpdateSchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
-import { leadToUI, uiStatusToDb, dbStatusToUi } from "../route";
+import { leadToUI, leadUIInclude, uiStatusToDb, dbStatusToUi } from "../route";
 import type { UILead } from "../route";
 export const dynamic = "force-dynamic";
 
-type LeadWithOwner = Prisma.LeadGetPayload<{ include: { assignedTo: true } }>;
+type LeadWithOwner = Prisma.LeadGetPayload<{ include: typeof leadUIInclude }>;
 
 export async function GET(
   _request: NextRequest,
@@ -18,9 +18,9 @@ export async function GET(
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const lead = await prisma.lead.findUnique({
-      where: { id },
-      include: { assignedTo: true },
+    const lead = await prisma.lead.findFirst({
+      where: { id, organizationId: user.organizationId },
+      include: leadUIInclude,
     });
     if (!lead) return notFound("Lead not found");
     return NextResponse.json(leadToUI(lead));
@@ -36,11 +36,18 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const parsed = leadUpdateSchema.parse(body);
-    const existing = await prisma.lead.findUnique({ where: { id } });
+    let parsed;
+    try {
+      parsed = leadUpdateSchema.parse(body);
+    } catch (err) {
+      return zodValidationError(err, "LEAD_UPDATE_FAILED", "The lead could not be updated.");
+    }
+    const existing = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Lead not found");
 
     const data: Prisma.LeadUpdateInput = {};
@@ -128,9 +135,9 @@ export async function PATCH(
     }
 
     if (Object.keys(data).length === 0) {
-      const current = await prisma.lead.findUnique({
-        where: { id },
-        include: { assignedTo: true },
+      const current = await prisma.lead.findFirst({
+        where: { id, organizationId: user.organizationId },
+        include: leadUIInclude,
       });
       return NextResponse.json(leadToUI(current!));
     }
@@ -138,7 +145,7 @@ export async function PATCH(
     const updated = await prisma.lead.update({
       where: { id },
       data,
-      include: { assignedTo: true },
+      include: leadUIInclude,
     });
 
     if (changes.length > 0) {
@@ -164,7 +171,7 @@ export async function PATCH(
     return NextResponse.json(leadToUI(updated));
   } catch (err) {
     logServerError(`PATCH /api/leads/${id}`, err);
-    return serverError("Failed to update lead");
+    return apiError(500, "LEAD_UPDATE_FAILED", "The lead could not be updated.");
   }
 }
 
@@ -174,22 +181,30 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.lead.findUnique({ where: { id } });
+    const existing = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Lead not found");
-    await prisma.lead.delete({ where: { id } });
+    // Archive (soft delete): Leads are referenced by activities, documents,
+    // quotes, invoices, reminders, and calendar events. Archiving preserves
+    // conversion history and related data.
+    await prisma.lead.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
     await logAudit({
       entityType: "lead",
       entityId: id,
-      action: "lead.deleted",
-      description: `Lead "${leadDisplayName(existing)}" deleted`,
+      action: "lead.archived",
+      description: `Lead "${leadDisplayName(existing)}" archived`,
       userId: user.id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
     logServerError(`DELETE /api/leads/${id}`, err);
-    return serverError("Failed to delete lead");
+    return apiError(500, "LEAD_DELETE_FAILED", "The lead could not be deleted.");
   }
 }
 

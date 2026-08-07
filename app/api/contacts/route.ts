@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, findOrCreateCompany } from "@/lib/server/records";
 import { contactSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export type UIContact = {
   email: string;
   phone: string;
   position: string;
+  role: string;
   company: string;
   companyId: string | null;
   country: string;
@@ -32,6 +34,7 @@ export function contactToUI(c: Prisma.ContactGetPayload<{ include: { company: tr
     email: c.email ?? "",
     phone: c.phone ?? "",
     position: c.position ?? "",
+    role: c.role ?? "",
     company: c.company?.companyName ?? "",
     companyId: c.companyId,
     country: c.country ?? "",
@@ -55,7 +58,8 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const filters = searchParams.get("filters");
 
-  const where: Prisma.ContactWhereInput = {};
+  const where: Prisma.ContactWhereInput = { organizationId: user.organizationId };
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { firstName: { contains: search, mode: "insensitive" } },
@@ -91,17 +95,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = contactSchema.parse(body);
 
-    const companyId = parsed.companyId ?? (parsed.company ? await findOrCreateCompany(parsed.company) : null);
+    const companyId = parsed.companyId ?? (parsed.company ? await findOrCreateCompany(parsed.company, user.organizationId) : null);
     const data: Prisma.ContactCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       firstName: parsed.firstName,
       lastName: parsed.lastName,
       email: parsed.email || undefined,
       phone: parsed.phone || undefined,
       position: parsed.position || undefined,
+      role: parsed.role || undefined,
       country: parsed.country || undefined,
       city: parsed.city || undefined,
       notes: parsed.notes || undefined,
@@ -117,10 +125,14 @@ export async function POST(request: NextRequest) {
       action: "contact.created",
       description: `Contact "${created.firstName} ${created.lastName}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(contactToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "CONTACT_VALIDATION_FAILED", "Invalid contact data.");
+    }
     logServerError("POST /api/contacts", err);
     return serverError("Failed to create contact");
   }

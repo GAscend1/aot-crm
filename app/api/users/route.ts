@@ -9,6 +9,7 @@ export async function GET() {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, name: true, email: true },
+      where: { organizationId: user.organizationId },
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ data: users });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { activitySchema } from "@/lib/validation/entities";
 import type { Prisma } from "@/generated/prisma/client";
@@ -17,6 +17,7 @@ export type UIActivity = {
   status: string;
   relatedTo: string;
   relatedType: string;
+  companyId: string;
   reminder: string;
   createdAt: string;
   updatedAt: string;
@@ -43,7 +44,10 @@ export function activityToUI(
           ? "customer"
           : c.ticketId
             ? "ticket"
-            : "",
+            : c.companyId
+              ? "company"
+              : "",
+    companyId: c.companyId ?? "",
     reminder: "",
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
@@ -59,7 +63,7 @@ export async function GET(request: NextRequest) {
   const sortBy = searchParams.get("sortBy") ?? "createdAt";
   const sortOrder = (searchParams.get("sortOrder") ?? "desc") as "asc" | "desc";
 
-  const where: Prisma.ActivityWhereInput = {};
+  const where: Prisma.ActivityWhereInput = { organizationId: user.organizationId };
   const leadId = searchParams.get("leadId");
   const opportunityId = searchParams.get("opportunityId");
   const customerId = searchParams.get("customerId");
@@ -68,7 +72,7 @@ export async function GET(request: NextRequest) {
   if (leadId) where.leadId = leadId;
   if (opportunityId) where.opportunityId = opportunityId;
   if (customerId) where.customerId = customerId;
-  if (companyId) where.customer = { companyId };
+  if (companyId) where.OR = [{ companyId }, { customer: { companyId } }];
   if (ticketId) where.ticketId = ticketId;
 
   const orderBy: Prisma.ActivityOrderByWithRelationInput = {};
@@ -102,12 +106,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = activitySchema.parse(body);
     const dueDate = parsed.dueDate ? new Date(parsed.dueDate) : undefined;
 
     const data: Prisma.ActivityCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       type: parsed.type,
       subject: parsed.subject,
       description: parsed.description || undefined,
@@ -119,6 +126,7 @@ export async function POST(request: NextRequest) {
       opportunity: parsed.opportunityId ? { connect: { id: parsed.opportunityId } } : undefined,
       customer: parsed.customerId ? { connect: { id: parsed.customerId } } : undefined,
       ticket: parsed.ticketId ? { connect: { id: parsed.ticketId } } : undefined,
+      company: parsed.companyId ? { connect: { id: parsed.companyId } } : undefined,
     };
 
     const created = await prisma.activity.create({
@@ -132,6 +140,7 @@ export async function POST(request: NextRequest) {
       action: "activity.created",
       description: `Activity "${created.subject}" (${created.type}) created`,
       userId: user.id,
+      organizationId: user.organizationId,
       data: {
         leadId: created.leadId,
         opportunityId: created.opportunityId,

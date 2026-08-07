@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
@@ -11,14 +11,15 @@ import {
   Pencil,
   Repeat,
   Star,
-  Trash2,
   UserRound,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { EntityStatusBadge } from "@/components/enterprise/EntityStatusBadge";
 import {
-  RecordQuickActions,
+  RecordActionBar,
+  RecordMoreMenu,
   RecordWorkspace,
   RecordWorkspaceField,
   RecordWorkspaceGrid,
@@ -29,12 +30,13 @@ import { ActivityComposer } from "@/components/common/ActivityComposer";
 import { EmailComposer } from "@/components/integrations/EmailComposer";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { leadService } from "@/services/index";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ApiRequestError } from "@/repositories/api/ApiRepository";
 
 import type { Lead } from "../types";
-import { LeadDrawer } from "./LeadDrawer";
+import { LeadForm } from "./LeadForm";
 import { AssignLeadDialog } from "./AssignLeadDialog";
 import { ConvertLeadDialog } from "./ConvertLeadDialog";
-import { LeadDeleteDialog } from "./LeadDeleteDialog";
 
 interface LeadWorkspaceProps {
   onChanged?: () => void;
@@ -46,40 +48,50 @@ export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
   const { record, loading, recordId, open, close, reload } =
     useRecordWorkspace(leadService);
 
-  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [, setRefreshKey] = useState(0);
 
-  const handleSave = async (data: Lead) => {
+  const isConverted = useMemo(
+    () => !!record?.convertedAt || !!record?.convertedOpportunityId,
+    [record]
+  );
+
+  const handleSave = useCallback(
+    async (data: Lead) => {
+      if (!record) return;
+      try {
+        const updated = await leadService.update(record.id, data as Partial<Lead>);
+        success("Lead updated", `${updated.title} has been updated.`);
+        setEditing(false);
+        onChanged?.();
+        reload();
+      } catch (err) {
+        if (err instanceof ApiRequestError) throw err;
+        showError("Error", "Failed to save lead.");
+        throw new ApiRequestError(500, "Failed to save lead.");
+      }
+    },
+    [record, success, showError, onChanged, reload]
+  );
+
+  const handleFavorite = useCallback(async () => {
     if (!record) return;
     try {
-      await leadService.update(record.id, data as Partial<Lead>);
-      success("Lead updated", `${data.title} has been updated.`);
-      setEditOpen(false);
-      onChanged?.();
-      reload();
-    } catch {
-      showError("Error", "Failed to save lead.");
-    }
-  };
-
-  const handleFavorite = async () => {
-    if (!record) return;
-    try {
-      const res = await fetch(`/api/leads/${record.id}/favorite`, {
-        method: "PATCH",
-      });
+      const res = await fetch(`/api/leads/${record.id}/favorite`, { method: "PATCH" });
       if (!res.ok) throw new Error("Failed");
     } catch {
       showError("Error", "Could not update favorite.");
     } finally {
       reload();
     }
-  };
+  }, [record, showError, reload]);
 
-  const handleDuplicate = async () => {
+  const handleDuplicate = useCallback(async () => {
     if (!record) return;
     try {
       const res = await fetch(`/api/leads/${record.id}/duplicate`, {
@@ -95,51 +107,38 @@ export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
     } catch {
       showError("Error", "Could not duplicate lead.");
     }
-  };
+  }, [record, success, showError, onChanged, open]);
 
-  const handleArchive = async () => {
+  const handleArchive = useCallback(async () => {
     if (!record) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/leads/${record.id}/archive`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to archive lead");
+      await leadService.delete(record.id);
       success("Lead archived", `${record.title} has been archived.`);
+      setDeleteOpen(false);
       onChanged?.();
       close();
     } catch {
       showError("Error", "Could not archive lead.");
+    } finally {
+      setDeleting(false);
     }
-  };
+  }, [record, success, showError, onChanged, close]);
 
-  const handleDelete = async () => {
-    if (!record) return;
-    try {
-      await leadService.delete(record.id);
-      success("Lead deleted");
-      onChanged?.();
-      close();
-    } catch {
-      showError("Error", "Failed to delete lead.");
-    }
-  };
-
-  const quickActions = useMemo(
+  const actionBar = useMemo(
     () => [
       {
-        label: "Send Email",
-        icon: Mail,
-        onClick: () => setEmailOpen(true),
-      },
-      {
-        label: "Assign Lead",
-        icon: UserRound,
-        onClick: () => setAssignOpen(true),
-      },
-      {
-        label: "Convert to Customer",
+        label: "Convert",
         icon: Repeat,
+        tone: "--success",
+        disabled: isConverted,
         onClick: () => setConvertOpen(true),
+      },
+      {
+        label: "Assign",
+        icon: UserRound,
+        tone: "--chart-4",
+        onClick: () => setAssignOpen(true),
       },
       {
         label: "Add Activity",
@@ -151,37 +150,41 @@ export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
         },
       },
       {
+        label: "Email",
+        icon: Mail,
+        tone: "--info",
+        onClick: () => setEmailOpen(true),
+      },
+    ],
+    [isConverted]
+  );
+
+  const moreActions = useMemo(
+    () => [
+      {
         label: "Open Full Page",
         icon: ExternalLink,
         onClick: () => {
           if (record) {
             close();
-            router.push(`/leads/${record.id}`);
+            window.location.href = `/leads/${record.id}`;
           }
         },
       },
+      {
+        label: "Duplicate",
+        icon: Copy,
+        onClick: () => void handleDuplicate(),
+      },
+      {
+        label: "Archive Lead",
+        icon: Archive,
+        destructive: true,
+        onClick: () => setDeleteOpen(true),
+      },
     ],
-    [record, router, close]
+    [record, close, handleDuplicate]
   );
-
-  const sidebarActions = [
-    {
-      label: "Duplicate",
-      icon: Copy,
-      onClick: () => void handleDuplicate(),
-    },
-    {
-      label: "Archive",
-      icon: Archive,
-      onClick: () => void handleArchive(),
-    },
-    {
-      label: "Delete",
-      icon: Trash2,
-      destructive: true,
-      onClick: () => setDeleteOpen(true),
-    },
-  ];
 
   return (
     <>
@@ -197,9 +200,26 @@ export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
             <EntityStatusBadge label={record.status} />
           ) : undefined
         }
+        editing={editing}
+        keepHeaderWhileEditing
+        editor={
+          record ? (
+            <LeadForm
+              initialData={record}
+              onSubmit={handleSave}
+              onCancel={() => setEditing(false)}
+            />
+          ) : undefined
+        }
+        editingActions={
+          <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+            <X />
+            Cancel
+          </Button>
+        }
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
               <Pencil />
               Edit
             </Button>
@@ -213,155 +233,182 @@ export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
                 className={record?.isFavorite ? "fill-amber-400 text-amber-400" : ""}
               />
             </Button>
+            <RecordMoreMenu actions={moreActions} />
           </>
         }
+        layout="split"
         sidebar={
-          <>
-            <RecordQuickActions actions={quickActions} />
-            <RecordWorkspaceSection title="More Actions">
-              <div className="flex flex-col gap-1.5">
-                {sidebarActions.map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <button
-                      key={action.label}
-                      type="button"
-                      onClick={action.onClick}
-                      className={`flex items-center gap-2.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                        action.destructive
-                          ? "border-danger/25 text-[color:var(--danger)] hover:bg-danger-soft"
-                          : "border-border text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      {action.label}
-                    </button>
-                  );
-                })}
+          <div className="flex h-full flex-col gap-4 p-4 lg:w-72 lg:p-5">
+            <RecordWorkspaceSection title="Inspector">
+              <div className="space-y-3">
+                <RecordWorkspaceField label="Owner" value={record?.owner || "Unassigned"} />
+                <RecordWorkspaceField label="Source" value={record?.source} />
+                <RecordWorkspaceField label="Score" value={record?.score} />
+                <RecordWorkspaceField
+                  label="Expected Revenue"
+                  value={
+                    record?.expectedRevenue != null
+                      ? `$${record.expectedRevenue.toLocaleString()}`
+                      : undefined
+                  }
+                />
+                {isConverted && (
+                  <div className="rounded-lg bg-success-soft px-3 py-2">
+                    <p className="text-xs font-semibold text-[color:var(--success)]">
+                      Converted
+                    </p>
+                    <div className="mt-1 flex flex-col items-start gap-1">
+                      {record?.convertedContactId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            close();
+                            router.push(`/contacts/${record.convertedContactId}`);
+                          }}
+                          className="text-xs font-medium text-[color:var(--primary)] hover:underline"
+                        >
+                          View linked contact
+                        </button>
+                      )}
+                      {record?.convertedCustomerId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            close();
+                            router.push(
+                              `/contacts?view=customers&record=${encodeURIComponent(record.convertedCustomerId ?? "")}`
+                            );
+                          }}
+                          className="text-xs font-medium text-[color:var(--primary)] hover:underline"
+                        >
+                          View linked customer
+                        </button>
+                      )}
+                      {record?.convertedOpportunityId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            close();
+                            router.push(`/opportunities/${record.convertedOpportunityId}`);
+                          }}
+                          className="text-xs font-medium text-[color:var(--primary)] hover:underline"
+                        >
+                          View linked opportunity
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {record?.tags && record.tags.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      Tags
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {record.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </RecordWorkspaceSection>
-          </>
+            <RecordWorkspaceSection title="Timestamps">
+              <div className="space-y-3">
+                <RecordWorkspaceField
+                  label="Created"
+                  value={
+                    record?.createdAt
+                      ? new Date(record.createdAt).toLocaleDateString()
+                      : undefined
+                  }
+                />
+                <RecordWorkspaceField
+                  label="Updated"
+                  value={
+                    record?.updatedAt
+                      ? new Date(record.updatedAt).toLocaleDateString()
+                      : undefined
+                  }
+                />
+              </div>
+            </RecordWorkspaceSection>
+          </div>
         }
       >
-        <RecordWorkspaceSection title="Details">
-          <RecordWorkspaceGrid>
-            <RecordWorkspaceField label="Contact" value={record?.contactName} />
-            <RecordWorkspaceField
-              label="Email"
-              value={
-                record?.email ? (
-                  <a
-                    href={`mailto:${record.email}`}
-                    className="text-[color:var(--primary)] hover:underline"
-                  >
-                    {record.email}
-                  </a>
-                ) : undefined
-              }
-            />
-            <RecordWorkspaceField label="Phone" value={record?.phone} />
-            <RecordWorkspaceField label="Source" value={record?.source} />
-            <RecordWorkspaceField
-              label="Owner"
-              value={record?.owner ?? "Unassigned"}
-            />
-            <RecordWorkspaceField label="Score" value={record?.score} />
-            <RecordWorkspaceField
-              label="Probability"
-              value={record?.probability != null ? `${record.probability}%` : undefined}
-            />
-            <RecordWorkspaceField
-              label="Expected Revenue"
-              value={
-                record?.expectedRevenue != null
-                  ? `$${record.expectedRevenue.toLocaleString()}`
-                  : undefined
-              }
-            />
-            <RecordWorkspaceField
-              label="Expected Close"
-              value={
-                record?.expectedCloseDate
-                  ? new Date(record.expectedCloseDate).toLocaleDateString()
-                  : undefined
-              }
-            />
-          </RecordWorkspaceGrid>
-        </RecordWorkspaceSection>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <RecordActionBar actions={actionBar} />
 
-        <RecordWorkspaceSection title="Notes">
-          <p className="text-sm whitespace-pre-wrap text-foreground">
-            {record?.notes || "No notes added yet."}
-          </p>
-        </RecordWorkspaceSection>
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+            <RecordWorkspaceSection title="Qualification">
+              <RecordWorkspaceGrid>
+                <RecordWorkspaceField label="Contact" value={record?.contactName} />
+                <RecordWorkspaceField
+                  label="Email"
+                  value={
+                    record?.email ? (
+                      <a
+                        href={`mailto:${record.email}`}
+                        className="text-[color:var(--primary)] hover:underline"
+                      >
+                        {record.email}
+                      </a>
+                    ) : undefined
+                  }
+                />
+                <RecordWorkspaceField label="Phone" value={record?.phone} />
+                <RecordWorkspaceField
+                  label="Probability"
+                  value={
+                    record?.probability != null
+                      ? `${record.probability}%`
+                      : undefined
+                  }
+                />
+                <RecordWorkspaceField
+                  label="Expected Close"
+                  value={
+                    record?.expectedCloseDate
+                      ? new Date(record.expectedCloseDate).toLocaleDateString()
+                      : undefined
+                  }
+                />
+              </RecordWorkspaceGrid>
+            </RecordWorkspaceSection>
 
-        {record?.tags && record.tags.length > 0 && (
-          <RecordWorkspaceSection title="Tags">
-            <div className="flex flex-wrap gap-1.5">
-              {record.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                >
-                  {tag}
+            <RecordWorkspaceSection title="Notes">
+              <p className="text-sm whitespace-pre-wrap text-foreground">
+                {record?.notes || "No notes added yet."}
+              </p>
+            </RecordWorkspaceSection>
+
+            <RecordWorkspaceSection
+              title="Add Activity"
+              actions={
+                <span className="text-xs text-muted-foreground">
+                  Log calls, emails, tasks, and notes
                 </span>
-              ))}
-            </div>
-          </RecordWorkspaceSection>
-        )}
-
-        <RecordWorkspaceSection
-          title="Add Activity"
-          actions={
-            <span className="text-xs text-muted-foreground">
-              Log calls, emails, tasks, and notes
-            </span>
-          }
-        >
-          <div id="lead-workspace-activity">
-            <ActivityComposer
-              entityType="lead"
-              entityId={record?.id}
-              onCreated={reload}
-            />
+              }
+            >
+              <div id="lead-workspace-activity">
+                <ActivityComposer
+                  entityType="lead"
+                  entityId={record?.id}
+                  onCreated={() => setRefreshKey((k) => k + 1)}
+                />
+              </div>
+            </RecordWorkspaceSection>
           </div>
-        </RecordWorkspaceSection>
-
-        <RecordWorkspaceSection title="Timestamps">
-          <RecordWorkspaceGrid className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-2">
-            <RecordWorkspaceField
-              label="Created"
-              value={
-                record?.createdAt
-                  ? new Date(record.createdAt).toLocaleString()
-                  : undefined
-              }
-            />
-            <RecordWorkspaceField
-              label="Updated"
-              value={
-                record?.updatedAt
-                  ? new Date(record.updatedAt).toLocaleString()
-                  : undefined
-              }
-            />
-          </RecordWorkspaceGrid>
-        </RecordWorkspaceSection>
+        </div>
       </RecordWorkspace>
 
       {record && (
         <>
-          <LeadDrawer
-            open={editOpen}
-            onOpenChange={(openState) => {
-              setEditOpen(openState);
-              if (!openState) {
-                reload();
-              }
-            }}
-            lead={record}
-            onSave={(data) => void handleSave(data)}
-          />
           <EmailComposer
             open={emailOpen}
             onClose={() => setEmailOpen(false)}
@@ -388,17 +435,24 @@ export function LeadWorkspace({ onChanged }: LeadWorkspaceProps) {
               onChanged?.();
               close();
               if (opportunityId) {
-                router.push(`/opportunities/${opportunityId}`);
-              } else {
-                router.push("/customers");
+                window.location.href = `/opportunities/${opportunityId}`;
               }
             }}
           />
-          <LeadDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            lead={record}
-            onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
+            onClose={() => setDeleteOpen(false)}
+            title="Archive Lead"
+            message={
+              <>
+                Archive <strong>{record.title}</strong>? This will remove the lead
+                from active lists while keeping related records intact.
+              </>
+            }
+            confirmLabel="Archive Lead"
+            variant="danger"
+            loading={deleting}
+            onConfirm={() => void handleArchive()}
           />
         </>
       )}

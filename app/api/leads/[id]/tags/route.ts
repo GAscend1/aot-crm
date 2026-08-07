@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET(
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const lead = await prisma.lead.findUnique({ where: { id }, select: { id: true } });
+    const lead = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId }, select: { id: true } });
     if (!lead) return notFound("Lead not found");
     const links = await prisma.leadTag.findMany({
       where: { leadId: id },
@@ -47,17 +47,21 @@ export async function POST(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = tagSchema.parse(body);
-    const lead = await prisma.lead.findUnique({ where: { id } });
+    const lead = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!lead) return notFound("Lead not found");
 
+    // Tags are org-scoped: unique on (organizationId, name).
+    const tagName = parsed.tag.trim();
     const tag = await prisma.tag.upsert({
-      where: { name: parsed.tag.trim() },
+      where: { organizationId_name: { organizationId: user.organizationId, name: tagName } },
       update: {},
-      create: { name: parsed.tag.trim() },
+      create: { name: tagName, organizationId: user.organizationId },
     });
     const existing = await prisma.leadTag.findUnique({
       where: { leadId_tagId: { leadId: id, tagId: tag.id } },
@@ -73,6 +77,7 @@ export async function POST(
       action: "lead.tag_added",
       description: `Tag "${tag.name}" added to lead "${leadDisplayName(lead)}"`,
       userId: user.id,
+      organizationId: user.organizationId,
       after: { tag: tag.name },
     });
     await createActivity({
@@ -80,6 +85,7 @@ export async function POST(
       subject: `Tag "${tag.name}" added`,
       status: "Completed",
       leadId: id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json({ data: names }, { status: 201 });
@@ -95,13 +101,15 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = tagSchema.parse(body);
-    const lead = await prisma.lead.findUnique({ where: { id } });
+    const lead = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!lead) return notFound("Lead not found");
-    const tag = await prisma.tag.findUnique({ where: { name: parsed.tag.trim() } });
+    const tag = await prisma.tag.findFirst({ where: { name: parsed.tag.trim(), organizationId: user.organizationId } });
     if (tag) {
       await prisma.leadTag.deleteMany({
         where: { leadId: id, tagId: tag.id },
@@ -115,6 +123,7 @@ export async function DELETE(
       action: "lead.tag_removed",
       description: `Tag "${parsed.tag}" removed from lead "${leadDisplayName(lead)}"`,
       userId: user.id,
+      organizationId: user.organizationId,
       after: { tag: parsed.tag },
     });
     await createActivity({
@@ -122,6 +131,7 @@ export async function DELETE(
       subject: `Tag "${parsed.tag}" removed`,
       status: "Completed",
       leadId: id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json({ data: names });

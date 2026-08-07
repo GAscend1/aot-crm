@@ -11,12 +11,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAsyncSubmit } from "@/components/common/use-async-submit";
+import { FormErrorBanner, FormFieldError } from "@/components/common/FormError";
 
 import { Lead, LeadSource, LeadStatus } from "../types";
 
 interface LeadFormProps {
   initialData?: Lead;
-  onSubmit: (data: Lead) => void;
+  /** Async save. Resolve on success; throw (or reject) on failure to stay open with errors. */
+  onSubmit: (data: Lead) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -39,11 +42,7 @@ const statusOptions: LeadStatus[] = [
   "Closed Lost",
 ];
 
-export function LeadForm({
-  initialData,
-  onSubmit,
-  onCancel,
-}: LeadFormProps) {
+export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [company, setCompany] = useState(initialData?.company ?? "");
   const [contactName, setContactName] = useState(initialData?.contactName ?? "");
@@ -61,8 +60,12 @@ export function LeadForm({
   );
   const [notes, setNotes] = useState(initialData?.notes ?? "");
 
-  function handleSubmit() {
-    onSubmit({
+  const { saving, error, fieldErrors, submit } = useAsyncSubmit(
+    onSubmit as (data: never) => Promise<unknown>,
+  );
+
+  async function handleSubmit() {
+    await submit({
       id: initialData?.id ?? crypto.randomUUID(),
       title,
       company,
@@ -81,20 +84,22 @@ export function LeadForm({
       notes,
       createdAt: initialData?.createdAt ?? new Date().toISOString().split("T")[0],
       updatedAt: new Date().toISOString().split("T")[0],
-    });
+    } as never);
   }
 
   const isEditing = !!initialData;
 
   return (
     <div className="flex flex-col gap-4">
+      <FormErrorBanner message={error} />
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-title">
             Title
           </label>
 
           <Input
+            id="lead-title"
             placeholder="Lead title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -102,11 +107,12 @@ export function LeadForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-company">
             Company
           </label>
 
           <Input
+            id="lead-company"
             placeholder="Company name"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
@@ -116,11 +122,12 @@ export function LeadForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-contact">
             Contact Name
           </label>
 
           <Input
+            id="lead-contact"
             placeholder="Full name"
             value={contactName}
             onChange={(e) => setContactName(e.target.value)}
@@ -128,26 +135,30 @@ export function LeadForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-email">
             Email
           </label>
 
           <Input
+            id="lead-email"
             type="email"
             placeholder="email@company.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            aria-invalid={!!fieldErrors.email}
           />
+          <FormFieldError message={fieldErrors.email} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-phone">
             Phone
           </label>
 
           <Input
+            id="lead-phone"
             placeholder="+1 555-0000"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -155,12 +166,12 @@ export function LeadForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-source">
             Source
           </label>
 
           <Select value={source} onValueChange={(v) => setSource(v as LeadSource)}>
-            <SelectTrigger>
+            <SelectTrigger id="lead-source">
               <SelectValue />
             </SelectTrigger>
 
@@ -177,11 +188,12 @@ export function LeadForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-score">
             Score (0-100)
           </label>
 
           <Input
+            id="lead-score"
             type="number"
             min={0}
             max={100}
@@ -192,11 +204,12 @@ export function LeadForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-probability">
             Probability (0-100)
           </label>
 
           <Input
+            id="lead-probability"
             type="number"
             min={0}
             max={100}
@@ -209,11 +222,12 @@ export function LeadForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-owner">
             Owner
           </label>
 
           <Input
+            id="lead-owner"
             placeholder="Assigned to"
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
@@ -221,11 +235,12 @@ export function LeadForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-revenue">
             Expected Revenue
           </label>
 
           <Input
+            id="lead-revenue"
             type="number"
             placeholder="0"
             value={expectedRevenue}
@@ -235,12 +250,12 @@ export function LeadForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">
+        <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-status">
           Status
         </label>
 
         <Select value={status} onValueChange={(v) => setStatus(v as LeadStatus)}>
-          <SelectTrigger>
+          <SelectTrigger id="lead-status">
             <SelectValue />
           </SelectTrigger>
 
@@ -255,11 +270,12 @@ export function LeadForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">
+        <label className="text-xs font-medium text-muted-foreground" htmlFor="lead-notes">
           Notes
         </label>
 
         <textarea
+          id="lead-notes"
           className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           placeholder="Additional notes..."
           value={notes}
@@ -268,12 +284,12 @@ export function LeadForm({
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit}>
-          {isEditing ? "Save Changes" : "Create Lead"}
+        <Button onClick={() => void handleSubmit()} disabled={saving}>
+          {saving ? "Saving..." : isEditing ? "Save Changes" : "Create Lead"}
         </Button>
       </div>
     </div>

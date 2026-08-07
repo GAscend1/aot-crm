@@ -29,8 +29,8 @@ export function DataTableBulkActions<TData>({
     <div className="flex items-center gap-2">
       {selectedRows.length > 0 && (
         <>
-          <span className="text-sm text-slate-500">
-            <strong className="text-slate-700 dark:text-slate-300">{selectedRows.length}</strong> selected
+          <span className="text-sm text-muted-foreground">
+            <strong className="text-foreground">{selectedRows.length}</strong> selected
           </span>
           {actions.map((action) => {
             const Icon = action.icon;

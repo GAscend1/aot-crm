@@ -4,6 +4,7 @@ import { Suspense, useCallback, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, AlertCircle, ShieldAlert, ArrowLeft } from "lucide-react";
@@ -59,7 +60,13 @@ function LoginForm() {
       <Card className="relative w-full max-w-lg border-white/10 bg-white/10 p-10 shadow-2xl backdrop-blur-xl text-center">
         <CardHeader className="p-0">
           <div className="flex justify-center">
-            <img src="/Logo.png" alt="AOT Logo" width={90} height={90} />
+            <Image
+              src="/Logo.png"
+              alt="AOT Logo"
+              width={90}
+              height={90}
+              priority
+            />
           </div>
           <CardTitle className="mt-6 text-4xl font-bold tracking-tight text-white">
             AOT CRM
@@ -106,9 +113,9 @@ function LoginForm() {
               <Button
                 variant="outline"
                 className="w-full h-12 gap-3 border-white/20 text-white hover:bg-white/10"
-                onClick={() => window.location.href = "/auth/admin-approval-required"}
+                onClick={() => window.location.href = "/auth/error?error=admin_consent_required"}
               >
-                View Admin Approval Instructions
+                View Consent Details
               </Button>
               <Button
                 variant="ghost"

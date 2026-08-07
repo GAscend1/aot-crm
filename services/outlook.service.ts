@@ -2,8 +2,8 @@ import { v4 as uuid } from "uuid";
 import type { EmailMessage, EmailAttachment, EmailTemplate } from "@/types/common";
 import { eventBus } from "./event-bus";
 import { Events } from "./events";
-import { graphApi, GraphClientError } from "./graph-client";
-import { graphPendingError, isGraphPending } from "./integration-gate";
+import { graphApi } from "./graph-client";
+import { toGraphClientError } from "./integration-gate";
 
 function toEmailMessage(item: Record<string, unknown>): EmailMessage {
   const sender = (item.sender as { emailAddress?: { name?: string; address?: string } })?.emailAddress;
@@ -81,11 +81,7 @@ class OutlookService {
       const result = await graphApi(graphPath + "?$top=50&$orderby=receivedDateTime DESC") as { value: Record<string, unknown>[] };
       return (result.value || []).map(toEmailMessage);
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to load messages: ${err.message}`);
-      }
-      throw new Error("Failed to load messages");
+      throw toGraphClientError(err, "Failed to load messages");
     }
   }
 
@@ -94,11 +90,7 @@ class OutlookService {
       const result = await graphApi(`/me/messages/${id}`) as Record<string, unknown>;
       return toEmailMessage(result);
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to load message: ${err.message}`);
-      }
-      throw new Error("Failed to load message");
+      throw toGraphClientError(err, "Failed to load message");
     }
   }
 
@@ -111,13 +103,33 @@ class OutlookService {
     attachments?: EmailAttachment[];
   }): Promise<EmailMessage> {
     try {
+      // Normalize the payload at the boundary so `undefined`/empty values can
+      // never reach the strict server schema ("expected string, received
+      // undefined"). Recipients without an address are dropped; if nothing
+      // remains, fail fast with a clear client-side message.
+      const to = (data.to || [])
+        .map((r) => ({ name: r.name || "", email: (r.email || "").trim() }))
+        .filter((r) => r.email.length > 0);
+      if (to.length === 0) {
+        throw new Error("At least one recipient is required.");
+      }
+      const subject = (data.subject || "").trim();
+      if (!subject) {
+        throw new Error("Subject is required.");
+      }
+      const body = data.body || "";
+
       const message = {
         message: {
-          subject: data.subject,
-          body: { contentType: "text", content: data.body },
-          toRecipients: data.to.map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
-          ccRecipients: (data.cc || []).map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
-          bccRecipients: (data.bcc || []).map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+          subject,
+          body: { contentType: "text", content: body },
+          toRecipients: to.map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+          ccRecipients: (data.cc || [])
+            .map((r) => ({ emailAddress: { address: (r.email || "").trim(), name: r.name || "" } }))
+            .filter((r) => r.emailAddress.address.length > 0),
+          bccRecipients: (data.bcc || [])
+            .map((r) => ({ emailAddress: { address: (r.email || "").trim(), name: r.name || "" } }))
+            .filter((r) => r.emailAddress.address.length > 0),
         },
         saveToSentItems: true,
       };
@@ -128,11 +140,11 @@ class OutlookService {
       const msg: EmailMessage = {
         id: uuid(),
         threadId: uuid(),
-        subject: data.subject,
-        body: data.body,
-        bodyPreview: data.body.slice(0, 100),
+        subject,
+        body,
+        bodyPreview: body.slice(0, 100),
         sender: { name: "", email: "" },
-        to: data.to,
+        to,
         cc: data.cc || [],
         bcc: data.bcc || [],
         attachments: data.attachments || [],
@@ -144,14 +156,10 @@ class OutlookService {
         receivedAt: new Date().toISOString(),
         categories: [],
       };
-      eventBus.emit(Events.EMAIL_SENT, { to: data.to[0]?.email, subject: data.subject, entityId: msg.id });
+      eventBus.emit(Events.EMAIL_SENT, { to: to[0]?.email, subject, entityId: msg.id });
       return msg;
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to send email: ${err.message}`);
-      }
-      throw new Error("Failed to send email");
+      throw toGraphClientError(err, "Failed to send email");
     }
   }
 
@@ -192,11 +200,7 @@ class OutlookService {
       eventBus.emit(Events.EMAIL_DRAFT_SAVED, { subject: data.subject, entityId: msg.id });
       return msg;
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to save draft: ${err.message}`);
-      }
-      throw new Error("Failed to save draft");
+      throw toGraphClientError(err, "Failed to save draft");
     }
   }
 
@@ -217,11 +221,7 @@ class OutlookService {
       eventBus.emit(Events.EMAIL_SENT, { entityId: msg.id });
       return msg;
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to reply: ${err.message}`);
-      }
-      throw new Error("Failed to reply");
+      throw toGraphClientError(err, "Failed to reply");
     }
   }
 
@@ -242,11 +242,7 @@ class OutlookService {
       eventBus.emit(Events.EMAIL_SENT, { entityId: msg.id });
       return msg;
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to reply all: ${err.message}`);
-      }
-      throw new Error("Failed to reply all");
+      throw toGraphClientError(err, "Failed to reply all");
     }
   }
 
@@ -272,11 +268,7 @@ class OutlookService {
       eventBus.emit(Events.EMAIL_SENT, { entityId: msg.id });
       return msg;
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to forward: ${err.message}`);
-      }
-      throw new Error("Failed to forward");
+      throw toGraphClientError(err, "Failed to forward");
     }
   }
 
@@ -311,11 +303,7 @@ class OutlookService {
     try {
       await graphApi(`/me/messages/${id}`, { method: "DELETE" });
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft Outlook");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to delete message: ${err.message}`);
-      }
-      throw new Error("Failed to delete message");
+      throw toGraphClientError(err, "Failed to delete message");
     }
   }
 }

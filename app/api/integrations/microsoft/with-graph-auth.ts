@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getGraphToken, graphFetch, graphFetchBuffer, GraphServerError } from "@/services/graph-server";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { prisma } from "@/lib/prisma";
+import { canUseFeature } from "@/lib/entitlements";
+import { getSubscription, isPlatformOwner } from "@/lib/server/tenant";
 
 const GRAPH_TIMEOUT_MS = 15_000;
 const MAX_REQUEST_BODY_BYTES = 512_000;
@@ -12,8 +15,12 @@ export type GraphRouteHandler = (
 ) => Promise<Response>;
 
 function getAppOrigin(): string {
+  // Production base URL precedence: AUTH_URL (Auth.js v5) > NEXTAUTH_URL
+  // (legacy) > Vercel > Azure App Service default hostname > localhost.
+  if (process.env.AUTH_URL) return process.env.AUTH_URL;
   if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.WEBSITE_HOSTNAME) return `https://${process.env.WEBSITE_HOSTNAME}`;
   return "http://localhost:3000";
 }
 
@@ -67,12 +74,15 @@ function rejectUnsupportedMethod(req: NextRequest): NextResponse | null {
 
 export function withGraphAuth(
   handler: GraphRouteHandler,
-  options?: { rateLimitAction?: string },
+  options?: { rateLimitAction?: string; entitlement?: string },
 ) {
   return async (req: NextRequest) => {
     if (process.env.USE_MICROSOFT_GRAPH !== "true") {
       return NextResponse.json(
-        { error: "Microsoft Graph is not enabled. Set USE_MICROSOFT_GRAPH=true to enable." },
+        {
+          error: "Microsoft Graph is not enabled. Set USE_MICROSOFT_GRAPH=true to enable.",
+          code: "graph_not_enabled",
+        },
         { status: 503 },
       );
     }
@@ -84,9 +94,42 @@ export function withGraphAuth(
       const session = await auth();
       if (!session?.user?.email) {
         return NextResponse.json(
-          { error: "Authentication required. Sign in with Microsoft Entra ID." },
+          {
+            error: "Authentication required. Sign in with Microsoft Entra ID.",
+            code: "no_token",
+          },
           { status: 401 },
         );
+      }
+
+      // Server-side feature entitlement enforcement. The Graph integration
+      // routes require the plan to grant the feature — e.g. outlook_email for
+      // mail, calendar_sync for calendar, teams for meetings. Fails closed: a
+      // session without a matching CRM user row is treated as not entitled.
+      // Verified AOT Platform Owners bypass the plan matrix (all implemented
+      // features allowed) but never bypass the technical provider state — if
+      // Teams itself fails, Teams is still reported unavailable.
+      if (options?.entitlement) {
+        const user = await prisma.user.findUnique({
+          where: { email: session.user.email },
+          select: { organizationId: true, role: true, email: true },
+        });
+        const ownerBypass =
+          !!user && isPlatformOwner(user, session.user.tenantId ?? null);
+        const subscription =
+          !ownerBypass && user ? await getSubscription(user.organizationId) : null;
+        if (
+          !ownerBypass &&
+          (!subscription || !canUseFeature(subscription.planCode, options.entitlement))
+        ) {
+          return NextResponse.json(
+            {
+              error: `${options.entitlement.replaceAll("_", " ")} is not included in your current plan. Upgrade to unlock it.`,
+              code: "FEATURE_NOT_ENTITLED",
+            },
+            { status: 403 },
+          );
+        }
       }
 
       if (req.method !== "GET") {

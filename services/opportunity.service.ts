@@ -25,6 +25,9 @@ export interface Opportunity {
   ownerId?: string;
   notes: string;
   status: "Open" | "Won" | "Lost";
+  wonReason?: string;
+  lostReason?: string;
+  closedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

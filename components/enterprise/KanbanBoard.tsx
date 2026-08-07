@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type ReactNode } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Plus, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,15 @@ interface KanbanCard {
   probability?: number;
   assignee?: string;
   tags?: string[];
+  /** Shows a green activity dot on the card. */
+  hasActivity?: boolean;
+  /** Deal-health badge rendered above the value. */
+  health?: { label: string; tone: string };
+}
+
+export interface KanbanCardMenuRender {
+  /** Menu control placed at the card's top-right (rendered inside a stop-propagation wrapper). */
+  renderCardMenu?: (card: KanbanCard) => ReactNode;
 }
 
 interface KanbanColumn {
@@ -25,7 +34,7 @@ interface KanbanColumn {
   cards: KanbanCard[];
 }
 
-interface KanbanBoardProps {
+interface KanbanBoardProps extends KanbanCardMenuRender {
   columns: KanbanColumn[];
   onCardMove: (cardId: string, fromColumn: string, toColumn: string, toIndex: number) => void;
   onCardClick?: (cardId: string) => void;
@@ -37,6 +46,7 @@ export function KanbanBoard({
   onCardMove,
   onCardClick,
   onAddClick,
+  renderCardMenu,
 }: KanbanBoardProps) {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggedCard, setDraggedCard] = useState<string | null>(null);
@@ -108,7 +118,7 @@ export function KanbanBoard({
             onDrop={(e) => handleDrop(e, column.id)}
             aria-label={`${column.title} stage`}
             className={cn(
-              "flex min-w-[272px] max-w-[320px] flex-1 flex-col rounded-xl border bg-muted/40 transition-colors duration-150",
+              "flex min-w-[264px] max-w-[308px] flex-1 flex-col rounded-xl border bg-muted/40 transition-colors duration-150",
               isDropTarget && "border-[color:var(--primary)] bg-primary-soft/40"
             )}
           >
@@ -143,7 +153,7 @@ export function KanbanBoard({
               </div>
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto p-2.5 scrollbar-thin">
+            <div className="flex-1 space-y-1.5 overflow-y-auto p-2 scrollbar-thin">
               <AnimatePresence initial={false}>
                 {column.cards.map((card) => {
                   const isDragging = draggedCard === card.id;
@@ -176,21 +186,46 @@ export function KanbanBoard({
                         onDragStart={(e) => handleDragStart(e, card.id)}
                         onDragEnd={handleDragEnd}
                         className={cn(
-                          "cursor-grab rounded-xl border bg-surface-raised p-3 transition-all duration-150 active:cursor-grabbing",
+                          "group/card relative cursor-grab rounded-xl border bg-surface-raised p-2.5 transition-all duration-150 active:cursor-grabbing",
                           isDragging
                             ? "z-10 cursor-grabbing opacity-80 shadow-lg"
                             : "shadow-sm hover:shadow-md"
                         )}
                       >
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-1.5">
                           <GripVertical
                             className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/50"
                             aria-hidden="true"
                           />
                           <div className="min-w-0 flex-1">
+                            {renderCardMenu && (
+                              <span
+                                className="absolute top-1.5 right-1.5 z-10 opacity-0 transition-opacity duration-150 group-hover/card:opacity-100 group-focus-within/card:opacity-100"
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                              >
+                                {renderCardMenu(card)}
+                              </span>
+                            )}
+                            {card.health && (
+                              <span
+                                className={cn(
+                                  "mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
+                                  card.health.tone
+                                )}
+                              >
+                                {card.health.label}
+                              </span>
+                            )}
                             <p className="text-sm font-medium text-foreground">
                               {card.title}
                             </p>
+                            {card.hasActivity && (
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-[color:var(--success)]">
+                                <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--success)]" />
+                                Active
+                              </span>
+                            )}
                             {card.subtitle && (
                               <p className="mt-0.5 truncate text-xs text-muted-foreground">
                                 {card.subtitle}
@@ -204,7 +239,7 @@ export function KanbanBoard({
                             {card.priority && (
                               <span
                                 className={cn(
-                                  "mt-1.5 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
+                                  "mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
                                   /high|urgent/i.test(card.priority)
                                     ? "bg-danger-soft text-[color:var(--danger)] ring-danger/20"
                                     : /low/i.test(card.priority)

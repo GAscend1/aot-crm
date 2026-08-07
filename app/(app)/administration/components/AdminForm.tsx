@@ -40,7 +40,7 @@ const statuses: UserStatus[] = [
 
 interface AdminFormProps {
   initialData?: User;
-  onSubmit: (data: User) => void;
+  onSubmit: (data: User) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -60,20 +60,27 @@ export function AdminForm({
   const [status, setStatus] = useState<UserStatus>(
     initialData?.status ?? "Active"
   );
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit() {
-    onSubmit({
-      id: initialData?.id ?? crypto.randomUUID(),
-      name,
-      email,
-      role: role as User["role"],
-      department,
-      team,
-      status,
-      lastLogin: initialData?.lastLogin ?? new Date().toISOString(),
-      createdAt: initialData?.createdAt ?? new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-    });
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        id: initialData?.id ?? crypto.randomUUID(),
+        name,
+        email,
+        role: role as User["role"],
+        department,
+        team,
+        status,
+        lastLogin: initialData?.lastLogin ?? new Date().toISOString(),
+        createdAt: initialData?.createdAt ?? new Date().toISOString().split("T")[0],
+        updatedAt: new Date().toISOString().split("T")[0],
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isEditing = !!initialData;
@@ -216,12 +223,12 @@ export function AdminForm({
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit}>
-          {isEditing ? "Save Changes" : "Create User"}
+        <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          {submitting ? "Saving..." : isEditing ? "Save Changes" : "Create User"}
         </Button>
       </div>
     </div>

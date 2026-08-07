@@ -25,13 +25,13 @@ export async function GET(
   try {
     const [auditLogs, activities] = await Promise.all([
       prisma.auditLog.findMany({
-        where: { entityType: "lead", entityId: id },
+        where: { entityType: "lead", entityId: id, organizationId: user.organizationId },
         include: { user: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
         take: 500,
       }),
       prisma.activity.findMany({
-        where: { leadId: id },
+        where: { leadId: id, organizationId: user.organizationId },
         include: { assignee: { select: { name: true } }, lead: { select: { firstName: true, lastName: true } } },
         orderBy: { createdAt: "desc" },
         take: 500,

@@ -1,6 +1,6 @@
 import type { UserProfile } from "@/types/common";
-import { graphApi, GraphClientError } from "./graph-client";
-import { graphPendingError, isGraphPending } from "./integration-gate";
+import { graphApi } from "./graph-client";
+import { toGraphClientError } from "./integration-gate";
 
 class GraphService {
   async getProfile(): Promise<UserProfile> {
@@ -39,11 +39,7 @@ class GraphService {
         presence,
       };
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft profile");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to load profile: ${err.message}`);
-      }
-      throw new Error("Failed to load profile");
+      throw toGraphClientError(err, "Failed to load profile");
     }
   }
 
@@ -52,11 +48,7 @@ class GraphService {
       const profile = await graphApi("/me/manager") as { manager: string };
       return { name: profile.manager, email: "" };
     } catch (err) {
-      if (isGraphPending(err)) throw graphPendingError("Microsoft profile");
-      if (err instanceof GraphClientError) {
-        throw new Error(`Failed to load manager: ${err.message}`);
-      }
-      throw new Error("Failed to load manager");
+      throw toGraphClientError(err, "Failed to load manager");
     }
   }
 

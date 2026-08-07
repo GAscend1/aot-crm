@@ -149,6 +149,11 @@ export interface CalendarEvent {
   reminder: number;
   createdAt: string;
   updatedAt: string;
+  /** Microsoft 365 sync state (NOT_SYNCED | SYNCING | SYNCED | ERROR | DELETED). */
+  graphSyncStatus?: string;
+  syncError?: string | null;
+  lastSyncedAt?: string | null;
+  timeZone?: string;
 }
 
 export interface TeamsMeeting {

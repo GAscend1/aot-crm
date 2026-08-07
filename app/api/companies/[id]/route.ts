@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, apiError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { companySchema } from "@/lib/validation/entities";
 import { companyToUI } from "../route";
@@ -15,7 +15,7 @@ export async function GET(
   if (!user) return unauthorized();
   const { id } = await params;
   try {
-    const company = await prisma.company.findUnique({ where: { id } });
+    const company = await prisma.company.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!company) return notFound("Company not found");
     return NextResponse.json(companyToUI(company));
   } catch (err) {
@@ -30,11 +30,18 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const parsed = companySchema.partial().parse(body);
-    const existing = await prisma.company.findUnique({ where: { id } });
+    let parsed;
+    try {
+      parsed = companySchema.partial().parse(body);
+    } catch (err) {
+      return zodValidationError(err, "COMPANY_UPDATE_FAILED", "The company could not be updated.");
+    }
+    const existing = await prisma.company.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Company not found");
 
     const data: Prisma.CompanyUpdateInput = {};
@@ -63,7 +70,7 @@ export async function PATCH(
     return NextResponse.json(companyToUI(updated));
   } catch (err) {
     logServerError(`PATCH /api/companies/${id}`, err);
-    return serverError("Failed to update company");
+    return apiError(500, "COMPANY_UPDATE_FAILED", "The company could not be updated.");
   }
 }
 
@@ -73,21 +80,29 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.company.findUnique({ where: { id } });
+    const existing = await prisma.company.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Company not found");
-    await prisma.company.delete({ where: { id } });
+    // Archive (soft delete): Companies are referenced by contacts, customers,
+    // opportunities, quotes, invoices, and documents. Archiving keeps those
+    // links intact while removing the company from active lists.
+    await prisma.company.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
     await logAudit({
       entityType: "company",
       entityId: id,
-      action: "company.deleted",
-      description: `Company "${existing.companyName}" deleted`,
+      action: "company.archived",
+      description: `Company "${existing.companyName}" archived`,
       userId: user.id,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
     logServerError(`DELETE /api/companies/${id}`, err);
-    return serverError("Failed to delete company");
+    return apiError(500, "COMPANY_DELETE_FAILED", "The company could not be deleted.");
   }
 }

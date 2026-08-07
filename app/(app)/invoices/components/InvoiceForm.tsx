@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Invoice, InvoiceLineItem } from "../types";
 
 export interface InvoicePrefill {
@@ -18,7 +19,7 @@ export interface InvoicePrefill {
 interface InvoiceFormProps {
   initialData?: Invoice;
   prefill?: InvoicePrefill;
-  onSubmit: (data: Invoice) => void;
+  onSubmit: (data: Invoice) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -28,6 +29,11 @@ interface DraftItem {
   description: string;
   quantity: string;
   unitPrice: string;
+}
+
+interface FormErrors {
+  customer?: string;
+  items?: string;
 }
 
 export function InvoiceForm({ initialData, prefill, onSubmit, onCancel }: InvoiceFormProps) {
@@ -68,40 +74,62 @@ export function InvoiceForm({ initialData, prefill, onSubmit, onCancel }: Invoic
         amount: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0),
       }));
 
-  const subtotal = parseItems().reduce((s, i) => s + i.amount, 0);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const parsedItems = parseItems();
+  const subtotal = parsedItems.reduce((s, i) => s + i.amount, 0);
   const tax = subtotal * ((Number(taxRate) || 0) / 100);
   const total = subtotal - (Number(discount) || 0) + tax;
 
-  function handleSubmit() {
-    onSubmit({
-      id: initialData?.id ?? crypto.randomUUID(),
-      invoiceNumber: initialData?.invoiceNumber ?? "",
-      status: initialData?.status ?? "DRAFT",
-      currency: currency || "USD",
-      subtotal,
-      tax,
-      taxRate: Number(taxRate) || 0,
-      discount: Number(discount) || 0,
-      total,
-      issueDate: initialData?.issueDate ?? new Date().toISOString().split("T")[0],
-      dueDate,
-      paidAt: initialData?.paidAt ?? "",
-      notes,
-      quote: initialData?.quote ?? "",
-      quoteId: initialData?.quoteId ?? "",
-      customer,
-      customerId: initialData?.customerId ?? prefill?.customerId ?? "",
-      company,
-      companyId: initialData?.companyId ?? prefill?.companyId ?? "",
-      opportunity,
-      opportunityId: initialData?.opportunityId ?? prefill?.opportunityId ?? "",
-      lead: initialData?.lead ?? "",
-      leadId: initialData?.leadId ?? "",
-      createdBy: initialData?.createdBy ?? "",
-      items: parseItems(),
-      createdAt: initialData?.createdAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+  async function handleSubmit() {
+    if (submitting) return;
+    const nextErrors: FormErrors = {};
+    if (!customer.trim()) nextErrors.customer = "Customer is required.";
+    if (parsedItems.length === 0) {
+      nextErrors.items = "Add at least one line item.";
+    } else {
+      const invalid = parsedItems.find(
+        (i) => i.quantity <= 0 || i.unitPrice < 0
+      );
+      if (invalid) nextErrors.items = "Quantity must be greater than zero and unit price cannot be negative.";
+    }
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        id: initialData?.id ?? crypto.randomUUID(),
+        invoiceNumber: initialData?.invoiceNumber ?? "",
+        status: initialData?.status ?? "DRAFT",
+        currency: currency || "USD",
+        subtotal,
+        tax,
+        taxRate: Number(taxRate) || 0,
+        discount: Number(discount) || 0,
+        total,
+        issueDate: initialData?.issueDate ?? new Date().toISOString().split("T")[0],
+        dueDate,
+        paidAt: initialData?.paidAt ?? "",
+        notes,
+        quote: initialData?.quote ?? "",
+        quoteId: initialData?.quoteId ?? "",
+        customer: customer.trim(),
+        customerId: initialData?.customerId ?? prefill?.customerId ?? "",
+        company,
+        companyId: initialData?.companyId ?? prefill?.companyId ?? "",
+        opportunity,
+        opportunityId: initialData?.opportunityId ?? prefill?.opportunityId ?? "",
+        lead: initialData?.lead ?? "",
+        leadId: initialData?.leadId ?? "",
+        createdBy: initialData?.createdBy ?? "",
+        items: parsedItems,
+        createdAt: initialData?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isEditing = !!initialData;
@@ -111,7 +139,19 @@ export function InvoiceForm({ initialData, prefill, onSubmit, onCancel }: Invoic
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-muted-foreground">Customer</label>
-          <Input placeholder="Customer name" value={customer} onChange={(e) => setCustomer(e.target.value)} />
+          <Input
+            placeholder="Customer name"
+            value={customer}
+            onChange={(e) => {
+              setCustomer(e.target.value);
+              if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
+            }}
+            aria-invalid={!!errors.customer}
+            className={cn(errors.customer && "border-[color:var(--danger)] ring-1 ring-inset ring-danger/30")}
+          />
+          {errors.customer && (
+            <p className="text-xs text-[color:var(--danger)]" role="alert">{errors.customer}</p>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-muted-foreground">Company</label>
@@ -169,6 +209,9 @@ export function InvoiceForm({ initialData, prefill, onSubmit, onCancel }: Invoic
           ))}
           {items.length === 0 && <p className="py-3 text-center text-xs text-slate-400">Add at least one line item.</p>}
         </div>
+        {errors.items && (
+          <p className="mt-1.5 text-xs text-[color:var(--danger)]" role="alert">{errors.items}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -212,10 +255,12 @@ export function InvoiceForm({ initialData, prefill, onSubmit, onCancel }: Invoic
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit}>{isEditing ? "Save Changes" : "Create Invoice"}</Button>
+        <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          {submitting ? "Saving..." : isEditing ? "Save Changes" : "Create Invoice"}
+        </Button>
       </div>
     </div>
   );

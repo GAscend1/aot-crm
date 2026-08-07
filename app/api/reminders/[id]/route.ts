@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { reminderSchema } from "@/lib/validation/entities";
 import { reminderToUI } from "../route";
@@ -12,11 +12,13 @@ export async function PATCH(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = reminderSchema.partial().parse(body);
-    const existing = await prisma.reminder.findUnique({ where: { id } });
+    const existing = await prisma.reminder.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Reminder not found");
     if (existing.userId !== user.id) {
       return NextResponse.json({ error: "You can only update your own reminders" }, { status: 403 });
@@ -53,9 +55,11 @@ export async function DELETE(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
-    const existing = await prisma.reminder.findUnique({ where: { id } });
+    const existing = await prisma.reminder.findFirst({ where: { id, organizationId: user.organizationId } });
     if (!existing) return notFound("Reminder not found");
     if (existing.userId !== user.id) {
       return NextResponse.json({ error: "You can only delete your own reminders" }, { status: 403 });

@@ -47,8 +47,12 @@ class ZoomService {
       body: JSON.stringify(data),
     });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || "Failed to create Zoom meeting");
+      // Surface the API's exact message (e.g. the 503 "not enabled" state)
+      // so callers can distinguish NOT CONFIGURED from a real failure.
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(
+        body.error || `Failed to create Zoom meeting (${res.status})`
+      );
     }
     const meeting = (await res.json()) as ZoomMeeting;
     eventBus.emit(Events.ZOOM_MEETING_CREATED, { ...meeting, entityId: meeting.id });
@@ -57,7 +61,12 @@ class ZoomService {
 
   async getMeetings(): Promise<ZoomMeeting[]> {
     const res = await fetch("/api/integrations/zoom/meetings");
-    if (!res.ok) throw new Error("Failed to load Zoom meetings");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(
+        body.error || `Failed to load Zoom meetings (${res.status})`
+      );
+    }
     const data = (await res.json()) as ZoomMeeting[];
     return data.sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
@@ -74,7 +83,12 @@ class ZoomService {
 
   async deleteMeeting(id: string): Promise<void> {
     const res = await fetch(`/api/integrations/zoom/meetings/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed to delete Zoom meeting");
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(
+        body.error || `Failed to delete Zoom meeting (${res.status})`
+      );
+    }
   }
 }
 

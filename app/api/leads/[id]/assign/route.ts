@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError, notFound } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, notFound, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, createNotification, leadDisplayName } from "@/lib/server/records";
 import { leadAssignSchema } from "@/lib/validation/entities";
-import { leadToUI } from "../../route";
+import { leadToUI, leadUIInclude } from "../../route";
 export const dynamic = "force-dynamic";
 
 export async function POST(
@@ -12,11 +12,13 @@ export async function POST(
 ) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = leadAssignSchema.parse(body);
-    const lead = await prisma.lead.findUnique({ where: { id }, include: { assignedTo: true } });
+    const lead = await prisma.lead.findFirst({ where: { id, organizationId: user.organizationId }, include: leadUIInclude });
     if (!lead) return notFound("Lead not found");
 
     let assigneeId = parsed.assigneeId ?? null;
@@ -26,14 +28,21 @@ export async function POST(
     }
 
     if (assigneeId) {
-      const assignee = await prisma.user.findUnique({ where: { id: assigneeId } });
-      if (!assignee) return NextResponse.json({ error: "Assignee not found" }, { status: 400 });
+      const assignee = await prisma.user.findFirst({
+        where: { id: assigneeId, organizationId: user.organizationId },
+      });
+      if (!assignee) {
+        return NextResponse.json(
+          { error: "Assignee not found in your workspace" },
+          { status: 400 },
+        );
+      }
     }
 
     const updated = await prisma.lead.update({
       where: { id },
       data: assigneeId ? { assignedTo: { connect: { id: assigneeId } } } : { assignedTo: { disconnect: true } },
-      include: { assignedTo: true },
+      include: leadUIInclude,
     });
 
     const beforeOwner = lead.assignedTo?.name ?? "Unassigned";

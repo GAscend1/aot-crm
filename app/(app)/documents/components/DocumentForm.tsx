@@ -21,7 +21,7 @@ import {
 
 interface DocumentFormProps {
   initialData?: Document;
-  onSubmit: (data: Document) => void;
+  onSubmit: (data: Document) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -55,26 +55,33 @@ export function DocumentForm({
   const [status, setStatus] = useState<DocumentStatus>(
     initialData?.status ?? "Active"
   );
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit() {
-    onSubmit({
-      id: initialData?.id ?? crypto.randomUUID(),
-      name,
-      category,
-      type,
-      size: initialData?.size ?? "0 KB",
-      uploadDate: initialData?.uploadDate ?? new Date().toISOString().split("T")[0],
-      uploadedBy: initialData?.uploadedBy ?? "Current User",
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      version: initialData?.version ?? "v1.0",
-      description,
-      status,
-      createdAt: initialData?.createdAt ?? new Date().toISOString().split("T")[0],
-      updatedAt: initialData?.updatedAt ?? new Date().toISOString().split("T")[0],
-    });
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        id: initialData?.id ?? crypto.randomUUID(),
+        name,
+        category,
+        type,
+        size: initialData?.size ?? "0 KB",
+        uploadDate: initialData?.uploadDate ?? new Date().toISOString().split("T")[0],
+        uploadedBy: initialData?.uploadedBy ?? "Current User",
+        tags: tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        version: initialData?.version ?? "v1.0",
+        description,
+        status,
+        createdAt: initialData?.createdAt ?? new Date().toISOString().split("T")[0],
+        updatedAt: initialData?.updatedAt ?? new Date().toISOString().split("T")[0],
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isEditing = !!initialData;
@@ -187,12 +194,12 @@ export function DocumentForm({
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit}>
-          {isEditing ? "Save Changes" : "Upload Document"}
+        <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          {submitting ? "Saving..." : isEditing ? "Save Changes" : "Upload Document"}
         </Button>
       </div>
     </div>

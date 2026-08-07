@@ -39,4 +39,4 @@ export const POST = withGraphAuth(async (accessToken, req: NextRequest) => {
   });
 
   return Response.json(result, { status: 201 });
-}, { rateLimitAction: "meetings:create" });
+}, { rateLimitAction: "meetings:create", entitlement: "teams" });

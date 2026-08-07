@@ -20,6 +20,10 @@ export interface Lead {
   notes: string;
   isFavorite: boolean;
   tags?: string[];
+  convertedAt?: string;
+  convertedCustomerId?: string;
+  convertedContactId?: string;
+  convertedOpportunityId?: string;
   createdAt: string;
   updatedAt: string;
 }

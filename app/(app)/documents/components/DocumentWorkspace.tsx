@@ -23,10 +23,10 @@ import {
 } from "@/components/enterprise/RecordWorkspace";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { documentService } from "@/services/index";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 import type { Document } from "../types";
-import { DocumentDrawer } from "./DocumentDrawer";
-import { DocumentDeleteDialog } from "./DocumentDeleteDialog";
+import { DocumentModal } from "./DocumentModal";
 
 const typeIcons: Record<string, LucideIcon> = {
   PDF: FileText,
@@ -68,6 +68,7 @@ export function DocumentWorkspace({ onChanged }: DocumentWorkspaceProps) {
     try {
       await documentService.delete(record.id);
       success("Document deleted");
+      setDeleteOpen(false);
       onChanged?.();
       close();
     } catch {
@@ -194,20 +195,28 @@ export function DocumentWorkspace({ onChanged }: DocumentWorkspaceProps) {
 
       {record && (
         <>
-          <DocumentDrawer
+          <DocumentModal
             open={editOpen}
-            onOpenChange={(openState) => {
-              setEditOpen(openState);
-              if (!openState) reload();
+            onClose={() => {
+              setEditOpen(false);
+              reload();
             }}
             document={record}
             onSave={(data) => void handleSave(data)}
           />
-          <DocumentDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            document={record}
+            onClose={() => setDeleteOpen(false)}
+            title="Delete Document"
+            message={
+              <>
+                Are you sure you want to delete <strong>{record.name}</strong>?
+                This action cannot be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
             onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
           />
         </>
       )}

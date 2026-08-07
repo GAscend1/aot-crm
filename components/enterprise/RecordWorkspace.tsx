@@ -4,7 +4,15 @@ import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { LucideIcon } from "lucide-react";
+import { MoreHorizontal, LucideIcon } from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 import {
   Dialog,
@@ -29,6 +37,18 @@ interface RecordWorkspaceProps {
   footer?: React.ReactNode;
   loading?: boolean;
   /**
+   * Inline edit mode. When true, the body renders `editor` (the record form)
+   * instead of `children`/`sidebar` so the SAME modal switches into edit mode
+   * rather than stacking a second dialog on top.
+   */
+  editing?: boolean;
+  /** Form rendered in the body while `editing` is true. */
+  editor?: React.ReactNode;
+  /** Header actions shown while `editing` is true (e.g. a Cancel button). */
+  editingActions?: React.ReactNode;
+  /** Keep the header mounted while editing so the title stays visible. */
+  keepHeaderWhileEditing?: boolean;
+  /**
    * "default" (current behavior) renders a single scrollable column.
    * "split" renders a true two-column shell (left workspace + right inspector)
    * with its own internal scrolling and overflow hidden at the shell level.
@@ -40,6 +60,13 @@ interface RecordWorkspaceProps {
   contentClassName?: string;
   /** Extra classes merged onto the body container. */
   bodyClassName?: string;
+  /**
+   * Whether the shell renders its own top-right close (X). Defaults to `false`
+   * when a custom `header` is supplied (the header owns the close button — e.g.
+   * OpportunityWorkspaceHeader) and `true` otherwise, so a record never shows
+   * TWO close controls.
+   */
+  showCloseButton?: boolean;
 }
 
 /**
@@ -59,26 +86,51 @@ export function RecordWorkspace({
   sidebar,
   footer,
   loading,
+  editing = false,
+  editor,
+  editingActions,
+  keepHeaderWhileEditing = false,
   layout = "default",
   sizeClassName,
   contentClassName,
   bodyClassName,
+  showCloseButton,
 }: RecordWorkspaceProps) {
   const split = layout === "split";
+  // A custom header is responsible for its own close control (OpportunityWorkspaceHeader
+  // renders an X). Rendering the shell X too would duplicate the close button.
+  const effectiveShowCloseButton = header
+    ? (showCloseButton ?? false)
+    : (showCloseButton ?? true);
+
+  // Viewport-safe shell: the dialog gets a DEFINITE height (capped to the
+  // viewport) so the `minmax(0,1fr)` body row is bounded and its inner
+  // scroll regions actually scroll. With `h-auto` + `max-h` only, the fr row
+  // sizes to content and the overflow-hidden shell clips the bottom instead
+  // of scrolling — the reported "lower content cut off" bug. The footer (when
+  // present) is its own auto-sized grid row below the scrollable body.
+  const gridRows = footer
+    ? "grid-rows-[auto_minmax(0,1fr)_auto]"
+    : "grid-rows-[auto_minmax(0,1fr)]";
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
+        showCloseButton={effectiveShowCloseButton}
         className={cn(
-          // Mobile: full-screen sheet. sm+: centered dialog.
-          "top-0 left-0 grid h-dvh w-full max-w-none translate-x-0 translate-y-0 grid-cols-1 gap-0 rounded-none border-0 p-0",
+          // Mobile: full-screen sheet (max-h-dvh overrides the base 90dvh cap).
+          // sm+: centered, height-capped dialog.
+          "top-0 left-0 grid h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 grid-cols-1 gap-0 rounded-none border-0 p-0",
+          gridRows,
           split
             ? cn(
-                "grid-rows-[auto_minmax(0,1fr)] sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[min(86dvh,900px)] sm:w-[min(82vw,1220px)] sm:min-w-[min(960px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-1 sm:overflow-hidden sm:rounded-2xl sm:border sm:shadow-2xl",
+                "sm:top-1/2 sm:left-1/2 sm:h-[min(86dvh,900px)] sm:max-h-[min(86dvh,900px)] sm:w-[min(82vw,1220px)] sm:min-w-[min(960px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-1 sm:overflow-hidden sm:rounded-2xl sm:border sm:shadow-2xl",
                 sizeClassName
               )
-            : "sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100%-1rem)] sm:max-w-[min(1320px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-[1fr_auto] sm:rounded-xl sm:border sm:shadow-2xl",
-          contentClassName
+            : cn(
+                "sm:top-1/2 sm:left-1/2 sm:h-[min(90dvh,900px)] sm:max-h-[min(90dvh,900px)] sm:w-[calc(100%-1rem)] sm:max-w-[min(1320px,calc(100vw-1rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:grid-cols-1 sm:overflow-hidden sm:rounded-xl sm:border sm:shadow-2xl",
+                contentClassName
+              )
         )}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
@@ -88,8 +140,15 @@ export function RecordWorkspace({
           <RecordWorkspaceSkeleton />
         ) : (
           <>
-            {header ?? (
-              <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b bg-popover/95 px-5 py-4 backdrop-blur-sm supports-[backdrop-filter]:bg-popover/80">
+            {header ?? (editing && !keepHeaderWhileEditing ? null : (
+              // pr-14 keeps the header actions clear of the shell's absolute
+              // top-right close (X) — exactly ONE close control per dialog.
+              <header
+                className={cn(
+                  "sticky top-0 z-10 flex items-start justify-between gap-3 border-b bg-popover/95 px-5 py-4 backdrop-blur-sm supports-[backdrop-filter]:bg-popover/80",
+                  effectiveShowCloseButton && "pr-14"
+                )}
+              >
                 <div className="min-w-0">
                   {eyebrow && (
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -108,11 +167,15 @@ export function RecordWorkspace({
                     </p>
                   )}
                 </div>
-                {actions && (
-                  <div className="flex shrink-0 items-center gap-2">{actions}</div>
-                )}
+                {editing
+                  ? editingActions && (
+                      <div className="flex shrink-0 items-center gap-2">{editingActions}</div>
+                    )
+                  : actions && (
+                      <div className="flex shrink-0 items-center gap-2">{actions}</div>
+                    )}
               </header>
-            )}
+            ))}
 
             <div
               className={cn(
@@ -123,23 +186,33 @@ export function RecordWorkspace({
                 bodyClassName
               )}
             >
-              <div
-                className={cn(
-                  "min-h-0 min-w-0",
-                  split ? "flex-1" : "flex-1 space-y-5"
-                )}
-              >
-                {children}
-              </div>
-              {sidebar && (
-                <aside
-                  className={cn(
-                    "shrink-0",
-                    split ? "w-full lg:w-auto" : "w-full space-y-5 lg:w-72"
+              {editing && editor ? (
+                <div className="min-h-0 min-w-0 flex-1">{editor}</div>
+              ) : (
+                <>
+                  <div
+                    className={cn(
+                      "min-h-0 min-w-0",
+                      split ? "flex-1" : "flex-1 space-y-5"
+                    )}
+                  >
+                    {children}
+                  </div>
+                  {sidebar && (
+                    <aside
+                      className={cn(
+                        "shrink-0",
+                        // The split inspector column scrolls independently when
+                        // it is taller than the capped dialog.
+                        split
+                          ? "w-full lg:h-full lg:w-auto lg:min-h-0 lg:overflow-y-auto"
+                          : "w-full space-y-5 lg:w-72"
+                      )}
+                    >
+                      {sidebar}
+                    </aside>
                   )}
-                >
-                  {sidebar}
-                </aside>
+                </>
               )}
             </div>
 
@@ -258,6 +331,88 @@ export function RecordQuickActions({
   );
 }
 
+export interface RecordActionChip {
+  label: string;
+  icon?: LucideIcon;
+  onClick: () => void;
+  destructive?: boolean;
+  disabled?: boolean;
+  /** Soft tint color token, e.g. "--chart-1". Defaults to neutral. */
+  tone?: string;
+}
+
+/**
+ * Compact horizontal action toolbar (chips), used directly under a header.
+ * Replaces oversized full-width Quick Actions panels.
+ */
+export function RecordActionBar({ actions }: { actions: RecordActionChip[] }) {
+  if (actions.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-muted/30 px-3 py-1.5 sm:px-4">
+      {actions.map((action) => {
+        const Icon = action.icon;
+        return (
+          <button
+            key={action.label}
+            type="button"
+            disabled={action.disabled}
+            onClick={action.onClick}
+            className={cn(
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold ring-1 ring-inset transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60",
+              action.destructive
+                ? "bg-danger-soft text-[color:var(--danger)] ring-danger/25 hover:bg-[color:var(--danger)]/15"
+                : action.tone
+                  ? `bg-[color:var(${action.tone})]/[0.1] text-[color:var(${action.tone})] ring-[color:var(${action.tone})]/25 hover:bg-[color:var(${action.tone})]/[0.18]`
+                  : "bg-muted text-foreground ring-border hover:bg-muted/70"
+            )}
+          >
+            {Icon && <Icon className="size-3.5" aria-hidden="true" />}
+            {action.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export interface RecordMoreAction {
+  label: string;
+  icon?: LucideIcon;
+  onClick: () => void;
+  destructive?: boolean;
+}
+
+/**
+ * "More" overflow menu that hosts low-frequency and destructive actions
+ * (e.g. archive/delete) instead of full-width danger buttons in the body.
+ */
+export function RecordMoreMenu({ actions }: { actions: RecordMoreAction[] }) {
+  if (actions.length === 0) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="More actions" />
+        }
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        {actions.map((action) => (
+          <DropdownMenuItem
+            key={action.label}
+            onClick={action.onClick}
+            variant={action.destructive ? "destructive" : "default"}
+          >
+            {action.icon && <action.icon className="h-4 w-4" />}
+            {action.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function RecordWorkspaceSkeleton() {
   return (
     <div className="space-y-4 p-5" role="status" aria-label="Loading record">
@@ -311,11 +466,13 @@ export function useRecordWorkspace<T extends { id: string }>(service: {
 
   const open = useCallback(
     (id: string) => {
-      router.push(`${pathname}?record=${encodeURIComponent(id)}`, {
-        scroll: false,
-      });
+      // Preserve existing query params (e.g. ?view=kanban) when navigating
+      // between sibling records, so prev/next never drops the active view.
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      params.set("record", id);
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, router]
+    [pathname, router, searchParams]
   );
 
   const close = useCallback(() => {

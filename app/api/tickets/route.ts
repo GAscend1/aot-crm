@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, TicketStatus, TicketPriority } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, subscriptionWriteGate, featureGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { ticketSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -56,6 +56,8 @@ export function ticketToUI(c: Prisma.TicketGetPayload<{ include: { assignee: tru
 export async function GET(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "tickets");
+  if (gate) return gate;
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "50")));
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const filters = searchParams.get("filters");
 
-  const where: Prisma.TicketWhereInput = {};
+  const where: Prisma.TicketWhereInput = { organizationId: user.organizationId };
   if (search) {
     where.OR = [
       { title: { contains: search, mode: "insensitive" } },
@@ -100,11 +102,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await featureGate(user, "tickets");
+  if (gate) return gate;
+  const subGate = await subscriptionWriteGate(user);
+  if (subGate) return subGate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = ticketSchema.parse(body);
 
     const data: Prisma.TicketCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       title: parsed.subject,
       description: parsed.description,
       priority: parsed.priority ?? "Medium",
@@ -125,6 +132,7 @@ export async function POST(request: NextRequest) {
       action: "ticket.created",
       description: `Ticket "${created.title}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(ticketToUI(created), { status: 201 });

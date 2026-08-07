@@ -8,6 +8,8 @@ import { EventModal } from "@/components/integrations/EventModal";
 import { TeamsMeetingDialog } from "@/components/integrations/TeamsMeetingDialog";
 import { ZoomMeetingDialog } from "@/components/integrations/ZoomMeetingDialog";
 import { ticketService } from "@/services/index";
+import { useCanUse } from "@/hooks/use-subscription";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
 import type { Ticket } from "@/services/ticket.service";
 
 const statusColors: Record<string, string> = {
@@ -26,6 +28,11 @@ const priorityColors: Record<string, string> = {
 
 export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  // Plan-gated actions (server enforces too): Email requires Professional+,
+  // Teams/Zoom require Enterprise. Locked plans get no dead buttons.
+  const canEmail = useCanUse("outlook_email");
+  const canTeams = useCanUse("teams");
+  const canZoom = useCanUse("zoom");
   const [emailOpen, setEmailOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
@@ -33,7 +40,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [ticketRecord, setTicketRecord] = useState<Ticket | null>(null);
 
   return (
-    <>
+    <FeatureGate feature="tickets" featureLabel="Tickets" mode="replace">
       <RecordDetail<Ticket>
         id={id}
         service={ticketService}
@@ -70,9 +77,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           ),
         })}
         quickActions={() => [
-          { label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) },
-          { label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) },
-          { label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) },
+          ...(canEmail ? [{ label: "Send Email", icon: Mail, onClick: () => setEmailOpen(true) }] : []),
+          ...(canTeams ? [{ label: "Teams Meeting", icon: Video, onClick: () => setTeamsOpen(true) }] : []),
+          ...(canZoom ? [{ label: "Zoom Meeting", icon: Video, onClick: () => setZoomOpen(true) }] : []),
           { label: "Schedule Meeting", icon: Calendar, onClick: () => setEventOpen(true) },
         ]}
       />
@@ -103,6 +110,6 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           />
         </>
       )}
-    </>
+    </FeatureGate>
   );
 }

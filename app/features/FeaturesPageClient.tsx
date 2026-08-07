@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   Users, GitBranch, BarChart3, Mail, Calendar, MessageSquare,
-  Video, FileText, Settings, Activity, Key, ArrowRight
+  FileText, Settings, Activity, Key, ArrowRight
 } from "lucide-react"
 import Link from "next/link"
 import { MarketingLayout } from "@/components/marketing/MarketingLayout"
@@ -20,7 +20,6 @@ const features = [
   { title: "Email Integration", description: "Connect Outlook mail and calendar for seamless email tracking, templates, and automated sequences.", icon: Mail },
   { title: "Calendar Sync", description: "Two-way calendar sync with Outlook to manage meetings, follow-ups, and availability across the team.", icon: Calendar },
   { title: "Teams Integration", description: "Collaborate on records, share updates, and join meetings directly from Microsoft Teams.", icon: MessageSquare },
-  { title: "Zoom Integration", description: "Schedule, join, and log Zoom meetings linked to contacts, leads, and opportunities.", icon: Video },
   { title: "Document Management", description: "Store, share, and collaborate on documents with version control and Azure Blob integration.", icon: FileText },
   { title: "Automation", description: "Build workflows to automate repetitive tasks, email sequences, and data enrichment rules.", icon: Settings },
   { title: "Audit Logs", description: "Full audit trail of every action, change, and access event for compliance and security review.", icon: Activity },

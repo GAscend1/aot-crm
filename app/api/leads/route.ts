@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit, createActivity, leadDisplayName } from "@/lib/server/records";
 import { leadCreateSchema } from "@/lib/validation/entities";
 import type { LeadStatus, Prisma } from "@/generated/prisma/client";
@@ -26,12 +27,24 @@ export type UILead = {
   isFavorite: boolean;
   tags: string[];
   notes: string;
+  convertedAt: string;
+  /** Linked account record created/reused at conversion. */
+  convertedCustomerId: string;
+  /** Linked person record created/reused at conversion (via the customer). */
+  convertedContactId: string;
+  convertedOpportunityId: string;
   createdAt: string;
   updatedAt: string;
 };
 
+/** Include required by leadToUI to surface the post-conversion contact link. */
+export const leadUIInclude = {
+  assignedTo: true,
+  customer: { select: { contactId: true } },
+} as const;
+
 export function leadToUI(
-  c: Prisma.LeadGetPayload<{ include: { assignedTo: true } }>
+  c: Prisma.LeadGetPayload<{ include: typeof leadUIInclude }>
 ): UILead {
   return {
     id: c.id,
@@ -53,6 +66,10 @@ export function leadToUI(
     isFavorite: c.isFavorite,
     tags: Array.isArray(c.tags) ? (c.tags as string[]) : [],
     notes: c.notes ?? "",
+    convertedAt: c.convertedAt?.toISOString() ?? "",
+    convertedCustomerId: c.customerId ?? "",
+    convertedContactId: c.customer?.contactId ?? "",
+    convertedOpportunityId: c.opportunityId ?? "",
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
@@ -88,7 +105,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") ?? "";
   const filters = searchParams.get("filters");
 
-  const where: Prisma.LeadWhereInput = {};
+  const where: Prisma.LeadWhereInput = { organizationId: user.organizationId };
   if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
@@ -120,7 +137,7 @@ export async function GET(request: NextRequest) {
     const [data, total] = await Promise.all([
       prisma.lead.findMany({
         where,
-        include: { assignedTo: true },
+        include: leadUIInclude,
         orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -143,6 +160,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = leadCreateSchema.parse(body);
@@ -152,6 +171,7 @@ export async function POST(request: NextRequest) {
     const lastName = parsed.lastName ?? parts.slice(1).join(" ") ?? "";
 
     const data: Prisma.LeadCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       firstName: firstName || "Unknown",
       lastName,
       title: parsed.title || undefined,
@@ -171,7 +191,7 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.lead.create({
       data,
-      include: { assignedTo: true },
+      include: leadUIInclude,
     });
 
     await logAudit({
@@ -180,6 +200,7 @@ export async function POST(request: NextRequest) {
       action: "lead.created",
       description: `Lead "${leadDisplayName(created)}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
       after: { title: created.title, status: created.status },
     });
     await createActivity({
@@ -188,10 +209,14 @@ export async function POST(request: NextRequest) {
       description: `Lead "${leadDisplayName(created)}" was created`,
       status: "Completed",
       leadId: created.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(leadToUI(created), { status: 201 });
   } catch (err) {
+    if (err instanceof ZodError) {
+      return zodValidationError(err, "LEAD_VALIDATION_FAILED", "Invalid lead data.");
+    }
     logServerError("POST /api/leads", err);
     return serverError("Failed to create lead");
   }

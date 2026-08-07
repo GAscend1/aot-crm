@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -8,27 +8,33 @@ import {
   Mail,
   Pencil,
   Phone,
+  Plus,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { EntityStatusBadge } from "@/components/enterprise/EntityStatusBadge";
 import {
-  RecordQuickActions,
+  RecordActionBar,
+  RecordMoreMenu,
   RecordWorkspace,
   RecordWorkspaceField,
   RecordWorkspaceGrid,
   RecordWorkspaceSection,
   useRecordWorkspace,
 } from "@/components/enterprise/RecordWorkspace";
+
 import { EmailComposer } from "@/components/integrations/EmailComposer";
 import { EventModal } from "@/components/integrations/EventModal";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { contactService } from "@/services/index";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ApiRequestError } from "@/repositories/api/ApiRepository";
+import { useCanUse } from "@/hooks/use-subscription";
 
 import type { Contact } from "../types";
-import { ContactDrawer } from "./ContactDrawer";
-import { ContactDeleteDialog } from "./ContactDeleteDialog";
+import { ContactForm } from "./ContactForm";
 
 interface ContactWorkspaceProps {
   onChanged?: () => void;
@@ -40,10 +46,13 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
   const { record, loading, recordId, close, reload } =
     useRecordWorkspace(contactService);
 
-  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
+
+  const canEmail = useCanUse("outlook_email");
 
   const fullName = useMemo(
     () =>
@@ -53,38 +62,61 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
     [record]
   );
 
-  const handleSave = async (data: Partial<Contact>) => {
-    if (!record) return;
-    try {
-      await contactService.update(record.id, data);
-      success("Contact updated", `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim() + " has been updated.");
-      setEditOpen(false);
-      onChanged?.();
-      reload();
-    } catch {
-      showError("Error", "Failed to save contact.");
-    }
-  };
+  const handleSave = useCallback(
+    async (data: Partial<Contact>) => {
+      if (!record) return;
+      try {
+        const updated = await contactService.update(record.id, data);
+        success(
+          "Contact updated",
+          `${updated.firstName} ${updated.lastName}`.trim() + " has been updated."
+        );
+        setEditing(false);
+        onChanged?.();
+        reload();
+      } catch (err) {
+        if (err instanceof ApiRequestError) throw err;
+        showError("Error", "Failed to save contact.");
+        throw new ApiRequestError(500, "Failed to save contact.");
+      }
+    },
+    [record, success, showError, onChanged, reload]
+  );
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!record) return;
+    setDeleting(true);
     try {
       await contactService.delete(record.id);
-      success("Contact deleted");
+      success("Contact archived", `${fullName} has been archived.`);
+      setDeleteOpen(false);
       onChanged?.();
       close();
     } catch {
-      showError("Error", "Failed to delete contact.");
+      showError("Error", "Failed to archive contact.");
+    } finally {
+      setDeleting(false);
     }
-  };
+  }, [record, fullName, success, showError, onChanged, close]);
 
-  const quickActions = useMemo(
+  const handleCreateOpportunity = useCallback(() => {
+    if (!record) return;
+    close();
+    router.push(`/opportunities?contactId=${encodeURIComponent(record.id)}`);
+  }, [record, close, router]);
+
+  const actionBar = useMemo(
     () => [
-      {
-        label: "Send Email",
-        icon: Mail,
-        onClick: () => setEmailOpen(true),
-      },
+      ...(canEmail
+        ? [
+            {
+              label: "Email",
+              icon: Mail,
+              tone: "--info" as const,
+              onClick: () => setEmailOpen(true),
+            },
+          ]
+        : []),
       {
         label: "Call",
         icon: Phone,
@@ -94,22 +126,41 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
         },
       },
       {
-        label: "Schedule Meeting",
+        label: "Schedule",
         icon: Calendar,
+        tone: "--chart-3",
         onClick: () => setEventOpen(true),
       },
+      {
+        label: "Create Opportunity",
+        icon: Plus,
+        tone: "--success",
+        onClick: handleCreateOpportunity,
+      },
+    ],
+    [record, canEmail, handleCreateOpportunity]
+  );
+
+  const moreActions = useMemo(
+    () => [
       {
         label: "Open Full Page",
         icon: ExternalLink,
         onClick: () => {
           if (record) {
             close();
-            router.push(`/contacts/${record.id}`);
+            window.location.href = `/contacts/${record.id}`;
           }
         },
       },
+      {
+        label: "Archive Contact",
+        icon: Trash2,
+        destructive: true,
+        onClick: () => setDeleteOpen(true),
+      },
     ],
-    [record, router, close]
+    [record, close]
   );
 
   return (
@@ -119,110 +170,128 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
         onClose={close}
         loading={loading}
         title={fullName || "Contact"}
-        eyebrow="Contact"
+        eyebrow="Person"
         subtitle={record?.position}
         badge={
           record?.status ? (
             <EntityStatusBadge label={record.status} />
           ) : undefined
         }
-        actions={
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil />
-            Edit
+        editing={editing}
+        keepHeaderWhileEditing
+        editor={
+          record ? (
+            <ContactForm
+              contact={record}
+              onSave={handleSave}
+              onCancel={() => setEditing(false)}
+            />
+          ) : undefined
+        }
+        editingActions={
+          <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+            <X />
+            Cancel
           </Button>
         }
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil />
+              Edit
+            </Button>
+            <RecordMoreMenu actions={moreActions} />
+          </>
+        }
+        layout="split"
         sidebar={
-          <RecordQuickActions
-            actions={[
-              ...quickActions,
-              {
-                label: "Delete",
-                icon: Trash2,
-                destructive: true,
-                onClick: () => setDeleteOpen(true),
-              },
-            ]}
-          />
+          <div className="flex h-full flex-col gap-4 p-4 lg:w-72 lg:p-5">
+            <RecordWorkspaceSection title="Inspector">
+              <div className="space-y-3">
+                <RecordWorkspaceField label="Company" value={record?.company} />
+                <RecordWorkspaceField label="Status" value={record?.status} />
+                {record?.tags && record.tags.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      Tags
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {record.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </RecordWorkspaceSection>
+            <RecordWorkspaceSection title="Timestamps">
+              <div className="space-y-3">
+                <RecordWorkspaceField
+                  label="Created"
+                  value={
+                    record?.createdAt
+                      ? new Date(record.createdAt).toLocaleDateString()
+                      : undefined
+                  }
+                />
+                <RecordWorkspaceField
+                  label="Updated"
+                  value={
+                    record?.updatedAt
+                      ? new Date(record.updatedAt).toLocaleDateString()
+                      : undefined
+                  }
+                />
+              </div>
+            </RecordWorkspaceSection>
+          </div>
         }
       >
-        <RecordWorkspaceSection title="Details">
-          <RecordWorkspaceGrid>
-            <RecordWorkspaceField label="Position" value={record?.position} />
-            <RecordWorkspaceField label="Company" value={record?.company} />
-            <RecordWorkspaceField
-              label="Email"
-              value={
-                record?.email ? (
-                  <a
-                    href={`mailto:${record.email}`}
-                    className="text-[color:var(--primary)] hover:underline"
-                  >
-                    {record.email}
-                  </a>
-                ) : undefined
-              }
-            />
-            <RecordWorkspaceField label="Phone" value={record?.phone} />
-            <RecordWorkspaceField label="Country" value={record?.country} />
-            <RecordWorkspaceField label="City" value={record?.city} />
-          </RecordWorkspaceGrid>
-        </RecordWorkspaceSection>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <RecordActionBar actions={actionBar} />
 
-        {record?.tags && record.tags.length > 0 && (
-          <RecordWorkspaceSection title="Tags">
-            <div className="flex flex-wrap gap-1.5">
-              {record.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </RecordWorkspaceSection>
-        )}
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+            <RecordWorkspaceSection title="Contact Details">
+              <RecordWorkspaceGrid>
+                <RecordWorkspaceField label="Position" value={record?.position} />
+                <RecordWorkspaceField label="Company" value={record?.company} />
+                <RecordWorkspaceField
+                  label="Email"
+                  value={
+                    record?.email ? (
+                      <a
+                        href={`mailto:${record.email}`}
+                        className="text-[color:var(--primary)] hover:underline"
+                      >
+                        {record.email}
+                      </a>
+                    ) : undefined
+                  }
+                />
+                <RecordWorkspaceField label="Phone" value={record?.phone} />
+                <RecordWorkspaceField label="Country" value={record?.country} />
+                <RecordWorkspaceField label="City" value={record?.city} />
+              </RecordWorkspaceGrid>
+            </RecordWorkspaceSection>
 
-        <RecordWorkspaceSection title="Notes">
-          <p className="text-sm whitespace-pre-wrap text-foreground">
-            {record?.notes || "No notes added yet."}
-          </p>
-        </RecordWorkspaceSection>
+            <RecordWorkspaceSection title="Notes">
+              <p className="text-sm whitespace-pre-wrap text-foreground">
+                {record?.notes || "No notes added yet."}
+              </p>
+            </RecordWorkspaceSection>
 
-        <RecordWorkspaceSection title="Timestamps">
-          <RecordWorkspaceGrid className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-2">
-            <RecordWorkspaceField
-              label="Created"
-              value={
-                record?.createdAt
-                  ? new Date(record.createdAt).toLocaleString()
-                  : undefined
-              }
-            />
-            <RecordWorkspaceField
-              label="Updated"
-              value={
-                record?.updatedAt
-                  ? new Date(record.updatedAt).toLocaleString()
-                  : undefined
-              }
-            />
-          </RecordWorkspaceGrid>
-        </RecordWorkspaceSection>
+
+          </div>
+        </div>
       </RecordWorkspace>
 
       {record && (
         <>
-          <ContactDrawer
-            open={editOpen}
-            onOpenChange={(openState) => {
-              setEditOpen(openState);
-              if (!openState) reload();
-            }}
-            contact={record}
-            onSave={(data) => void handleSave(data)}
-          />
           <EmailComposer
             open={emailOpen}
             onClose={() => setEmailOpen(false)}
@@ -235,13 +304,19 @@ export function ContactWorkspace({ onChanged }: ContactWorkspaceProps) {
             entityType="contact"
             entityId={record.id}
           />
-          <ContactDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            onOpenChange={(openState) => {
-              setDeleteOpen(openState);
-              if (!openState) reload();
-            }}
-            contact={record}
+            onClose={() => setDeleteOpen(false)}
+            title="Archive Contact"
+            message={
+              <>
+                Archive <strong>{fullName}</strong>? This will remove the
+                contact from active lists while keeping linked records intact.
+              </>
+            }
+            confirmLabel="Archive Contact"
+            variant="danger"
+            loading={deleting}
             onConfirm={() => void handleDelete()}
           />
         </>

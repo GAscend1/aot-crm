@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useCanUse } from "@/hooks/use-subscription";
 import { OpportunityStageMenu } from "./OpportunityStageMenu";
 import { OPPORTUNITY_STAGES, stageDotVar, type OpportunityStage } from "../stageConfig";
 
@@ -63,6 +64,9 @@ interface OpportunityWorkspaceHeaderProps {
   onNext: () => void;
   onClose: () => void;
   onEdit: () => void;
+  /** When true, the header pencil becomes a Cancel button for inline editing. */
+  editing?: boolean;
+  onCancelEdit?: () => void;
   onEmail: () => void;
   onTeams: () => void;
   onZoom: () => void;
@@ -114,6 +118,8 @@ export function OpportunityWorkspaceHeader({
   onNext,
   onClose,
   onEdit,
+  editing = false,
+  onCancelEdit,
   onEmail,
   onTeams,
   onZoom,
@@ -135,6 +141,16 @@ export function OpportunityWorkspaceHeader({
   const isClosed = stage === "Closed Won" || stage === "Closed Lost";
   const overdue =
     !isClosed && !!expectedCloseDate && new Date(expectedCloseDate).getTime() < startOfToday();
+
+  // Plan-gated quick actions: quotes/invoices require Professional+, Email
+  // (Outlook Mail) requires Professional+, Teams/Zoom require Enterprise.
+  // Server routes enforce the same entitlement — the UI just hides the entry
+  // points so locked plans are never offered dead buttons.
+  const canQuote = useCanUse("quotes");
+  const canInvoice = useCanUse("invoices");
+  const canEmail = useCanUse("outlook_email");
+  const canTeams = useCanUse("teams");
+  const canZoom = useCanUse("zoom");
 
   return (
     <header className="bg-popover/95 backdrop-blur-sm supports-[backdrop-filter]:bg-popover/80">
@@ -160,12 +176,12 @@ export function OpportunityWorkspaceHeader({
 
           <button
             type="button"
-            onClick={onEdit}
+            onClick={editing ? onCancelEdit : onEdit}
             className={iconButtonClass}
-            aria-label="Edit opportunity"
-            title="Edit opportunity"
+            aria-label={editing ? "Cancel editing" : "Edit opportunity"}
+            title={editing ? "Cancel editing" : "Edit opportunity"}
           >
-            <Pencil className="h-3.5 w-3.5" />
+            {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
           </button>
 
           <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
@@ -202,15 +218,21 @@ export function OpportunityWorkspaceHeader({
           >
             <Phone className="h-4 w-4" />
           </a>
-          <button type="button" onClick={onEmail} className={iconButtonClass} aria-label="Email customer" title="Email">
-            <Mail className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={onTeams} className={iconButtonClass} aria-label="Start Teams meeting" title="Teams meeting">
-            <Video className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={onZoom} className={iconButtonClass} aria-label="Start Zoom meeting" title="Zoom meeting">
-            <MonitorPlay className="h-4 w-4" />
-          </button>
+          {canEmail && (
+            <button type="button" onClick={onEmail} className={iconButtonClass} aria-label="Email customer" title="Email">
+              <Mail className="h-4 w-4" />
+            </button>
+          )}
+          {canTeams && (
+            <button type="button" onClick={onTeams} className={iconButtonClass} aria-label="Start Teams meeting" title="Teams meeting">
+              <Video className="h-4 w-4" />
+            </button>
+          )}
+          {canZoom && (
+            <button type="button" onClick={onZoom} className={iconButtonClass} aria-label="Start Zoom meeting" title="Zoom meeting">
+              <MonitorPlay className="h-4 w-4" />
+            </button>
+          )}
           <a
             href={
               website
@@ -273,11 +295,16 @@ export function OpportunityWorkspaceHeader({
             </button>
           </div>
 
+          {/* The workspace shell suppresses its own X when a custom header is
+              present (RecordWorkspace), so this is the ONE primary close for the
+              record. Escape + focus restore are handled by the base-ui Dialog
+              root in RecordWorkspace. */}
           <button
             type="button"
             onClick={onClose}
             className={cn(iconButtonClass, "hover:bg-danger-soft hover:text-[color:var(--danger)]")}
-            aria-label="Close opportunity"
+            aria-label="Close"
+            title="Close"
           >
             <X className="h-4 w-4" />
           </button>
@@ -302,14 +329,18 @@ export function OpportunityWorkspaceHeader({
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <button type="button" onClick={onQuote} className={cn(chipClass, "text-[color:var(--chart-5)]")}>
-            <Plus className="size-3" />
-            New Quote
-          </button>
-          <button type="button" onClick={onInvoice} className={cn(chipClass, "text-[color:var(--success)]")}>
-            <Plus className="size-3" />
-            New Invoice
-          </button>
+          {canQuote && (
+            <button type="button" onClick={onQuote} className={cn(chipClass, "text-[color:var(--chart-5)]")}>
+              <Plus className="size-3" />
+              New Quote
+            </button>
+          )}
+          {canInvoice && (
+            <button type="button" onClick={onInvoice} className={cn(chipClass, "text-[color:var(--success)]")}>
+              <Plus className="size-3" />
+              New Invoice
+            </button>
+          )}
         </div>
       </div>
 
@@ -325,11 +356,11 @@ export function OpportunityWorkspaceHeader({
 
       {/* Primary action bar — directly below the header, not a card */}
       <OpportunityPrimaryActions
-        onQuote={onQuote}
-        onInvoice={onInvoice}
+        onQuote={canQuote ? onQuote : undefined}
+        onInvoice={canInvoice ? onInvoice : undefined}
         onUpload={onUpload}
         onActivity={onActivity}
-        onConvert={onConvert}
+        onConvert={canQuote && canInvoice ? onConvert : undefined}
         onAssign={onAssign}
         converting={converting}
       />
@@ -347,11 +378,11 @@ export function OpportunityPrimaryActions({
   onAssign,
   converting = false,
 }: {
-  onQuote: () => void;
-  onInvoice: () => void;
+  onQuote?: () => void;
+  onInvoice?: () => void;
   onUpload: () => void;
   onActivity: () => void;
-  onConvert: () => void;
+  onConvert?: () => void;
   onAssign: () => void;
   converting?: boolean;
 }) {
@@ -360,14 +391,18 @@ export function OpportunityPrimaryActions({
       <span className="mr-0.5 hidden text-[10px] font-semibold tracking-wider text-muted-foreground uppercase sm:inline">
         Actions
       </span>
-      <button type="button" onClick={onQuote} className={actionChipClass("--chart-5")}>
-        <FileText className="size-3.5" />
-        Quote
-      </button>
-      <button type="button" onClick={onInvoice} className={actionChipClass("--success")}>
-        <Receipt className="size-3.5" />
-        Invoice
-      </button>
+      {onQuote && (
+        <button type="button" onClick={onQuote} className={actionChipClass("--chart-5")}>
+          <FileText className="size-3.5" />
+          Quote
+        </button>
+      )}
+      {onInvoice && (
+        <button type="button" onClick={onInvoice} className={actionChipClass("--success")}>
+          <Receipt className="size-3.5" />
+          Invoice
+        </button>
+      )}
       <button type="button" onClick={onUpload} className={actionChipClass("--chart-6")}>
         <FileUp className="size-3.5" />
         Upload
@@ -376,10 +411,12 @@ export function OpportunityPrimaryActions({
         <Plus className="size-3.5" />
         Activity
       </button>
-      <button type="button" onClick={onConvert} disabled={converting} className={actionChipClass("--chart-2")}>
-        {converting ? <Loader2 className="size-3.5 animate-spin" /> : <Receipt className="size-3.5" />}
-        {converting ? "Converting…" : "Convert"}
-      </button>
+      {onConvert && (
+        <button type="button" onClick={onConvert} disabled={converting} className={actionChipClass("--chart-2")}>
+          {converting ? <Loader2 className="size-3.5 animate-spin" /> : <Receipt className="size-3.5" />}
+          {converting ? "Converting…" : "Convert"}
+        </button>
+      )}
       <button type="button" onClick={onAssign} className={actionChipClass("--chart-4")}>
         <UserRound className="size-3.5" />
         Assign

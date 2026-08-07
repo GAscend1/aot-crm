@@ -28,22 +28,29 @@ export function AssignLeadDialog({
   const { success, error: showError } = useToastContext();
   const [users, setUsers] = useState<UserOption[]>([]);
   const [assigneeId, setAssigneeId] = useState<string>(currentOwnerId ?? "");
-  const [prevOpen, setPrevOpen] = useState(open);
   const [saving, setSaving] = useState(false);
 
-  if (open && prevOpen !== open) {
-    setPrevOpen(open);
-    setAssigneeId(currentOwnerId ?? "");
-  }
-
   useEffect(() => {
-    if (open) {
-      fetch("/api/users")
-        .then((r) => r.json())
-        .then((body: { data: UserOption[] }) => setUsers(body.data))
-        .catch(() => setUsers([]));
-    }
-  }, [open]);
+    if (!open) return;
+    let cancelled = false;
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((body: { data: UserOption[] }) => {
+        if (cancelled) return;
+        setUsers(body.data);
+        // Re-seed the owner each time the dialog opens. Done inside the async
+        // callback so React never sees a synchronous setState in an effect.
+        setAssigneeId(currentOwnerId ?? "");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUsers([]);
+        setAssigneeId(currentOwnerId ?? "");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, currentOwnerId]);
 
   const handleAssign = async () => {
     if (!assigneeId) {
@@ -76,29 +83,29 @@ export function AssignLeadDialog({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/20 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-150" />
         <DialogPrimitive.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 transition-all duration-150">
-          <div className="flex w-full max-w-md flex-col rounded-xl border bg-white shadow-2xl dark:bg-slate-950 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-800">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-                <UserRound className="h-4 w-4 text-blue-500" />
+          <div className="flex w-full max-w-md flex-col rounded-xl border bg-popover shadow-2xl">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <UserRound className="h-4 w-4 text-[color:var(--primary)]" />
                 Assign Lead
               </h2>
-              <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" />}>
+              <DialogPrimitive.Close render={<Button variant="ghost" size="icon-sm" aria-label="Close" />}>
                 <X className="h-4 w-4" />
               </DialogPrimitive.Close>
             </div>
 
             <div className="space-y-4 p-4">
               <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">{leadTitle}</p>
-                <p className="text-xs text-slate-500">Choose a new owner for this lead.</p>
+                <p className="text-sm font-medium text-foreground">{leadTitle}</p>
+                <p className="text-xs text-muted-foreground">Choose a new owner for this lead.</p>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-500">Owner</label>
+                <label className="text-xs font-medium text-muted-foreground">Owner</label>
                 <select
                   value={assigneeId}
                   onChange={(e) => setAssigneeId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:text-white"
+                  className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <option value="">Select an owner...</option>
                   {users.map((u) => (
@@ -110,7 +117,7 @@ export function AssignLeadDialog({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t px-4 py-3 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>

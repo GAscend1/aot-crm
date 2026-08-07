@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { NotificationType } from "@/generated/prisma/client";
+import { DEFAULT_ORG_ID } from "./tenant";
 
 export interface AuditInput {
   entityType: string;
@@ -7,6 +8,7 @@ export interface AuditInput {
   action: string;
   description?: string;
   userId?: string | null;
+  organizationId?: string | null;
   data?: Record<string, unknown>;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
@@ -21,6 +23,7 @@ export async function logAudit(input: AuditInput): Promise<void> {
         action: input.action,
         description: input.description,
         userId: input.userId ?? null,
+        organizationId: input.organizationId ?? DEFAULT_ORG_ID,
         data: input.data ? (input.data as object) : undefined,
         before: input.before ? (input.before as object) : undefined,
         after: input.after ? (input.after as object) : undefined,
@@ -41,11 +44,23 @@ export interface NotificationInput {
   actionLink?: string;
 }
 
+export interface NotificationInput {
+  userId: string;
+  organizationId?: string | null;
+  type?: NotificationType;
+  title: string;
+  message?: string;
+  entityType?: string;
+  entityId?: string;
+  actionLink?: string;
+}
+
 export async function createNotification(input: NotificationInput): Promise<void> {
   try {
     await prisma.notification.create({
       data: {
         userId: input.userId,
+        organizationId: input.organizationId ?? DEFAULT_ORG_ID,
         type: input.type ?? "Info",
         title: input.title,
         message: input.message,
@@ -69,7 +84,9 @@ export async function createActivity(input: {
   opportunityId?: string | null;
   customerId?: string | null;
   ticketId?: string | null;
+  companyId?: string | null;
   assigneeId?: string | null;
+  organizationId?: string | null;
 }): Promise<void> {
   try {
     await prisma.activity.create({
@@ -83,7 +100,9 @@ export async function createActivity(input: {
         opportunityId: input.opportunityId ?? null,
         customerId: input.customerId ?? null,
         ticketId: input.ticketId ?? null,
+        companyId: input.companyId ?? null,
         assigneeId: input.assigneeId ?? null,
+        organizationId: input.organizationId ?? DEFAULT_ORG_ID,
         completedAt: input.status === "Completed" ? new Date() : null,
       },
     });
@@ -92,15 +111,21 @@ export async function createActivity(input: {
   }
 }
 
-export async function findOrCreateCompany(name: string): Promise<string | null> {
+export async function findOrCreateCompany(
+  name: string,
+  organizationId: string = DEFAULT_ORG_ID,
+): Promise<string | null> {
   const trimmed = name.trim();
   if (!trimmed) return null;
   const existing = await prisma.company.findFirst({
-    where: { companyName: { equals: trimmed, mode: "insensitive" } },
+    where: {
+      organizationId,
+      companyName: { equals: trimmed, mode: "insensitive" },
+    },
     select: { id: true },
   });
   if (existing) return existing.id;
-  const created = await prisma.company.create({ data: { companyName: trimmed } });
+  const created = await prisma.company.create({ data: { companyName: trimmed, organizationId } });
   return created.id;
 }
 

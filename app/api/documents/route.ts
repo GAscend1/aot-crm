@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { documentSchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   const sortOrder = (searchParams.get("sortOrder") ?? "desc") as "asc" | "desc";
   const search = searchParams.get("search") ?? "";
 
-  const where: Prisma.DocumentWhereInput = {};
+  const where: Prisma.DocumentWhereInput = { organizationId: user.organizationId };
   const leadId = searchParams.get("leadId");
   const opportunityId = searchParams.get("opportunityId");
   const customerId = searchParams.get("customerId");
@@ -76,11 +76,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = documentSchema.parse(body);
 
     const data: Prisma.DocumentCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       name: parsed.name,
       type: parsed.type,
       mimeType: parsed.mimeType,
@@ -106,6 +109,7 @@ export async function POST(request: NextRequest) {
       action: "document.created",
       description: `Document "${created.name}" created`,
       userId: user.id,
+      organizationId: user.organizationId,
     });
 
     return NextResponse.json(documentToUI(created), { status: 201 });

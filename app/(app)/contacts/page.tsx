@@ -1,17 +1,21 @@
-import { PageLayout } from "@/components/common/PageLayout";
+import { Suspense } from "react";
 
-import { ContactStats } from "./components/ContactStats";
-import { ContactTable } from "./components/ContactTable";
+import { PageLayout } from "@/components/common/PageLayout";
+import { ContactsView } from "./components/ContactsView";
 
 export default function ContactsPage() {
   return (
     <PageLayout
       title="Contacts"
-      description="Manage your network of business contacts, leads, and team members."
+      description="Manage people, customer accounts, and leads — switch between People, Customers, and Leads views."
     >
-      <ContactStats />
-
-      <ContactTable />
+      <Suspense
+        fallback={
+          <div className="h-72 animate-pulse rounded-xl bg-muted" />
+        }
+      >
+        <ContactsView />
+      </Suspense>
     </PageLayout>
   );
 }

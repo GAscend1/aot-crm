@@ -1,17 +1,11 @@
-import { PageLayout } from "@/components/common/PageLayout";
+import { ViewRedirect } from "@/components/common/ViewRedirect";
 
-import { LeadStats } from "./components/LeadStats";
-import { LeadTable } from "./components/LeadTable";
-
-export default function LeadsPage() {
+export default function LeadsRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   return (
-    <PageLayout
-      title="Leads"
-      description="Track and manage potential sales opportunities through the pipeline."
-    >
-      <LeadStats />
-
-      <LeadTable />
-    </PageLayout>
+    <ViewRedirect pathname="/contacts" view="leads" searchParams={searchParams} />
   );
 }

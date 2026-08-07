@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, Company } from "@/generated/prisma/client";
-import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError } from "@/lib/server/api";
+import { getCrmUser, unauthorized, serverError, logServerError, zodValidationError, subscriptionWriteGate } from "@/lib/server/api";
 import { logAudit } from "@/lib/server/records";
 import { companySchema } from "@/lib/validation/entities";
 export const dynamic = "force-dynamic";
@@ -55,7 +55,10 @@ export async function GET(request: NextRequest) {
   const sortOrder = (searchParams.get("sortOrder") ?? "desc") as "asc" | "desc";
   const search = searchParams.get("search") ?? "";
 
-  const where: Prisma.CompanyWhereInput = {};
+  // Tenant isolation: ALWAYS scope to the caller's organization (server-derived
+  // from the verified session — never from the browser).
+  const where: Prisma.CompanyWhereInput = { organizationId: user.organizationId };
+  if (searchParams.get("includeArchived") !== "true") where.archivedAt = null;
   if (search) {
     where.OR = [
       { companyName: { contains: search, mode: "insensitive" } },
@@ -86,11 +89,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCrmUser();
   if (!user) return unauthorized();
+  const gate = await subscriptionWriteGate(user);
+  if (gate) return gate;
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = companySchema.parse(body);
     const name = (parsed.companyName ?? parsed.name ?? "").trim();
     const data: Prisma.CompanyCreateInput = {
+      organization: { connect: { id: user.organizationId } },
       companyName: name,
       industry: parsed.industry || undefined,
       website: parsed.website || undefined,

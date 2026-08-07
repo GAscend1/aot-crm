@@ -12,16 +12,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DetailField, DetailGrid, DetailSection } from "@/components/enterprise/DetailView";
 import { TagInput } from "@/components/enterprise/TagInput";
 import { SectionCard } from "@/components/common/SectionCard";
 import { EmailComposer } from "@/components/integrations/EmailComposer";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useToastContext } from "@/app/(app)/AppProviders";
 import { leadService } from "@/services/index";
 import type { Lead } from "../types";
-import { LeadForm } from "../components/LeadForm";
-import { LeadDeleteDialog } from "../components/LeadDeleteDialog";
+import { LeadModal } from "../components/LeadModal";
 import { AssignLeadDialog } from "../components/AssignLeadDialog";
 import { ConvertLeadDialog } from "../components/ConvertLeadDialog";
 import { LeadHistoryTab } from "../components/LeadHistoryTab";
@@ -127,10 +126,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (!lead) return;
     try {
       await leadService.delete(lead.id);
-      success("Lead deleted");
+      success("Lead archived", `${lead.title} has been archived.`);
       router.replace("/leads");
     } catch {
-      showError("Error", "Failed to delete lead.");
+      showError("Error", "Failed to archive lead.");
     }
   };
 
@@ -202,16 +201,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (opportunityId) {
       router.push(`/opportunities/${opportunityId}`);
     } else {
-      router.push("/customers");
+      // Canonical destination: Customers is a view of the Contacts module.
+      router.push("/contacts?view=customers");
     }
   };
 
   if (loading || !lead) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-48 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -268,7 +268,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setConvertOpen(true)}>
                 <Repeat className="mr-2 h-4 w-4" />
-                Convert to Customer
+                Convert
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => void handleArchive()}>
                 <Archive className="mr-2 h-4 w-4" />
@@ -342,6 +342,42 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 suggestions={["enterprise", "tech", "saas", "startup", "hot", "follow-up"]}
               />
             </DetailSection>
+
+            {lead.convertedAt && (
+              <DetailSection title="Conversion">
+                <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">
+                  Converted on {new Date(lead.convertedAt).toLocaleDateString()}. The
+                  original lead is retained here for history — navigate to the
+                  records created from it:
+                </p>
+                <div className="flex flex-col items-start gap-1.5">
+                  {lead.convertedContactId && (
+                    <Link
+                      href={`/contacts/${lead.convertedContactId}`}
+                      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      View linked contact
+                    </Link>
+                  )}
+                  {lead.convertedCustomerId && (
+                    <Link
+                      href={`/contacts?view=customers&record=${encodeURIComponent(lead.convertedCustomerId)}`}
+                      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      View linked customer
+                    </Link>
+                  )}
+                  {lead.convertedOpportunityId && (
+                    <Link
+                      href={`/opportunities/${lead.convertedOpportunityId}`}
+                      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      View linked opportunity
+                    </Link>
+                  )}
+                </div>
+              </DetailSection>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -413,28 +449,27 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             leadTitle={lead.title}
             onConverted={handleConverted}
           />
-          <LeadDeleteDialog
+          <ConfirmDialog
             open={deleteOpen}
-            lead={lead}
+            onClose={() => setDeleteOpen(false)}
+            title="Archive Lead"
+            message={
+              <>
+                Archive <strong>{lead.title}</strong>? This will remove the lead
+                from active lists while keeping related records intact.
+              </>
+            }
+            confirmLabel="Archive Lead"
+            variant="danger"
             onConfirm={() => void handleDelete()}
-            onCancel={() => setDeleteOpen(false)}
           />
 
-          <Sheet open={editOpen} onOpenChange={setEditOpen}>
-            <SheetContent side="right" className="w-full sm:max-w-lg">
-              <SheetHeader>
-                <SheetTitle>Edit Lead</SheetTitle>
-                <SheetDescription>Update details for {lead.title}</SheetDescription>
-              </SheetHeader>
-              <div className="flex-1 overflow-y-auto px-4">
-                <LeadForm
-                  initialData={lead}
-                  onSubmit={(data) => void handleEditSave(data)}
-                  onCancel={() => setEditOpen(false)}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
+          <LeadModal
+            open={editOpen}
+            onClose={() => setEditOpen(false)}
+            lead={lead}
+            onSave={handleEditSave}
+          />
         </>
       )}
     </>
