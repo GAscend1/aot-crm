@@ -23,10 +23,10 @@ export function EmailTimeline({ entityEmail, entityName }: EmailTimelineProps) {
   useEffect(() => {
     let cancelled = false;
     outlookService
-      .getMessages()
-      .then((result) => {
+      .getMessages("inbox", 0)
+      .then(({ messages }) => {
         if (!cancelled) {
-          setEmails(result);
+          setEmails(messages);
           setIntegrationIssue(null);
           setLoadError(null);
         }
@@ -128,7 +128,7 @@ export function EmailTimeline({ entityEmail, entityName }: EmailTimelineProps) {
           onClose={() => setReplyTo(null)}
           to={[{ name: replyTo.sender.name, email: replyTo.sender.email }]}
           subject={`Re: ${replyTo.subject}`}
-          onSent={() => { setReplyTo(null); outlookService.getMessages().then(setEmails); }}
+          onSent={() => { setReplyTo(null); outlookService.getMessages("inbox", 0).then(({ messages }) => setEmails(messages)); }}
         />
       )}
 
@@ -138,7 +138,7 @@ export function EmailTimeline({ entityEmail, entityName }: EmailTimelineProps) {
           onClose={() => setForwardFrom(null)}
           to={[]}
           subject={`Fw: ${forwardFrom.subject}`}
-          onSent={() => { setForwardFrom(null); outlookService.getMessages().then(setEmails); }}
+          onSent={() => { setForwardFrom(null); outlookService.getMessages("inbox", 0).then(({ messages }) => setEmails(messages)); }}
         />
       )}
     </>

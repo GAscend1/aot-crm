@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCrmUser, unauthorized, serverError, logServerError } from "@/lib/server/api";
 import { graphFetch, GraphServerError } from "@/services/graph-server";
 import { getGraphToken } from "@/services/graph-server";
+import { appOrigin as defaultAppOrigin } from "@/lib/server/auth-env";
 export const dynamic = "force-dynamic";
 
 /**
@@ -13,11 +14,11 @@ export const dynamic = "force-dynamic";
  * unset, the endpoint reports 503 and the CRM falls back to delta polling.
  */
 
-function appOrigin(): string {
+function webhookAppOrigin(): string {
+  // Webhook notifications must be reachable from Microsoft — a public HTTPS
+  // tunnel/URL wins; otherwise fall back to the app's public origin.
   if (process.env.MICROSOFT_GRAPH_WEBHOOK_URL) return process.env.MICROSOFT_GRAPH_WEBHOOK_URL;
-  if (process.env.AUTH_URL) return process.env.AUTH_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
+  return defaultAppOrigin();
 }
 
 const CLIENT_STATE = process.env.MICROSOFT_GRAPH_WEBHOOK_CLIENT_STATE ?? "aot-crm-calendar";
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const parsed = createSubscriptionSchema.parse(await request.json().catch(() => ({})));
-    const notificationUrl = `${appOrigin().replace(/\/$/, "")}/api/integrations/microsoft/calendar/webhook`;
+    const notificationUrl = `${webhookAppOrigin().replace(/\/$/, "")}/api/integrations/microsoft/calendar/webhook`;
 
     const accessToken = await getGraphToken(request);
     const existing = await prisma.webhookSubscription.findFirst({

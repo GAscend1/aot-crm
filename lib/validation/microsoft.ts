@@ -22,6 +22,7 @@ const attachmentSchema = z.object({
   name: z.string().max(256),
   contentBytes: z.string().max(4_194_304, "Attachment too large"),
   contentType: z.string().max(256).optional(),
+  "@odata.type": z.string().max(128).optional().default("#microsoft.graph.fileAttachment"),
 }).strict();
 
 export const mailSendSchema = z.object({
@@ -38,6 +39,22 @@ export const mailSendSchema = z.object({
     attachments: z.array(attachmentSchema).max(20).optional().default([]),
   }).strict(),
   saveToSentItems: z.boolean().optional().default(true),
+}).strict();
+
+/**
+ * Partial update of an existing message (used for mark-as-read and for
+ * editing a draft: subject/body/recipients). All fields optional.
+ */
+export const mailUpdateSchema = z.object({
+  subject: z.string().max(256).optional(),
+  body: z.object({
+    contentType: z.enum(["text", "html"]).optional().default("text"),
+    content: z.string().max(1_048_576).optional().default(""),
+  }).strict().optional(),
+  toRecipients: optionalRecipientList,
+  ccRecipients: optionalRecipientList,
+  bccRecipients: optionalRecipientList,
+  isRead: z.boolean().optional(),
 }).strict();
 
 export const mailDraftSchema = z.object({

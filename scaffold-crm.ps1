@@ -35,7 +35,6 @@ export default function Page() {
     New-Item -ItemType Directory -Force "modules/$module/services" | Out-Null
 
     New-Item "modules/$module/types.ts" -ItemType File -Force | Out-Null
-    New-Item "modules/$module/mockData.ts" -ItemType File -Force | Out-Null
     New-Item "modules/$module/columns.tsx" -ItemType File -Force | Out-Null
     New-Item "modules/$module/validation.ts" -ItemType File -Force | Out-Null
 

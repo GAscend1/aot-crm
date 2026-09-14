@@ -1,22 +1,94 @@
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 import { msTokenUrl } from "@/lib/server/ms-auth";
+import { secureCookiesEnabled } from "@/lib/server/auth-env";
 
 export class GraphServerError extends Error {
   status: number;
   code?: string;
+  /** Microsoft Graph `request-id` header — safe to log, never a token. */
+  requestId?: string;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, requestId?: string) {
     super(message);
     this.name = "GraphServerError";
     this.status = status;
     this.code = code;
+    this.requestId = requestId;
   }
+}
+
+const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
+
+/**
+ * Resolve a Graph request URL. Microsoft Graph `@odata.nextLink` and
+ * `@odata.deltaLink` values are ALREADY absolute URLs — unconditionally
+ * prepending the v1.0 base again produced the "Invalid version: v1.0https:"
+ * failure for calendar delta/next pages. Absolute URLs pass through untouched;
+ * only relative paths get the base prefix. Exported for unit tests.
+ */
+export function resolveGraphUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `${GRAPH_BASE_URL}${clean}`;
+}
+
+/**
+ * Safe, structured failure diagnostics: operation, HTTP status, Graph error
+ * code, Microsoft request-id, whether the request URL was relative or absolute,
+ * and the Graph API version. Never logs tokens, cookies, secrets or content.
+ */
+function logGraphFailure(path: string, err: GraphServerError): void {
+  // Redact opaque paging cursors ($skiptoken / $deltatoken) from the logged
+  // path — they are Graph tokens and must never reach logs. `urlAbsolute` is
+  // the requested "relative or absolute" signal.
+  const safePath = path
+    .replace(/([?&])\$?skiptoken=[^&\s]+/gi, "$1skiptoken=redacted")
+    .replace(/([?&])\$?deltatoken=[^&\s]+/gi, "$1deltatoken=redacted");
+  console.error(
+    "[microsoft-graph] request failed",
+    JSON.stringify({
+      operation: safePath,
+      status: err.status,
+      code: err.code,
+      requestId: err.requestId,
+      urlAbsolute: /^https?:\/\//i.test(path),
+      version: "v1.0",
+    }),
+  );
+}
+
+/** Build a GraphServerError from a failed Graph response, redacting tokens. */
+function toGraphServerError(
+  res: Response,
+  body: { error?: { message?: string; code?: string } },
+): GraphServerError {
+  const graphMessage = body.error?.message;
+  const safeMessage = graphMessage
+    ? graphMessage.replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+                   .replace(/access_token[^&\s]+/gi, "access_token=[redacted]")
+    : `Graph API returned status ${res.status}`;
+
+  // request-id is Microsoft's correlation id for the failed call — safe to log.
+  return new GraphServerError(
+    safeMessage,
+    res.status,
+    body.error?.code,
+    res.headers.get("request-id") ?? undefined,
+  );
 }
 
 export async function getGraphToken(req?: NextRequest): Promise<string> {
   const secret = process.env.AUTH_SECRET;
-  const token = await getToken({ req: req as never, secret });
+  // In production the Auth.js session cookie is `__Secure-authjs.session-token`
+  // (secure cookie policy). getToken() only scans for the secure-prefixed name
+  // when told to — otherwise it looks for the unprefixed dev name and returns
+  // null, which surfaced as `no_token` (401) for every Graph call on Azure.
+  const token = await getToken({
+    req: req as never,
+    secret,
+    secureCookie: secureCookiesEnabled(),
+  });
   const accessToken = token?.accessToken;
 
   if (!accessToken || typeof accessToken !== "string" || accessToken.length < 20) {
@@ -60,7 +132,7 @@ export async function refreshGraphToken(refreshToken: string): Promise<{ accessT
 }
 
 export async function graphFetch(accessToken: string, path: string, options?: RequestInit): Promise<unknown> {
-  const url = `https://graph.microsoft.com/v1.0${path}`;
+  const url = resolveGraphUrl(path);
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -72,17 +144,9 @@ export async function graphFetch(accessToken: string, path: string, options?: Re
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const graphMessage = body.error?.message;
-    const safeMessage = graphMessage
-      ? graphMessage.replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
-                     .replace(/access_token[^&\s]+/gi, "access_token=[redacted]")
-      : `Graph API returned status ${res.status}`;
-
-    throw new GraphServerError(
-      safeMessage,
-      res.status,
-      body.error?.code,
-    );
+    const err = toGraphServerError(res, body);
+    logGraphFailure(path, err);
+    throw err;
   }
 
   if (res.status === 204) return null;
@@ -91,7 +155,7 @@ export async function graphFetch(accessToken: string, path: string, options?: Re
 }
 
 export async function graphFetchBuffer(accessToken: string, path: string, options?: RequestInit): Promise<ArrayBuffer> {
-  const url = `https://graph.microsoft.com/v1.0${path}`;
+  const url = resolveGraphUrl(path);
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -102,17 +166,9 @@ export async function graphFetchBuffer(accessToken: string, path: string, option
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const graphMessage = body.error?.message;
-    const safeMessage = graphMessage
-      ? graphMessage.replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
-                     .replace(/access_token[^&\s]+/gi, "access_token=[redacted]")
-      : `Graph API returned status ${res.status}`;
-
-    throw new GraphServerError(
-      safeMessage,
-      res.status,
-      body.error?.code,
-    );
+    const err = toGraphServerError(res, body);
+    logGraphFailure(path, err);
+    throw err;
   }
 
   return res.arrayBuffer();

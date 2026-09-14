@@ -4,6 +4,7 @@ import { getGraphToken, graphFetch, graphFetchBuffer, GraphServerError } from "@
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { canUseFeature } from "@/lib/entitlements";
+import { appOrigin } from "@/lib/server/auth-env";
 import { getSubscription, isPlatformOwner } from "@/lib/server/tenant";
 
 const GRAPH_TIMEOUT_MS = 15_000;
@@ -14,21 +15,11 @@ export type GraphRouteHandler = (
   req: NextRequest,
 ) => Promise<Response>;
 
-function getAppOrigin(): string {
-  // Production base URL precedence: AUTH_URL (Auth.js v5) > NEXTAUTH_URL
-  // (legacy) > Vercel > Azure App Service default hostname > localhost.
-  if (process.env.AUTH_URL) return process.env.AUTH_URL;
-  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  if (process.env.WEBSITE_HOSTNAME) return `https://${process.env.WEBSITE_HOSTNAME}`;
-  return "http://localhost:3000";
-}
-
 function rejectCrossOrigin(req: NextRequest): NextResponse | null {
   const origin = req.headers.get("origin");
   if (!origin) return null;
 
-  const allowed = getAppOrigin();
+  const allowed = appOrigin();
   try {
     const o = new URL(origin);
     const a = new URL(allowed);
@@ -158,15 +149,34 @@ export function withGraphAuth(
       const accessToken = await getGraphToken(req);
       return await handler(accessToken, req);
     } catch (err) {
-      console.error("[microsoft-graph] request failed:", (err as Error)?.name);
-
+      // Safe, structured diagnostics: operation, HTTP status, Graph error code
+      // and Microsoft's request-id ONLY. Never log cookies, tokens, secrets,
+      // tenant IDs or Authorization headers.
+      const operation = req.nextUrl.pathname;
       if (err instanceof GraphServerError) {
+        console.error(
+          "[microsoft-graph] request failed",
+          JSON.stringify({
+            operation,
+            status: err.status,
+            code: err.code,
+            requestId: err.requestId,
+          }),
+        );
         return NextResponse.json(
           { error: err.message, code: err.code },
           { status: err.status },
         );
       }
 
+      console.error(
+        "[microsoft-graph] request failed",
+        JSON.stringify({
+          operation,
+          status: 500,
+          code: "unexpected_error",
+        }),
+      );
       return NextResponse.json(
         { error: "An unexpected error occurred" },
         { status: 500 },

@@ -259,6 +259,8 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  activities Activity[]
+
   @@index([organizationId])
 }
 
@@ -393,13 +395,19 @@ model Activity {
   ticket        Ticket?        @relation(fields: [ticketId], references: [id])
   companyId     String?
   company       Company?       @relation(fields: [companyId], references: [id])
+  contactId     String?
+  contact       Contact?       @relation(fields: [contactId], references: [id])
   assigneeId    String?
   assignee      User?          @relation(fields: [assigneeId], references: [id])
+  // Microsoft Graph message id of a linked email (unique — dedupe key so a
+  // refresh can never create duplicate CRM email activities).
+  graphMessageId String?       @unique
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([leadId])
   @@index([companyId])
+  @@index([contactId])
   @@index([createdAt])
   @@index([organizationId])
 }
