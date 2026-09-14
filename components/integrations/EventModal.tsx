@@ -24,13 +24,13 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
   const { success, error: showError } = useToastContext();
   const isExisting = !!event;
   const [view, setView] = useState<"details" | "edit">(event ? "details" : "edit");
-  const [providerMode, setProviderMode] = useState<"live" | "mock">("mock");
+  const [providerMode, setProviderMode] = useState<"live" | "local">("local");
 
   useEffect(() => {
     fetch("/api/integrations/microsoft/status")
       .then((r) => r.json())
-      .then((data: { enabled: boolean }) => setProviderMode(data.enabled ? "live" : "mock"))
-      .catch(() => setProviderMode("mock"));
+      .then((data: { enabled: boolean }) => setProviderMode(data.enabled ? "live" : "local"))
+      .catch(() => setProviderMode("local"));
   }, []);
 
   const [subject, setSubject] = useState(event?.subject || "");
@@ -168,7 +168,7 @@ export function EventModal({ open, onClose, event, entityType, entityId, onSaved
                   <Calendar className="h-3.5 w-3.5" />
                   {event.onlineMeeting?.provider === "teams" ? "Teams Meeting" : "Calendar Event"}
                   <span className="rounded bg-muted px-1.5 py-0.5">
-                    {providerMode === "live" ? "Outlook live" : "Local"}
+                    {providerMode === "live" ? "Outlook live" : "Local — Not synced with Outlook"}
                   </span>
                   {event.graphSyncStatus === "SYNCED" && (
                     <span className="rounded bg-success-soft px-1.5 py-0.5 font-medium text-[color:var(--success)]">

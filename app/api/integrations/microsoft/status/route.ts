@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { secureCookiesEnabled } from "@/lib/server/auth-env";
 import { getToken } from "next-auth/jwt";
 import { graphFetch } from "@/services/graph-server";
 import {
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
 
   if (configComplete) {
     try {
-      const token = await getToken({ req, secret });
+      const token = await getToken({ req, secret, secureCookie: secureCookiesEnabled() });
       signedIn = typeof token?.accessToken === "string" && token.accessToken.length > 20;
       tokenExpired = token?.expiresAt
         ? Date.now() > (token.expiresAt as number) * 1000

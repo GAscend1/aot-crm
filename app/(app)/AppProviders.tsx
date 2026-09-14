@@ -24,6 +24,7 @@ import { useSyncedNotifications } from "@/hooks/use-synced-notifications";
 import { useToast } from "@/hooks/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { useModuleViewTracker } from "@/hooks/use-module-view-tracker";
 import type { Notification } from "@/types/common";
 
 interface AppContextType {
@@ -164,6 +165,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     ],
     true
   );
+
+  // Track module-level navigation for audit logging.
+  useModuleViewTracker();
 
   // First-time user flow: the onboarding wizard dispatches
   // `aot:onboarding-complete` when it finishes — auto-start the guided tour so

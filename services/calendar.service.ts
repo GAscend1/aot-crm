@@ -27,6 +27,8 @@ export interface CalendarSyncStatus {
 export interface SyncRunResult {
   ok: boolean;
   error?: string;
+  /** Machine-readable failure code (e.g. no_token, invalid_calendar_range:...). */
+  code?: string;
   pulled?: { imported: number; updated: number; removed: number };
   queue?: { processed: number; succeeded: number; failed: number };
 }
@@ -128,6 +130,7 @@ class CalendarService {
       return {
         ok: Boolean(body.ok),
         error: body.error ? String(body.error) : undefined,
+        code: body.code ? String(body.code) : undefined,
         pulled: body.pulled as SyncRunResult["pulled"],
         queue: body.queue as SyncRunResult["queue"],
       };

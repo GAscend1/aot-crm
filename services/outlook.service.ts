@@ -2,13 +2,17 @@ import { v4 as uuid } from "uuid";
 import type { EmailMessage, EmailAttachment, EmailTemplate } from "@/types/common";
 import { eventBus } from "./event-bus";
 import { Events } from "./events";
+import { EMAIL_PAGE_SIZE } from "@/lib/email-utils";
 import { graphApi } from "./graph-client";
 import { toGraphClientError } from "./integration-gate";
 
-function toEmailMessage(item: Record<string, unknown>): EmailMessage {
+/** Map a Graph message item into the CRM EmailMessage shape (exported for tests). */
+export function graphMessageToEmailMessage(item: Record<string, unknown>): EmailMessage {
   const sender = (item.sender as { emailAddress?: { name?: string; address?: string } })?.emailAddress;
   const toRecipients = (item.toRecipients as { emailAddress?: { name?: string; address?: string } }[]) || [];
   const ccRecipients = (item.ccRecipients as { emailAddress?: { name?: string; address?: string } }[]) || [];
+  const bccRecipients = (item.bccRecipients as { emailAddress?: { name?: string; address?: string } }[]) || [];
+  const attachments = (item.attachments as Record<string, unknown>[] | undefined) || [];
   return {
     id: (item.id as string) || uuid(),
     threadId: (item.conversationId as string) || uuid(),
@@ -27,16 +31,29 @@ function toEmailMessage(item: Record<string, unknown>): EmailMessage {
       name: r.emailAddress?.name || "",
       email: r.emailAddress?.address || "",
     })),
-    bcc: [],
-    attachments: [],
+    bcc: bccRecipients.map((r) => ({
+      name: r.emailAddress?.name || "",
+      email: r.emailAddress?.address || "",
+    })),
+    attachments: attachments.map((a) => ({
+      id: String(a.id ?? ""),
+      name: String(a.name ?? ""),
+      contentType: String(a.contentType ?? ""),
+      size: Number(a.size ?? 0),
+      contentBytes: a.contentBytes ? String(a.contentBytes) : undefined,
+    })),
     isRead: (item.isRead as boolean) ?? true,
     isDraft: (item.isDraft as boolean) ?? false,
-    hasAttachments: (item.hasAttachments as boolean) ?? false,
+    hasAttachments: (item.hasAttachments as boolean) ?? (attachments.length > 0),
     importance: (item.importance as "low" | "normal" | "high") || "normal",
     sentAt: (item.sentDateTime as string) || new Date().toISOString(),
     receivedAt: (item.receivedDateTime as string) || new Date().toISOString(),
     categories: (item.categories as string[]) || [],
   };
+}
+
+function toEmailMessage(item: Record<string, unknown>): EmailMessage {
+  return graphMessageToEmailMessage(item);
 }
 
 class OutlookService {
@@ -70,7 +87,14 @@ class OutlookService {
     },
   ];
 
-  async getMessages(folder = "inbox"): Promise<EmailMessage[]> {
+  /**
+   * Load one page of a folder. $skip-based paging keeps the mailbox bounded
+   * and never exposes opaque Graph continuation tokens to the browser.
+   */
+  async getMessages(
+    folder = "inbox",
+    skip = 0,
+  ): Promise<{ messages: EmailMessage[]; hasMore: boolean }> {
     try {
       const folderMap: Record<string, string> = {
         inbox: "/me/mailFolders/inbox/messages",
@@ -78,8 +102,11 @@ class OutlookService {
         drafts: "/me/mailFolders/drafts/messages",
       };
       const graphPath = folderMap[folder] || `/me/mailFolders/${folder}/messages`;
-      const result = await graphApi(graphPath + "?$top=50&$orderby=receivedDateTime DESC") as { value: Record<string, unknown>[] };
-      return (result.value || []).map(toEmailMessage);
+      const result = await graphApi(
+        `${graphPath}?$top=${EMAIL_PAGE_SIZE}&$skip=${skip}&$orderby=receivedDateTime DESC`
+      ) as { value: Record<string, unknown>[] };
+      const messages = (result.value || []).map(toEmailMessage);
+      return { messages, hasMore: messages.length >= EMAIL_PAGE_SIZE };
     } catch (err) {
       throw toGraphClientError(err, "Failed to load messages");
     }
@@ -119,6 +146,15 @@ class OutlookService {
       }
       const body = data.body || "";
 
+      const attachments = (data.attachments || [])
+        .filter((a) => a.contentBytes)
+        .map((a) => ({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: a.name,
+          contentType: a.contentType || "application/octet-stream",
+          contentBytes: a.contentBytes,
+        }));
+
       const message = {
         message: {
           subject,
@@ -130,6 +166,7 @@ class OutlookService {
           bccRecipients: (data.bcc || [])
             .map((r) => ({ emailAddress: { address: (r.email || "").trim(), name: r.name || "" } }))
             .filter((r) => r.emailAddress.address.length > 0),
+          attachments,
         },
         saveToSentItems: true,
       };
@@ -306,6 +343,137 @@ class OutlookService {
       throw toGraphClientError(err, "Failed to delete message");
     }
   }
+
+  /** Mark a message as read via Graph. */
+  async markAsRead(id: string): Promise<void> {
+    try {
+      await graphApi(`/me/messages/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isRead: true }),
+      });
+    } catch (err) {
+      throw toGraphClientError(err, "Failed to update message");
+    }
+  }
+
+  /** Update an existing draft (subject/body/recipients). */
+  async updateDraft(
+    id: string,
+    data: {
+      to?: { name: string; email: string }[];
+      subject?: string;
+      body?: string;
+    },
+  ): Promise<void> {
+    try {
+      const body: Record<string, unknown> = {
+        subject: data.subject ?? undefined,
+        body: data.body !== undefined ? { contentType: "text", content: data.body } : undefined,
+        toRecipients: (data.to ?? []).map((r) => ({ emailAddress: { address: r.email, name: r.name } })),
+      };
+      await graphApi(`/me/messages/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      throw toGraphClientError(err, "Failed to update draft");
+    }
+  }
+
+  /** Send an existing draft. Only resolves after Graph confirms the send. */
+  async sendDraft(id: string): Promise<void> {
+    try {
+      await graphApi(`/me/messages/${id}/send`, { method: "POST" });
+    } catch (err) {
+      throw toGraphClientError(err, "Failed to send draft");
+    }
+  }
+
+  /** Attachment metadata for a message (no content). */
+  async getAttachments(messageId: string): Promise<EmailAttachment[]> {
+    try {
+      const result = await graphApi(`/me/messages/${messageId}/attachments`) as { value?: Record<string, unknown>[] };
+      return (result.value || []).map((a) => ({
+        id: String(a.id ?? ""),
+        name: String(a.name ?? ""),
+        contentType: String(a.contentType ?? ""),
+        size: Number(a.size ?? 0),
+      }));
+    } catch (err) {
+      throw toGraphClientError(err, "Failed to load attachments");
+    }
+  }
+
+  /**
+   * Signed-in download URL for an attachment's content. The browser GETs this
+   * route with its session cookie; the server re-authenticates and streams the
+   * bytes from Graph. Content is only fetched on explicit download.
+   */
+  attachmentContentUrl(messageId: string, attachmentId: string, name: string): string {
+    const params = new URLSearchParams({ name });
+    return `/api/integrations/microsoft/mail/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/content?${params.toString()}`;
+  }
+
+  /** Org-scoped CRM records matching the email's addresses. */
+  async getEmailContext(addresses: string[]): Promise<EmailContextMatch[]> {
+    const params = new URLSearchParams();
+    addresses.slice(0, 20).forEach((a) => params.append("addresses", a));
+    const res = await fetch(`/api/email/context?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const body = (await res.json().catch(() => ({ matches: [] }))) as { matches?: EmailContextMatch[] };
+    return body.matches ?? [];
+  }
+
+  /** Explicitly link an email to a CRM record (creates an Email activity). */
+  async linkEmailToRecord(input: EmailLinkInput): Promise<{ id: string; duplicate?: boolean }> {
+    const res = await fetch("/api/email/associate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      throw new Error(String(body.error ?? "Failed to link email to record"));
+    }
+    return { id: String(body.id ?? ""), duplicate: Boolean(body.duplicate) };
+  }
+
+  /** Existing CRM Email activities for a Graph message id. */
+  async getEmailAssociations(messageId: string): Promise<EmailAssociation[]> {
+    const res = await fetch(`/api/email/associations?messageId=${encodeURIComponent(messageId)}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const body = (await res.json().catch(() => ({ data: [] }))) as { data?: EmailAssociation[] };
+    return body.data ?? [];
+  }
+}
+
+export interface EmailContextMatch {
+  kind: "contact" | "customer" | "lead" | "company";
+  id: string;
+  name: string;
+  email: string;
+  company?: string;
+  href: string;
+}
+
+export interface EmailLinkInput {
+  messageId: string;
+  subject: string;
+  description?: string;
+  senderEmail?: string;
+  senderName?: string;
+  receivedAt?: string;
+  entityType: "contact" | "company" | "lead" | "opportunity" | "customer";
+  entityId: string;
+}
+
+export interface EmailAssociation {
+  id: string;
+  entityType: string;
+  entityId: string;
+  entityName: string;
+  subject: string;
+  linkedAt: string;
 }
 
 export const outlookService = new OutlookService();

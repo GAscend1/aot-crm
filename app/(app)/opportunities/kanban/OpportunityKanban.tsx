@@ -74,13 +74,49 @@ export function OpportunityKanban() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<PipelineFilters>(DEFAULT_FILTERS);
   const [quickUpdate, setQuickUpdate] = useState<QuickUpdateState | null>(null);
+  const [activeOppIds, setActiveOppIds] = useState<Set<string>>(new Set());
   const { success, error: showError } = useToastContext();
+
+  /**
+   * Batch-fetch which opportunities have recent activity (last 30 days).
+   * Single query — no N+1. Fetches recent activities and filters client-side
+   * for opportunity-related entries.
+   */
+  const loadActivityIndicators = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        sortBy: "createdAt",
+        sortOrder: "desc",
+        pageSize: "200",
+      });
+      const res = await fetch(`/api/activities?${params}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        data?: { relatedTo?: string; relatedType?: string; date?: string }[];
+      };
+      const activeIds = new Set<string>();
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      for (const act of body.data ?? []) {
+        if (act.relatedType === "opportunity" && act.relatedTo) {
+          // Only mark as active if the activity is recent (within 30 days)
+          const actDate = act.date ? new Date(act.date).getTime() : 0;
+          if (actDate >= thirtyDaysAgo) {
+            activeIds.add(act.relatedTo);
+          }
+        }
+      }
+      setActiveOppIds(activeIds);
+    } catch {
+      // Non-critical — silently degrade to no activity indicators.
+    }
+  }, []);
 
   const reload = useCallback(() => {
     opportunityService.findAll().then((result) => {
       setOpportunities(result.data);
+      void loadActivityIndicators();
     });
-  }, []);
+  }, [loadActivityIndicators]);
 
   const quickUpdateOpportunity = useMemo(
     () => opportunities.find((o) => o.id === quickUpdate?.id) ?? null,
@@ -91,8 +127,9 @@ export function OpportunityKanban() {
     opportunityService.findAll().then((result) => {
       setOpportunities(result.data);
       setLoading(false);
+      void loadActivityIndicators();
     });
-  }, []);
+  }, [loadActivityIndicators]);
 
   const filteredOpportunities = useMemo(
     () => opportunities.filter((opp) => matchesFilters(opp, filters)),
@@ -128,7 +165,7 @@ export function OpportunityKanban() {
           tags: opp.leadSource ? [opp.leadSource] : [],
           health: { label: health.label, tone: dealHealthToneClass(health.tone) },
           /** Activity indicator — true if there was recent activity */
-          hasActivity: false, // Could be enhanced with real activity data
+          hasActivity: activeOppIds.has(opp.id),
         };
       }),
   }));

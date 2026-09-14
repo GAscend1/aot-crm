@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { AlertCircle, ChevronLeft, ChevronRight, Cloud, CloudOff, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventModal } from "@/components/integrations/EventModal";
 import { IntegrationStateBanner } from "@/components/common/IntegrationStateBanner";
+import { IntegrationWarning } from "@/components/common/IntegrationWarning";
 import { calendarService, type CalendarSyncStatus } from "@/services/calendar.service";
-import { classifyGraphError, type IntegrationStatus } from "@/services/integration-gate";
+import {
+  buildIntegrationStatus,
+  classifyCalendarIssue,
+  type CalendarIssue,
+} from "@/services/integration-gate";
+import { calendarViewRange } from "@/lib/calendar-range";
 import type { CalendarEvent } from "@/types/common";
 import { cn } from "@/lib/utils";
 
@@ -28,53 +34,60 @@ export function CalendarView() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [integrationIssue, setIntegrationIssue] = useState<IntegrationStatus | null>(null);
+  // Calendar failures are calendar-specific — only genuine auth/session
+  // problems map to the global "Microsoft 365" banner (see classifyCalendarIssue).
+  const [calendarIssue, setCalendarIssue] = useState<CalendarIssue | null>(null);
   const [syncStatus, setSyncStatus] = useState<CalendarSyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const monthStart = useMemo(() => {
-    const d = new Date(year, month, 1);
-    return d.toISOString().slice(0, 10);
-  }, [year, month]);
-
-  const monthEnd = useMemo(() => {
-    const d = new Date(year, month + 1, 0, 23, 59, 59);
-    return d.toISOString();
-  }, [year, month]);
+  // Visible-view fetch window: the current month (+ a small buffer for
+  // straddling events) — never years of data to render one month.
+  const viewRange = useMemo(
+    () => calendarViewRange(view, currentDate),
+    [view, currentDate]
+  );
 
   const loadEvents = useCallback(() => {
     calendarService
-      .getEvents(monthStart, monthEnd)
+      .getEvents(viewRange.start, viewRange.end)
       .then((result) => {
         setEvents(result);
-        setIntegrationIssue(null);
       })
       .catch((err: unknown) => {
         setEvents([]);
-        setIntegrationIssue(classifyGraphError(err));
+        setCalendarIssue(
+          classifyCalendarIssue({ message: err instanceof Error ? err.message : undefined })
+        );
       });
-  }, [monthStart, monthEnd]);
+  }, [viewRange]);
 
   const loadSyncStatus = useCallback(() => {
     calendarService.getSyncStatus().then(setSyncStatus);
   }, []);
 
   const handleSync = useCallback(async () => {
+    if (syncingRef.current) return; // no duplicate concurrent syncs
+    syncingRef.current = true;
     setSyncing(true);
     try {
       const result = await calendarService.syncNow();
-      if (result.ok && result.pulled && result.pulled.imported + result.pulled.updated + result.pulled.removed > 0) {
-        loadEvents();
-      }
-      if (result.error) {
-        setIntegrationIssue(
-          classifyGraphError(new Error(result.error))
+      if (result.ok) {
+        // Successful retry/sync: clear stale calendar error, refresh events.
+        setCalendarIssue(null);
+        if (result.pulled && result.pulled.imported + result.pulled.updated + result.pulled.removed > 0) {
+          loadEvents();
+        }
+      } else if (result.error) {
+        setCalendarIssue(
+          classifyCalendarIssue({ code: result.code, message: result.error })
         );
       }
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
       loadSyncStatus();
     }
@@ -90,11 +103,15 @@ export function CalendarView() {
       .syncNow()
       .then((result) => {
         if (cancelled) return;
-        if (result.ok && result.pulled && result.pulled.imported + result.pulled.updated + result.pulled.removed > 0) {
-          loadEvents();
-        }
-        if (result.error) {
-          setIntegrationIssue(classifyGraphError(new Error(result.error)));
+        if (result.ok) {
+          setCalendarIssue(null);
+          if (result.pulled && result.pulled.imported + result.pulled.updated + result.pulled.removed > 0) {
+            loadEvents();
+          }
+        } else if (result.error) {
+          setCalendarIssue(
+            classifyCalendarIssue({ code: result.code, message: result.error })
+          );
         }
       })
       .finally(() => {
@@ -140,11 +157,20 @@ export function CalendarView() {
 
   return (
     <div className="space-y-4">
-      {integrationIssue && (
+      {calendarIssue && calendarIssue.kind === "connection" && calendarIssue.state && (
         <IntegrationStateBanner
-          status={integrationIssue}
-          onRetry={handleSync}
-          onDismiss={() => setIntegrationIssue(null)}
+          status={buildIntegrationStatus(calendarIssue.state, { detail: calendarIssue.message })}
+          onRetry={() => void handleSync()}
+          onDismiss={() => setCalendarIssue(null)}
+        />
+      )}
+
+      {calendarIssue && calendarIssue.kind !== "connection" && (
+        <IntegrationWarning
+          title={calendarIssue.title}
+          message={calendarIssue.message}
+          action={{ label: "Retry", onClick: () => void handleSync() }}
+          onDismiss={() => setCalendarIssue(null)}
         />
       )}
 

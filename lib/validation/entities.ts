@@ -95,6 +95,9 @@ export const activitySchema = z.object({
   customerId: z.string().optional().nullable(),
   ticketId: z.string().optional().nullable(),
   companyId: z.string().optional().nullable(),
+  contactId: z.string().optional().nullable(),
+  // Microsoft Graph message id for EMAIL activities (unique dedupe key).
+  graphMessageId: z.string().optional().nullable(),
   assigneeId: z.string().optional().nullable(),
   createReminder: z.boolean().optional(),
   reminderDue: z.string().nullable().optional(),

@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Building2, Pencil, Shield, Search, Users } from "lucide-react";
+import { Building2, Pencil, Shield, Search, Users, Activity } from "lucide-react";
 import { useApiList } from "@/hooks/use-api-list";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PLAN_LABELS } from "@/lib/entitlements";
 import type { UIOrganization } from "@/app/api/platform/organizations/route";
 import { PlanOverrideDialog } from "./PlanOverrideDialog";
+import { OrgActivityModal } from "./OrgActivityModal";
 
 const STATUS_STYLES: Record<string, string> = {
   TRIALING: "bg-warning-soft text-[color:var(--warning)]",
@@ -45,6 +46,9 @@ export function OrganizationsList() {
   const [search, setSearch] = useState("");
   const [overrideOrg, setOverrideOrg] = useState<UIOrganization | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [activityOrg, setActivityOrg] = useState<UIOrganization | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityKey, setActivityKey] = useState(0);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -173,17 +177,31 @@ export function OrganizationsList() {
                   <td className="px-4 py-3 text-muted-foreground">{fmtDate(org.createdAt)}</td>
                   <td className="px-4 py-3 text-muted-foreground">{fmtDate(org.lastActiveAt)}</td>
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setOverrideOrg(org);
-                        setDialogOpen(true);
-                      }}
-                    >
-                      <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                      Set plan
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setActivityOrg(org);
+                          setActivityOpen(true);
+                          setActivityKey((k) => k + 1);
+                        }}
+                      >
+                        <Activity className="mr-1.5 h-3.5 w-3.5" />
+                        View Activities
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setOverrideOrg(org);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        Set plan
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -200,6 +218,16 @@ export function OrganizationsList() {
         }}
         org={overrideOrg}
         onApplied={refresh}
+      />
+
+      <OrgActivityModal
+        key={activityKey}
+        open={activityOpen}
+        onClose={() => {
+          setActivityOpen(false);
+          setActivityOrg(null);
+        }}
+        organizationId={activityOrg?.id ?? ""}
       />
     </div>
   );

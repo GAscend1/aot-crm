@@ -150,6 +150,95 @@ export function classifyTeamsError(err: unknown): IntegrationStatus {
   return teams("GRAPH_UNAVAILABLE", "Unable to load/create Teams meetings.", "retry");
 }
 
+export type CalendarIssueKind = "connection" | "throttled" | "calendar";
+
+export interface CalendarIssue {
+  /**
+   * "connection" — auth/session problem; the global integration banner is
+   * legitimate (Reconnect).
+   * "throttled" / "calendar" — the calendar request itself failed; this is a
+   * calendar-sync issue, NOT a Microsoft 365 outage.
+   */
+  kind: CalendarIssueKind;
+  /** Set when kind === "connection": maps 1:1 to the global banner states. */
+  state?: "SIGN_IN_REQUIRED" | "RECONSENT_REQUIRED" | "TOKEN_EXPIRED";
+  title: string;
+  message: string;
+  code?: string;
+}
+
+/**
+ * Classify a calendar failure into a calendar-specific issue vs. a genuine
+ * connection problem. A single failed calendar request (e.g. an oversized
+ * range, a throttled call) must NEVER surface as "Microsoft 365 unavailable" —
+ * Graph may be perfectly connected, as proven by a concurrent successful sync.
+ * Only auth/session failures map to the global connection banner.
+ */
+export function classifyCalendarIssue(opts: {
+  code?: string | null;
+  status?: number | null;
+  message?: string | null;
+}): CalendarIssue {
+  const code = opts.code ?? undefined;
+  const status = opts.status ?? undefined;
+  const message = opts.message ?? "";
+
+  const connection = (
+    state: NonNullable<CalendarIssue["state"]>,
+    title: string,
+    msg: string,
+  ): CalendarIssue => ({ kind: "connection", state, title, message: msg, code });
+
+  if (code === "no_token" || code === "no_stored_token" || code === "refresh_failed") {
+    return connection(
+      "SIGN_IN_REQUIRED",
+      "Sign in required",
+      "Sign in with Microsoft Entra ID to sync your calendar with Microsoft 365.",
+    );
+  }
+  if (status === 401) {
+    return connection(
+      "TOKEN_EXPIRED",
+      "Session expired",
+      "Your Microsoft 365 session expired and could not be refreshed. Sign in again to resume calendar sync.",
+    );
+  }
+  if (status === 403) {
+    return connection(
+      "RECONSENT_REQUIRED",
+      "Consent required",
+      "Your Microsoft 365 connection needs consent again. Reconnect to resume calendar sync.",
+    );
+  }
+  if (status === 429) {
+    return {
+      kind: "throttled",
+      title: "Calendar sync is rate-limited",
+      message: "Microsoft is throttling calendar requests. Wait a moment and try again.",
+      code,
+    };
+  }
+
+  // A rejected/bad request (e.g. oversized range) is a calendar-request issue.
+  if (code?.startsWith("invalid_calendar_range") || /1825|allowed range|greater than the allowed range/i.test(message)) {
+    return {
+      kind: "calendar",
+      title: "Calendar sync issue",
+      message:
+        "The requested date range exceeds Microsoft's calendar limit. The CRM now bounds sync windows automatically — try again.",
+      code,
+    };
+  }
+
+  // Everything else is a calendar-request failure — never a global outage.
+  return {
+    kind: "calendar",
+    title: "Calendar sync issue",
+    message: message || "This calendar sync could not be completed. The rest of Microsoft 365 keeps working.",
+    code,
+  };
+}
+
 /**
  * True when a thrown error represents an integration that is simply not
  * configured/enabled (e.g. Zoom's 503 "not enabled" response). UIs show the

@@ -127,6 +127,8 @@ export async function POST(request: NextRequest) {
       customer: parsed.customerId ? { connect: { id: parsed.customerId } } : undefined,
       ticket: parsed.ticketId ? { connect: { id: parsed.ticketId } } : undefined,
       company: parsed.companyId ? { connect: { id: parsed.companyId } } : undefined,
+      contact: parsed.contactId ? { connect: { id: parsed.contactId } } : undefined,
+      graphMessageId: parsed.graphMessageId || undefined,
     };
 
     const created = await prisma.activity.create({

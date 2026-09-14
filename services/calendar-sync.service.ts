@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { graphFetch, GraphServerError } from "./graph-server";
+import { calendarSyncWindow } from "@/lib/calendar-range";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -177,9 +178,23 @@ async function applyGraphEvents(
   accessToken: string,
   deltaLink: string | null,
 ): Promise<{ imported: number; updated: number; removed: number; nextDeltaLink: string }> {
+  // Initial full pull uses the bounded CRM sync window (past 90 days → next
+  // 365 days = 455 days) — never an unbounded sentinel. Microsoft Graph rejects
+  // /me/calendarview ranges longer than 1825 days, and a giant sentinel range
+  // used to make every first sync fail.
+  const syncWindow = calendarSyncWindow();
   let url: string | null =
     deltaLink ??
-    "/me/calendarview?startDateTime=2000-01-01T00:00:00Z&endDateTime=2100-01-01T00:00:00Z&$select=id,changeKey,subject,body,start,end,location,attendees,organizer,isAllDay,isOnlineMeeting,onlineMeeting,showAs,categories,isReminderOn,reminderMinutesBeforeStart";
+    `/me/calendarview?startDateTime=${encodeURIComponent(syncWindow.start.toISOString())}&endDateTime=${encodeURIComponent(syncWindow.end.toISOString())}&$select=id,changeKey,subject,body,start,end,location,attendees,organizer,isAllDay,isOnlineMeeting,onlineMeeting,showAs,categories,isReminderOn,reminderMinutesBeforeStart`;
+
+  // Safe diagnostics: never log tokens — only the requested range length.
+  if (!deltaLink) {
+    const days = Math.round((syncWindow.end.getTime() - syncWindow.start.getTime()) / 86_400_000);
+    console.debug(
+      "[calendar-sync] full pull range",
+      JSON.stringify({ start: syncWindow.start.toISOString(), end: syncWindow.end.toISOString(), days }),
+    );
+  }
 
   let imported = 0;
   let updated = 0;
@@ -308,9 +323,12 @@ export async function pullCalendarDelta(
 
     return { ...result, lastSyncAt };
   } catch (err) {
-    // 410 Gone (or malformed delta) means the delta cursor expired — clear it
-    // and fall back to one full resync so sync recovers without manual help.
-    if (err instanceof GraphServerError && (err.status === 410 || err.status === 400)) {
+    // 410 Gone is Microsoft's documented signal that the delta cursor expired
+    // — clear it and fall back to one bounded full resync so sync recovers
+    // without manual help. 400s (e.g. an invalid request) are NOT treated as
+    // cursor expiry; a 400 previously caused an endless full-resync loop for
+    // the oversized-range request.
+    if (err instanceof GraphServerError && err.status === 410) {
       try {
         await prisma.calendarDeltaState.deleteMany({ where: { userId } });
         const result = await applyGraphEvents(userId, user.organizationId, accessToken, null);

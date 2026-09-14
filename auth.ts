@@ -4,6 +4,7 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { clearGraphRefreshToken, persistGraphRefreshToken } from "@/lib/server/graph-tokens";
 import { extractTenantId, msIssuer, msTokenUrl } from "@/lib/server/ms-auth";
 import { isAotPlatformTenantId } from "@/lib/server/platform-tenant";
+import { secureCookiesEnabled } from "@/lib/server/auth-env";
 
 declare module "next-auth/jwt" {
   interface JWT {
@@ -38,6 +39,26 @@ declare module "next-auth" {
 export const AUTHORIZATION_ERROR = "admin_consent_required";
 
 /**
+ * Explicit proxy/trust + cookie policy for the Azure App Service.
+ *
+ * - trustHost: Auth.js only trusts the Host / x-forwarded-* headers when a
+ *   public base URL is configured; we make that explicit so callback origin
+ *   generation never silently depends on per-instance env state.
+ * - useSecureCookies: locks the `__Secure-`/`__Host-` cookie names for the
+ *   whole deployment. Auth.js otherwise derives them per request from the
+ *   observed scheme (x-forwarded-proto), which can flip mid-OAuth-flow behind
+ *   the App Service and leave the PKCE verifier / state cookies unreadable on
+ *   the callback.
+ */
+const trustHost = Boolean(
+  process.env.AUTH_URL ||
+    process.env.NEXTAUTH_URL ||
+    process.env.AUTH_TRUST_HOST ||
+    process.env.NODE_ENV !== "production",
+);
+const useSecureCookies = secureCookiesEnabled();
+
+/**
  * Microsoft-only authentication.
  *
  * The Entra App Registration is multi-tenant: work/school accounts from ANY
@@ -69,6 +90,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
 
   secret: process.env.AUTH_SECRET,
+
+  // Deterministic proxy + cookie policy (see the consts above).
+  trustHost,
+  useSecureCookies,
 
   session: {
     strategy: "jwt",

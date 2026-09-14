@@ -78,8 +78,23 @@ function resolveUrl(path: string, options?: RequestInit): string {
     return `${INTEGRATIONS_ROOT}/calendar/events/${eventsIdMatch[1]}`;
   }
 
+  const sendMatch = path.match(/^\/me\/messages\/([^/]+)\/send$/);
+  if (sendMatch && method === "POST") {
+    return `${INTEGRATIONS_ROOT}/mail/${sendMatch[1]}/send`;
+  }
+
+  const attachmentsMatch = path.match(/^\/me\/messages\/([^/]+)\/attachments$/);
+  if (attachmentsMatch && method === "GET") {
+    return `${INTEGRATIONS_ROOT}/mail/${attachmentsMatch[1]}/attachments`;
+  }
+
+  const attachmentContentMatch = path.match(/^\/me\/messages\/([^/]+)\/attachments\/([^/]+)\/\$value$/);
+  if (attachmentContentMatch && method === "GET") {
+    return `${INTEGRATIONS_ROOT}/mail/${attachmentContentMatch[1]}/attachments/${attachmentContentMatch[2]}/content`;
+  }
+
   const messagesMatch = path.match(/^\/me\/messages\/([^/]+)$/);
-  if (messagesMatch && (method === "GET" || method === "DELETE")) {
+  if (messagesMatch && (method === "GET" || method === "PATCH" || method === "DELETE")) {
     return `${INTEGRATIONS_ROOT}/mail/${messagesMatch[1]}`;
   }
 
